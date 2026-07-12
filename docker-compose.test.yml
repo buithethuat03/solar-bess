@@ -1,0 +1,80 @@
+services:
+  postgres-test:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: solar_bess_test
+      POSTGRES_USER: solar_bess_test
+      POSTGRES_PASSWORD: solar_bess_test
+    ports:
+      - "127.0.0.1:5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U solar_bess_test -d solar_bess_test"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+  redis-test:
+    image: redis:8-alpine
+    user: redis
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        umask 077
+        {
+          printf 'bind 0.0.0.0\n'
+          printf 'protected-mode yes\n'
+          printf 'requirepass %s\n' "$$(cat /run/secrets/redis_test_password)"
+          printf 'appendonly no\n'
+          printf 'save ""\n'
+          printf 'maxmemory-policy noeviction\n'
+        } > /tmp/redis.conf
+        exec redis-server /tmp/redis.conf
+    secrets:
+      - redis_test_password
+    ports:
+      - "127.0.0.1:6380:6379"
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$(cat /run/secrets/redis_test_password)\" redis-cli ping | grep -q PONG"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+  worker-test:
+    profiles: ["worker"]
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    environment:
+      NODE_ENV: test
+      WORKER_DATABASE_URL_FILE: /run/secrets/database_url_test
+      WORKER_DATABASE_HOST_OVERRIDE: postgres-test
+      WORKER_DATABASE_PORT_OVERRIDE: 5432
+      WORKER_REDIS_PASSWORD_FILE: /run/secrets/redis_test_password
+      WORKER_REDIS_HOST: redis-test
+      WORKER_REDIS_PORT: 6379
+      WORKER_QUEUE_NAME: domain-events-test
+      WORKER_DLQ_NAME: domain-events-test-dlq
+      WORKER_QUEUE_PREFIX: solar-bess-test
+      WORKER_CONSUMER_NAME: foundation-event-ledger-test-v1
+      WORKER_HEALTH_PORT: 3001
+    secrets:
+      - database_url_test
+      - redis_test_password
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "apps/worker/dist/healthcheck.js"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+    stop_grace_period: 40s
+
+secrets:
+  database_url_test:
+    file: ${WORKER_TEST_SECRETS_DIR:-/tmp/solar-bess-worker-test-secrets}/database_url
+  redis_test_password:
+    file: ${WORKER_TEST_SECRETS_DIR:-/tmp/solar-bess-worker-test-secrets}/redis_password

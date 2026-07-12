@@ -1,0 +1,56 @@
+{
+  "name": "solar-bess-web",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "npm run test:unit --workspaces --if-present",
+    "test:integration": "npm run test:integration --workspace=@solar-bess/api && npm run test:integration --workspace=@solar-bess/worker",
+    "test:e2e": "playwright test",
+    "openapi:lint": "redocly lint docs/openapi/openapi.yaml",
+    "migration:run": "npm run migration:run --workspace=@solar-bess/api",
+    "migration:revert": "npm run migration:revert --workspace=@solar-bess/api",
+    "migration:show": "npm run migration:show --workspace=@solar-bess/api",
+    "migration:generate": "npm run migration:generate --workspace=@solar-bess/api --",
+    "migration:create": "npm run migration:create --workspace=@solar-bess/api --",
+    "db:bootstrap": "npm run bootstrap --workspace=@solar-bess/api",
+    "cipher:encrypt": "npm run cipher:encrypt --workspace=@solar-bess/api",
+    "env:encrypt": "npm run env:encrypt --workspace=@solar-bess/api",
+    "secrets:materialize": "npm run secrets:materialize --workspace=@solar-bess/api",
+    "worker:start": "npm run start --workspace=@solar-bess/worker",
+    "worker:start:dev": "npm run start:dev --workspace=@solar-bess/worker",
+    "worker:test:secrets": "npm run test:secrets --workspace=@solar-bess/worker",
+    "worker:outbox:replay": "npm run outbox:replay --workspace=@solar-bess/worker --"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1",
+    "@redocly/cli": "2.38.0",
+    "@typescript-eslint/eslint-plugin": "8.48.1",
+    "@typescript-eslint/parser": "8.48.1",
+    "eslint": "9.39.5",
+    "eslint-plugin-vue": "10.7.0",
+    "globals": "16.5.0",
+    "typescript": "5.9.3"
+  },
+  "engines": {
+    "node": ">=24.0.0",
+    "npm": ">=11.0.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true,
+    "esbuild@0.25.12": true,
+    "argon2@0.44.0": true,
+    "protobufjs@7.6.5": true,
+    "vue-demi@0.14.10": true,
+    "msgpackr-extract@3.0.4": false,
+    "@scarf/scarf": false,
+    "core-js": false
+  }
+}

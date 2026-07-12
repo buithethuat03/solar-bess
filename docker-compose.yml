@@ -1,0 +1,193 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER_FILE: /run/secrets/postgres_user
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_user
+      - postgres_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$(cat /run/secrets/postgres_user)\" -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [app]
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    user: redis
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        umask 077
+        {
+          printf 'bind 0.0.0.0\n'
+          printf 'protected-mode yes\n'
+          printf 'requirepass %s\n' "$$(cat /run/secrets/redis_password)"
+          printf 'appendonly yes\n'
+          printf 'appendfsync everysec\n'
+          printf 'maxmemory-policy noeviction\n'
+        } > /tmp/redis.conf
+        exec redis-server /tmp/redis.conf
+    secrets:
+      - redis_password
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$(cat /run/secrets/redis_password)\" redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [app]
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      CIPHER_KEY: ${CIPHER_KEY}
+      APP_PORT: ${APP_PORT:-3000}
+      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_HOST_OVERRIDE: postgres
+      REDIS_HOST: redis
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REDIS_DATABASE: ${REDIS_DATABASE:-0}
+      REDIS_CONNECT_TIMEOUT_MS: ${REDIS_CONNECT_TIMEOUT_MS:-2000}
+      REDIS_KEY_PREFIX: ${REDIS_KEY_PREFIX:-solar-bess}
+      RATE_LIMIT_HASH_SECRET: ${RATE_LIMIT_HASH_SECRET}
+      TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-1}
+      COMMAND_RECEIPT_RETENTION_HOURS: ${COMMAND_RECEIPT_RETENTION_HOURS:-24}
+      SCHEDULE_NEAR_CRITICAL_FLOAT_DAYS: ${SCHEDULE_NEAR_CRITICAL_FLOAT_DAYS:-5}
+      SCHEDULE_DEFAULT_LOOKAHEAD_DAYS: ${SCHEDULE_DEFAULT_LOOKAHEAD_DAYS:-21}
+      SCHEDULE_IMPORT_MAX_ROWS: ${SCHEDULE_IMPORT_MAX_ROWS:-5000}
+      SCHEDULE_MAX_ABS_LAG_DAYS: ${SCHEDULE_MAX_ABS_LAG_DAYS:-3650}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_ISSUER: ${JWT_ISSUER}
+      JWT_AUDIENCE: ${JWT_AUDIENCE}
+      JWT_ACCESS_TTL_SECONDS: ${JWT_ACCESS_TTL_SECONDS:-900}
+      JWT_REFRESH_TTL_SECONDS: ${JWT_REFRESH_TTL_SECONDS:-604800}
+      AUTH_RATE_LIMIT_MAX_ATTEMPTS: ${AUTH_RATE_LIMIT_MAX_ATTEMPTS:-5}
+      AUTH_RATE_LIMIT_WINDOW_SECONDS: ${AUTH_RATE_LIMIT_WINDOW_SECONDS:-60}
+      ARGON2_MEMORY_COST: ${ARGON2_MEMORY_COST:-19456}
+      ARGON2_TIME_COST: ${ARGON2_TIME_COST:-2}
+      ARGON2_PARALLELISM: ${ARGON2_PARALLELISM:-1}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      COOKIE_NAME: ${COOKIE_NAME:-refresh_token}
+      COOKIE_PATH: ${COOKIE_PATH:-/v1/auth}
+      COOKIE_SAME_SITE: ${COOKIE_SAME_SITE:-lax}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:'+(process.env.APP_PORT||'3000')+'/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 15
+    networks: [app]
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      WORKER_DATABASE_URL_FILE: /run/secrets/database_url
+      WORKER_DATABASE_HOST_OVERRIDE: postgres
+      WORKER_REDIS_PASSWORD_FILE: /run/secrets/redis_password
+      WORKER_REDIS_HOST: redis
+      WORKER_REDIS_PORT: ${REDIS_PORT:-6379}
+      WORKER_REDIS_DATABASE: ${REDIS_DATABASE:-0}
+      WORKER_REDIS_CONNECT_TIMEOUT_MS: ${REDIS_CONNECT_TIMEOUT_MS:-2000}
+      WORKER_QUEUE_NAME: ${WORKER_QUEUE_NAME:-domain-events}
+      WORKER_DLQ_NAME: ${WORKER_DLQ_NAME:-domain-events-dlq}
+      WORKER_QUEUE_PREFIX: ${WORKER_QUEUE_PREFIX:-solar-bess}
+      WORKER_CONSUMER_NAME: ${WORKER_CONSUMER_NAME:-foundation-event-ledger-v1}
+      WORKER_HANDLER_VERSION: ${WORKER_HANDLER_VERSION:-1.0.0}
+      WORKER_CONSUMER_ATTEMPTS: ${WORKER_CONSUMER_ATTEMPTS:-5}
+      WORKER_CONSUMER_BACKOFF_MS: ${WORKER_CONSUMER_BACKOFF_MS:-1000}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
+      WORKER_JOB_LOCK_MS: ${WORKER_JOB_LOCK_MS:-30000}
+      WORKER_CONSUMPTION_LEASE_MS: ${WORKER_CONSUMPTION_LEASE_MS:-60000}
+      WORKER_DATABASE_POOL_SIZE: ${WORKER_DATABASE_POOL_SIZE:-5}
+      WORKER_DATABASE_CONNECT_TIMEOUT_MS: ${WORKER_DATABASE_CONNECT_TIMEOUT_MS:-3000}
+      WORKER_DATABASE_QUERY_TIMEOUT_MS: ${WORKER_DATABASE_QUERY_TIMEOUT_MS:-10000}
+      OUTBOX_POLL_INTERVAL_MS: ${OUTBOX_POLL_INTERVAL_MS:-1000}
+      OUTBOX_BATCH_SIZE: ${OUTBOX_BATCH_SIZE:-25}
+      OUTBOX_LEASE_MS: ${OUTBOX_LEASE_MS:-30000}
+      OUTBOX_MAX_ATTEMPTS: ${OUTBOX_MAX_ATTEMPTS:-10}
+      OUTBOX_RETRY_BACKOFF_MS: ${OUTBOX_RETRY_BACKOFF_MS:-2000}
+      OUTBOX_PUBLISH_TIMEOUT_MS: ${OUTBOX_PUBLISH_TIMEOUT_MS:-5000}
+      SCHEDULE_NEAR_CRITICAL_FLOAT_DAYS: ${SCHEDULE_NEAR_CRITICAL_FLOAT_DAYS:-5}
+      SCHEDULE_ALERT_SCAN_INTERVAL_MS: ${SCHEDULE_ALERT_SCAN_INTERVAL_MS:-60000}
+      SCHEDULE_THRESHOLD_VERSION: ${SCHEDULE_THRESHOLD_VERSION:-SCHEDULE_THRESHOLDS_V1}
+      WORKER_HEALTH_PORT: ${WORKER_HEALTH_PORT:-3001}
+      WORKER_SHUTDOWN_TIMEOUT_MS: ${WORKER_SHUTDOWN_TIMEOUT_MS:-30000}
+    secrets:
+      - database_url
+      - redis_password
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "apps/worker/dist/healthcheck.js"]
+      interval: 10s
+      timeout: 4s
+      retries: 20
+      start_period: 10s
+    stop_grace_period: 40s
+    networks: [app]
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      api:
+        condition: service_healthy
+      worker:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/web-health"]
+      interval: 10s
+      timeout: 3s
+      retries: 15
+    networks: [app]
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  app:
+    driver: bridge
+
+secrets:
+  postgres_user:
+    file: ${RUNTIME_SECRETS_DIR:-/tmp/solar-bess-secrets}/postgres_user
+  postgres_password:
+    file: ${RUNTIME_SECRETS_DIR:-/tmp/solar-bess-secrets}/postgres_password
+  database_url:
+    file: ${RUNTIME_SECRETS_DIR:-/tmp/solar-bess-secrets}/database_url
+  redis_password:
+    file: ${RUNTIME_SECRETS_DIR:-/tmp/solar-bess-secrets}/redis_password

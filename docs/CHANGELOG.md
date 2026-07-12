@@ -1,0 +1,190 @@
+# Changelog tài liệu và phạm vi
+
+File này ghi lịch sử thay đổi phạm vi, tài liệu và governance của dự án. Không sửa hoặc xóa entry đã phát hành; nếu cần, thêm entry đính chính mới.
+
+## Mẫu entry
+
+```markdown
+## YYYY-MM-DD — <Tiêu đề thay đổi>
+
+- **Loại:** Scope | Requirement | Architecture | Data | API | Security | Governance | Documentation
+- **Người yêu cầu/phê duyệt:** TBD
+- **Mã bị ảnh hưởng:** BR-... / FR-... / Source Feature ID / Không áp dụng
+- **Trước thay đổi:** ...
+- **Sau thay đổi:** ...
+- **Lý do:** ...
+- **Artefact bị ảnh hưởng:** ...
+- **Migration/tương thích:** ...
+- **Trạng thái:** Proposed | Approved | Rejected | Implemented
+```
+
+## 2026-07-12 — Hoàn tất canonical documentation gate cho US-004 Risk, Issue và Change
+
+- **Loại:** Requirement; Architecture; Data; API; Security; UX; Workflow; Test; Documentation; không thay đổi phạm vi nghiệp vụ baseline.
+- **Người yêu cầu/phê duyệt:** Người dùng/Product Owner trao quyền quyết định và yêu cầu thực hiện liên tục ngày 2026-07-11/12; Codex chốt EC2 test profile theo delegated authority.
+- **Mã bị ảnh hưởng:** `BR-022`, `BR-031`, `BR-032`, `FR-098…FR-105`, `UC-004`, `US-004`, `AC-014…AC-017`, `WF-015`, `WF-021`, `DB-020`, `DB-065…DB-068`, `DB-098`, `DB-102…DB-105`; cấp mới `DB-112`; concretize `API-038`, cấp mới `API-143…API-159`; `SEC-105…SEC-111`, `SEC-114`, `SEC-118`, `SEC-119`, `TEST-012`, `TEST-014…TEST-017` và mapped NFR/security tests.
+- **Trước thay đổi:** API-038 dùng GenericCommand/Envelope; DB-065…068 chỉ logical dictionary; Risk/Issue/action/closure/change approval/rebaseline contract chưa decision-complete.
+- **Sau thay đổi:** Risk, Issue, ChangeRequest là aggregate riêng; DB-112 sở hữu action; 1…5 exposure/env threshold, numeric(19,4), nullable package scope/exact-package ABAC, closure/change SoD, immutable approved impact, worker notification, Vue/Command Center và public ApprovedChangeReader→rebaseline được concretize. Claim DB-068/FR-103 và external FR-105 adapters giữ dependency rõ, không bị claim Implemented.
+- **Lý do:** Đạt cổng tài liệu trước production implementation US-004 và mở khóa positive AC-012 mà không phá module boundary hoặc dùng UUID/free text giả approval.
+- **Artefact bị ảnh hưởng:** SRS/Domain/Architecture/Data/API/OpenAPI/Security/UX/Workflow/Backlog/Test/Trace/Decision/INDEX, ExecPlan US-003/004; source/migration/frontend/worker sẽ thay đổi từ milestone implementation sau gate.
+- **Migration/tương thích:** API-038 chưa có implementation/consumer nên concretize trước release; API-143…159 additive. Migration mới phải giữ composite tenant/project/package FK, DB-020→DB-067 provenance, approved immutability và DB-105 schedule regression; rollback không được drop committed source/approval history.
+- **Validation:** OpenAPI lint/unique ID/link/trace/baseline checksum chạy tại M0 exit; không ghi test implementation Pass trong entry gate này.
+- **Trạng thái:** Approved/Build-ready cho EC2 test; implementation chưa bắt đầu tại thời điểm gate.
+
+## 2026-07-12 — Triển khai core US-003 Project Controls và cấp API-141 progress history
+
+- **Loại:** Architecture; Data; API; Security; Frontend; Test; Deployment; Documentation; không thay đổi phạm vi nghiệp vụ baseline.
+- **Người yêu cầu/phê duyệt:** Người dùng/Product Owner yêu cầu thực hiện liên tục và deploy EC2 test; Codex thực hiện theo delegated authority ngày 2026-07-12.
+- **Mã bị ảnh hưởng:** `BR-018`, `BR-032`, `FR-016…FR-021`, `UC-003`, `US-003`, `AC-010…AC-013`, `WF-003`, `DB-012`, `DB-017…DB-021`, `DB-098`, `DB-101…DB-105`, `API-023`, `API-024`, `API-034…API-037`, `API-140`; cấp mới `API-141`, `API-142`; `SEC-105…SEC-111`, `SEC-118`, `SEC-119`, `TEST-010…TEST-013`, `TEST-185`, `TEST-187`, `TEST-189`, `TEST-190`, `TEST-193…TEST-196`.
+- **Trước thay đổi:** US-003 mới Approved/Build-ready; chưa có physical schedule aggregate, API/controller, worker alert, Schedule UI hoặc progress-history query dùng được.
+- **Sau thay đổi:** Có TypeORM entity/migration Package/Schedule/WBS/Activity/Dependency/Baseline/Progress/Notification; pure calendar/CPM/SPI/progress projector; PACKAGE ABAC/SoD/audit/outbox; draft preview/commit; initial baseline; append-only progress/correction; worker alert; Vue Schedule và Dashboard alert lane. `API-141` cung cấp history có cursor/scope để UI chọn stable correction target; `API-142` xuất authorized look-ahead CSV, neutralize spreadsheet formula và audit. Core được deploy EC2 test; positive rebaseline vẫn bị chặn đúng bởi `US-004/DB-067`.
+- **Lý do:** Hiện thực hóa vertical slice đã được phê duyệt và đóng usability/security gap nhập UUID correction thủ công.
+- **Artefact bị ảnh hưởng:** `apps/api`, `apps/worker`, `apps/web`, `tests/e2e`, Compose, OpenAPI, API/Trace/INDEX/Changelog và ExecPlan US-003.
+- **Migration/tương thích:** Migration `1783730000000-CreateProjectControls` đã chạy idempotent; API-141 là additive. Hai action URL dấu `:` được escape cho Nest 11/path-to-regexp nhưng public URL không đổi. Approved baseline/progress history không bị drop khi rollback.
+- **Validation:** Build toàn workspace pass; API unit 47/47, Web unit 32/32, Worker unit 21/21; lint/type/OpenAPI pass. Core Compose PostgreSQL/Redis/API/worker/web healthy và public root/login/health HTTP 200; Dashboard/API-142 source mới hơn đã build/test cục bộ nhưng latest image redeploy còn pending. PostgreSQL integration/Playwright final rerun còn pending do approval network sandbox, vì vậy không tuyên bố `TEST-010…013` hoặc US-003 full Pass.
+- **Trạng thái:** Core Implemented và deployed EC2 test; full story In Progress.
+
+## 2026-07-12 — Hoàn tất canonical documentation gate cho US-003 Project Controls
+
+- **Loại:** Requirement; Data; API; Security; UX; Workflow; Test; Documentation; không mở rộng baseline.
+- **Người yêu cầu/phê duyệt:** Người dùng/Product Owner trao quyền quyết định và yêu cầu thực hiện liên tục ngày 2026-07-11; Codex đóng M0 theo delegated authority.
+- **Mã bị ảnh hưởng:** `BR-018`, `BR-032`, `FR-016…FR-021`, `UC-003`, `US-003`, `AC-010…AC-013`, `WF-003`, `DB-012`, `DB-017…DB-021`, `DB-101`, schedule-alert subset `DB-105`, `API-023`, `API-024`, `API-034…API-037`; cấp mới `API-140`; `SEC-105…SEC-111`, `SEC-118`, `SEC-119`, `TEST-010…TEST-013`, `TEST-185`, `TEST-187`, `TEST-189`, `TEST-190`, `TEST-193…TEST-196`.
+- **Trước thay đổi:** US-003 có ExecPlan nhưng canonical data/API/workflow/SoD/calculation/import schema còn chưa đồng bộ; API baseline decision chưa có stable ID; implementation bị chặn ở M0.
+- **Sau thay đổi:** Cụ thể hóa calendar/day-level CPM, weight/progress/SPI, Package/Schedule/WBS/Activity/Dependency/Baseline/Progress/alert projection, API request/response, PREVIEW/COMMIT, append-only correction, baseline state/independent approval và `API-140`. US-003 M1/M2 được phép triển khai; positive rebaseline vẫn phụ thuộc approved `US-004/DB-067`, full alert delivery phụ thuộc operational worker/`DB-102…105`.
+- **Lý do:** Đạt cổng tài liệu trước production code và giữ direct/dependency trace chính xác.
+- **Artefact bị ảnh hưởng:** Data/API/OpenAPI/Security/UX/Workflow/Backlog/Test/Trace/Decision/INDEX và `.agent/execplans/2026-07-11-project-controls-us003.md`.
+- **Migration/tương thích:** Chưa tạo schema trong entry này. Migration US-003 phải có `down`, composite tenant/project FK, snapshot/history immutability và up/down/up evidence. API mới giữ planned status đến khi implementation/test pass.
+- **Trạng thái:** Approved/Build-ready; implementation In Progress, chưa tuyên bố `US-003` hoặc `TEST-010…013` Pass.
+
+## 2026-07-11 — Phê duyệt roadmap phụ thuộc và operational foundation cho EC2 test
+
+- **Loại:** Architecture; Data; Security; DevOps; Documentation; không thay đổi phạm vi nghiệp vụ baseline.
+- **Người yêu cầu/phê duyệt:** Người dùng/Product Owner trao quyền quyết định và yêu cầu thực hiện liên tục ngày 2026-07-11; Codex chốt implementation profile trong phạm vi được ủy quyền.
+- **Mã bị ảnh hưởng:** `ADR-001`, `ADR-002`, `ADR-004`, `ADR-006`, `NFR-006`, `NFR-007`, `NFR-012`, `NFR-020`, `NFR-021`, `NFR-023`, `NFR-024`, `SEC-103`, `SEC-105…SEC-111`, `SEC-118`, `SEC-122`, `SEC-124`, `SEC-125`, `TEST-180`, `TEST-200`, `TEST-202…TEST-208`, `TEST-231`; cấp mới/reserve `DB-101…DB-111`.
+- **Trước thay đổi:** PostgreSQL/API/web đã chạy nhưng chưa có Redis, BullMQ, worker, transactional outbox, generic command receipt hoặc database composite FK chống liên kết xuyên tenant; ADR vẫn ghi runtime/broker vật lý là TBD. Thứ tự backlog chưa phản ánh dependency và có thể khiến Command Center dùng dữ liệu nguồn chưa tồn tại.
+- **Sau thay đổi:** Chấp nhận riêng cho EC2 test profile PostgreSQL 17 + Redis + BullMQ + worker/outbox; business/audit/outbox phải atomic, consumer idempotent, command có request hash, login rate limit dùng Redis fail-closed và FK dùng tenant composite key. Chốt roadmap theo dependency; `US-003/004` và các source domain được làm trước khi đóng `US-002`. Production ADR/topology/HA/SLO vẫn Proposed.
+- **Lý do:** Ngăn pattern thiếu atomicity/tenant enforcement lan sang các module tiếp theo và bảo đảm feature chỉ được tuyên bố hoàn tất khi có dữ liệu/side effect kiểm chứng thật.
+- **Artefact bị ảnh hưởng:** `.agent/execplans/2026-07-11-platform-delivery-program.md`, `.agent/execplans/2026-07-11-operational-foundation.md`, Architecture/Data/Test/DevOps/Trace/Decisions/INDEX; source/migration/Compose sẽ được tạo trong milestone implementation kế tiếp.
+- **Migration/tương thích:** Migration mới phải expand/validate composite FK, tạo `DB-102…104` và có `down`; `DB-101`, `DB-105…111` chỉ reserve cho đúng slice, không tạo table trong operational milestone. Test DB synthetic có thể reset; production data không được tự sửa tenant khi validation fail.
+- **Trạng thái:** Approved cho EC2 test; implementation In Progress. External provider/live-data acceptance và production profile vẫn chưa được phê duyệt.
+
+## 2026-07-11 — Phê duyệt implementation slice US-001 Project Master
+
+- **Loại:** Scope; Requirement; Data; API; Security; Workflow; Deployment.
+- **Người yêu cầu/phê duyệt:** Người dùng/Product Owner xác nhận trực tiếp ngày 2026-07-11.
+- **Mã bị ảnh hưởng:** `BR-001`, `BR-031`, `BR-033`, `FR-010…FR-025`, `US-001`, `AC-001…AC-004`, `WF-001`, `DB-001…DB-013`, `API-003…API-007`, `API-015…API-025`, `SEC-105…SEC-111`, `SEC-118`, `TEST-001…TEST-004`, `TEST-202…TEST-208`.
+- **Trước thay đổi:** US-001 và tenant/org/project lifecycle/role catalog còn Draft/Open Question; production implementation ngoài auth chưa được phép.
+- **Sau thay đổi:** US-001 là vertical slice đầu tiên được duyệt; chốt Tenant là customer/group boundary, Company 0..n Legal Entity, project code unique tenant, Project 1..n Site, type/phase/status catalog, archive-only và initial extensible roles. Test DB được phép reset/seed.
+- **Lý do:** Product Owner yêu cầu bắt đầu hoàn thiện tính năng theo backlog sau khi base ổn định.
+- **Artefact bị ảnh hưởng:** Data/API/OpenAPI/Security/Workflow/Backlog/Test/Trace/Open Questions/DevOps, ExecPlan và application source.
+- **Migration/tương thích:** Migration mới phải có rollback; EC2 test không có dữ liệu cần giữ. Không áp dụng quyền reset này cho production.
+- **Trạng thái:** Approved; implementation In Progress.
+
+## 2026-07-11 — Hoàn tất và deploy US-001 Project Master
+
+- **Loại:** Architecture; Data; API; Security; Frontend; Test; Deployment; Documentation.
+- **Người yêu cầu/phê duyệt:** Người dùng/Product Owner yêu cầu tiếp tục đến khi hoàn tất ngày 2026-07-11.
+- **Mã bị ảnh hưởng:** `BR-001`, `BR-031`, `BR-033`, `FR-010…FR-025`, `US-001`, `AC-001…AC-004`, `WF-001`, `DB-002/003/006/007/009…011/013/098`, `API-003…007`, `API-015…022`, `API-025`, `SEC-105…111/118`, `TEST-001…004`, `TEST-202…208`.
+- **Trước thay đổi:** US-001 Approved/In Progress; EC2 chỉ có base/auth và frontend structure, chưa có Project Master end-to-end.
+- **Sau thay đổi:** Có TypeORM entities/migration/rollback/seed; PostgreSQL-backed RBAC scope; organization/portfolio/project/site/party API; Vue list/create/detail/edit/activate/archive/Site/party UI; public EC2 deployment.
+- **Lý do:** Hoàn thiện vertical slice nghiệp vụ đầu tiên theo backlog và quyết định Product Owner.
+- **Artefact bị ảnh hưởng:** `apps/api`, `apps/web`, `tests/e2e`, Compose/API image, OpenAPI, Architecture/Data/API/Security/Workflow/Backlog/Test/DevOps/Trace/INDEX và ExecPlan.
+- **Migration/tương thích:** Migration `1783728000000-CreateProjectMaster` có `down` và đã pass `up → down → up`; API container chạy pending migration trước HTTP. E2E credential là fixture tạm, đã xóa sau test. Không có OT/BESS control path.
+- **Validation:** Root/API/Web lint zero warning; API type/build/unit 15/15; Web type/build/unit 19/19; integration 13/13; OpenAPI valid; Playwright final 3/3; public health/database OK và HTTP 200. Blank-screen do top-level-await/lazy-route deadlock được phát hiện, sửa và regression pass.
+- **Trạng thái:** Implemented và deployed tại EC2 test.
+
+## 2026-07-11 — Thiết lập governance repository
+
+- **Loại:** Governance và Documentation.
+- **Người yêu cầu/phê duyệt:** Người dùng repository.
+- **Mã bị ảnh hưởng:** Không áp dụng; không thay đổi requirement nghiệp vụ.
+- **Trước thay đổi:** Repository chưa có `AGENTS.md`, hướng dẫn ExecPlan hoặc changelog chuẩn; thư mục tài liệu dùng casing `Docs`.
+- **Sau thay đổi:** Bổ sung `AGENTS.md`, `.agent/PLANS.md`, `docs/CHANGELOG.md`; chuẩn hóa thư mục tài liệu thành `docs`.
+- **Lý do:** Thiết lập quy tắc phát triển, truy vết, kiểm soát phạm vi và an toàn PM/O&M/OT cho dự án Solar & BESS.
+- **Artefact bị ảnh hưởng:** Governance repository và đường dẫn tài liệu. Nội dung `docs/Đề xuất tính năng nền tảng Solar và BESS.md` được giữ nguyên.
+- **Migration/tương thích:** Mọi liên kết mới phải dùng `docs/`; không tạo lại `Docs/`.
+- **Trạng thái:** Implemented.
+
+## 2026-07-11 — Đồng bộ đường dẫn artefact với chương trình tài liệu
+
+- **Loại:** Governance và Documentation.
+- **Người yêu cầu/phê duyệt:** Người dùng repository qua goal objective.
+- **Mã bị ảnh hưởng:** Không áp dụng; không thay đổi requirement nghiệp vụ.
+- **Trước thay đổi:** `AGENTS.md` dùng các path ví dụ không đánh số và `docs/api/openapi.yaml`, khác path được yêu cầu trực tiếp.
+- **Sau thay đổi:** Chuẩn hóa path governance theo bộ tài liệu `docs/00…16`, `docs/INDEX.md` và `docs/openapi/openapi.yaml`.
+- **Lý do:** Bảo đảm một nguồn sự thật và không tạo file alias trùng nội dung.
+- **Artefact bị ảnh hưởng:** `AGENTS.md`, ExecPlan, `docs/00-documentation-plan.md` và changelog.
+- **Migration/tương thích:** Không tạo các path alias cũ; link mới chỉ dùng bộ path được đánh số.
+- **Trạng thái:** Implemented.
+
+## 2026-07-11 — Tạo bộ tài liệu phát triển phần mềm Solar & BESS v0.1
+
+- **Loại:** Documentation; Requirement; Architecture; Data; API; Security.
+- **Người yêu cầu/phê duyệt:** Người dùng yêu cầu tạo bộ hồ sơ; nội dung dẫn xuất vẫn chờ Product Owner và các owner chuyên môn phê duyệt.
+- **Mã bị ảnh hưởng:** Định nghĩa mới có truy vết: `BR-001…BR-040`, `FR-001…FR-198`, `NFR-001…NFR-024`, `UC-001…UC-037`, `ADR-001…ADR-010`, `DB-001…DB-098`, `API-001…API-136`, `SEC-101…SEC-132`, `WF-001…WF-025`, `US-001…US-037`, `AC-001…AC-173`, `TEST-001…TEST-229`.
+- **Trước thay đổi:** Chỉ có baseline tính năng và tài liệu governance; chưa có chuỗi Vision → BRD → PRD → SRS → Domain/Architecture/Data/API/Security/UX/Workflow/Backlog/Test/DevOps/Traceability.
+- **Sau thay đổi:** Tạo `docs/00-documentation-plan.md` đến `docs/16-open-questions-and-decisions.md`, `docs/INDEX.md` và `docs/openapi/openapi.yaml`; thêm ExecPlan sống tại `.agent/execplans/2026-07-11-software-documentation-suite.md`.
+- **Lý do:** Cung cấp đầu vào có thể review cho thiết kế và lập trình, đồng thời giữ nguyên phạm vi nguồn, truy vết ID, multi-tenant và ranh giới PM/O&M/OT.
+- **Artefact bị ảnh hưởng:** Các file dẫn xuất nêu trên, `docs/CHANGELOG.md`, ExecPlan và các link governance. Baseline `docs/Đề xuất tính năng nền tảng Solar và BESS.md` không thay đổi; SHA-256 vẫn là `51DBAD85FFC548AB9D95743551DE6BE745EA2723B3F237054B9C793B3A8CF55C`.
+- **Migration/tương thích:** Không có code, schema hay dữ liệu production. Open Questions, ADR Proposed, payload/technology/threshold còn `TBD` phải được đóng trước build/production gate.
+- **Trạng thái:** Implemented (documentation Draft v0.1; business/architecture approval chưa hoàn tất).
+
+## 2026-07-11 — Phê duyệt base/auth MVP và EC2 test deployment
+
+- **Loại:** Requirement; Architecture; Data; API; Security; Documentation.
+- **Người yêu cầu/phê duyệt:** Người dùng/Product Owner qua yêu cầu trực tiếp ngày 2026-07-11.
+- **Mã bị ảnh hưởng:** `BR-033`, `BR-040`, `FR-147`, `UC-020`, `US-020`, `SEC-101`, `SEC-103`, `SEC-117`, `SEC-118`; mới `WF-026`, `DB-099…DB-100`, `API-137…API-139`, `AC-174…AC-177`, `TEST-230…TEST-233`.
+- **Trước thay đổi:** Auth chỉ mô tả SSO/MFA ở Draft, chưa có API login/refresh/logout, credential/session entity hoặc quyền viết production code.
+- **Sau thay đổi:** Phê duyệt local email/password cho base/test, access JWT 15 phút, refresh JWT HttpOnly 7 ngày có rotation/revoke, PostgreSQL và triển khai Docker Compose trên EC2 test. SSO/MFA được hoãn, không bị loại khỏi roadmap.
+- **Lý do:** Tạo vertical slice đầu tiên có thể truy cập và kiểm thử từ máy cá nhân trong giai đoạn xây base.
+- **Artefact bị ảnh hưởng:** ExecPlan auth, API/OpenAPI, data, security, workflow, backlog, test, traceability, INDEX và source code/toolchain sẽ tạo.
+- **Migration/tương thích:** Schema mới chỉ dùng dữ liệu test; phải có migration up/down. Trước production thật phải review HTTPS, secret/KMS, SSO/MFA, retention và security operations.
+- **Trạng thái:** Implemented trên EC2 test; production thật chưa được phê duyệt.
+
+## 2026-07-11 — Chuẩn hóa base/auth theo modular DDD và TypeORM CLI
+
+- **Loại:** Architecture; Data; DevOps; Documentation; không thay đổi phạm vi nghiệp vụ.
+- **Người yêu cầu/phê duyệt:** Người dùng/Product Owner qua yêu cầu trực tiếp ngày 2026-07-11.
+- **Mã bị ảnh hưởng:** `ADR-001`, `ADR-004`, `FR-147`, `DB-001`, `DB-005`, `DB-098…DB-100`, `API-001`, `API-137…API-139`, `SEC-101`, `SEC-103`, `SEC-117`, `SEC-118`, `TEST-200`, `TEST-230…TEST-233`.
+- **Trước thay đổi:** Auth controller/service, ORM entity và database access còn ghép theo cấu trúc framework; migration dùng custom runner/alias `db:migrate`; typography chưa ưu tiên font Windows hỗ trợ tiếng Việt.
+- **Sau thay đổi:** Identity & Access được tách thành domain/application/infrastructure/interfaces với domain entity khác ORM entity, repository/security ports và composition root; migration dùng TypeORM CLI qua `npm run migration:show|run|revert|generate|create`; UI ưu tiên Calibri/Segoe UI/Arial.
+- **Lý do:** Biến auth slice thành reference bounded context có thể mở rộng, giữ dependency rule kiểm chứng tự động và chuẩn hóa lifecycle schema cho dự án dài hạn.
+- **Artefact bị ảnh hưởng:** `apps/api`, `apps/web/src/styles.css`, root/API manifests, Docker/Compose config, `.agent/execplans/2026-07-11-ddd-base-refactor.md`, `docs/05-domain-model.md`, `docs/06-solution-architecture.md`, `docs/14-devops-and-deployment.md`, `docs/INDEX.md`.
+- **Migration/tương thích:** Không đổi schema hoặc API contract; timestamp/class migration giữ nguyên. Up/down/up chạy trên PostgreSQL test; image cũ vẫn tương thích schema. Production thật vẫn bị chặn bởi các điều kiện HTTPS/secret/SSO-MFA/operations đã ghi nhận.
+- **Trạng thái:** Implemented cho base/auth EC2 test profile.
+
+## 2026-07-11 — Supersede DDD source tree bằng Nest convention và encrypted environment
+
+- **Loại:** Architecture; Data; Security; DevOps; Documentation; không thay đổi phạm vi nghiệp vụ.
+- **Người yêu cầu/phê duyệt:** Người dùng/Product Owner qua yêu cầu trực tiếp ngày 2026-07-11.
+- **Mã bị ảnh hưởng:** `ADR-001`, `ADR-004`, `FR-147`, `FR-154`, `DB-001`, `DB-005`, `DB-098…DB-100`, `API-001`, `API-137…API-139`, `SEC-101`, `SEC-103`, `SEC-117`, `SEC-118`, `TEST-200`, `TEST-230…TEST-233`.
+- **Trước thay đổi:** TypeORM artifacts nằm sâu trong module/shared infrastructure; Identity Access bắt buộc domain/application/infrastructure/interfaces và custom repository/ports; DB/JWT credential trong `.env` là plaintext; rate/TTL/Argon cost hard-code.
+- **Sau thay đổi:** Entity/migration/DataSource/seed tập trung ở `src/database`; Identity Access dùng controller/service/guard/DTO + TypeORM repository chuẩn; thêm `CipherModule` AES-256-GCM, encrypted credential enforcement và typed env config cho rate/JWT/Argon/cookie. Password DB giữ Argon2id hash một chiều.
+- **Lý do:** Theo convention source tree và mức abstraction do owner chốt; giảm ceremony, tăng khả năng tìm kiếm/configure và bảo vệ credential file base/test.
+- **Artefact bị ảnh hưởng:** `apps/api/src`, API/root manifests, `.env.example`, `.gitignore`, `docker-compose.yml`, test, ExecPlan, domain/architecture/security/devops/index/changelog.
+- **Migration/tương thích:** Không đổi schema/API/migration identity. `.env` cần one-time encryption và Compose cần runtime PostgreSQL secret files. Rollback code cũ cần controlled plaintext runtime config; không ghi plaintext trở lại repository.
+- **Trạng thái:** Implemented và static/unit validated; migration/integration/deploy validation đang chờ quyền truy cập local PostgreSQL/Docker của phiên hiện tại.
+
+## 2026-07-11 — Chuẩn hóa cấu trúc frontend Vue cho khả năng mở rộng
+
+- **Loại:** Architecture; Frontend; Documentation; không thay đổi phạm vi nghiệp vụ.
+- **Người yêu cầu/phê duyệt:** Người dùng/Product Owner qua yêu cầu trực tiếp ngày 2026-07-11.
+- **Mã bị ảnh hưởng:** `ADR-001`, `ADR-003`, `FR-147`, `NFR-011`, `API-137…API-139`, `SEC-103`, `SEC-118`, `TEST-230…TEST-233`.
+- **Trước thay đổi:** Store chứa raw fetch/error/retry; view chứa trực tiếp form/layout/header/status markup; router/routes/guard chung file; chưa có API/shared component/layout/type/constants structure; Element Plus register toàn bộ.
+- **Sau thay đổi:** Frontend tách `app`, `api`, `components/common`, `components/auth`, `layouts`, `router`, `stores`, `styles`, `types`, `constants`, `views`; store gọi typed auth API; view lazy-load; Element Plus register tối thiểu.
+- **Lý do:** Tạo convention rõ cho dự án lớn, giảm coupling và giữ transport/state/presentation đúng owner.
+- **Artefact bị ảnh hưởng:** `apps/web/src`, Vite/Vitest/TypeScript config, frontend ExecPlan, architecture/test/index/changelog.
+- **Migration/tương thích:** Không đổi API/data/browser storage. Asset hash thay đổi khi deploy; rollback bằng web image trước. Entry JS/CSS giảm đáng kể.
+- **Trạng thái:** Implemented và lint/type/unit/build validated; combined E2E/deploy pending cùng backend blocker.
+
+## 2026-07-11 — Chuẩn hóa cấu trúc backend test tree
+
+- **Loại:** Architecture; Test; Documentation; không thay đổi phạm vi nghiệp vụ.
+- **Người yêu cầu/phê duyệt:** Người dùng/Product Owner qua yêu cầu trực tiếp ngày 2026-07-11.
+- **Mã bị ảnh hưởng:** `ADR-001`, `ADR-004`, `SEC-101`, `SEC-117`, `SEC-118`, `TEST-200`, `TEST-230…TEST-233`.
+- **Trước thay đổi:** Jest config, integration setup, unit test và integration test cùng nằm ở root `apps/api/test`.
+- **Sau thay đổi:** Tách `test/config`, `test/setup`, `test/unit/{architecture,config,modules}` và `test/integration/modules`; test tree phản chiếu production concern và có testMatch/setup riêng.
+- **Lý do:** Tránh root test lộn xộn khi thêm module, phân biệt dependency/runtime của từng test level và giữ production `src` sạch.
+- **Artefact bị ảnh hưởng:** `apps/api/test`, API package scripts, architecture/test/index/changelog.
+- **Migration/tương thích:** Không đổi production code/API/schema. Unit pass; integration chưa chạy được do sandbox local network `EPERM`.
+- **Trạng thái:** Implemented; lint/type/unit validated.

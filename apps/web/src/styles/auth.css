@@ -1,0 +1,21 @@
+.auth-layout { min-height: 100vh; display: grid; grid-template-columns: minmax(360px, 1.1fr) minmax(420px, .9fr); background: #eef1e9; }
+.auth-layout__brand { position: relative; overflow: hidden; padding: clamp(48px, 7vw, 104px); display: flex; flex-direction: column; justify-content: center; color: #effbf2; background: radial-gradient(circle at 78% 18%, rgba(203,232,93,.24), transparent 32%), linear-gradient(145deg, #0c3830 0%, var(--color-brand-deep) 70%); }
+.auth-layout__brand::after { content: ""; position: absolute; width: 520px; height: 520px; border: 1px solid rgba(204,234,113,.18); border-radius: 50%; right: -210px; bottom: -260px; box-shadow: 0 0 0 70px rgba(204,234,113,.035), 0 0 0 140px rgba(204,234,113,.025); }
+.auth-layout__brand h1 { max-width: 700px; margin: 20px 0; font-size: clamp(44px, 5.4vw, 78px); line-height: .98; font-weight: 600; letter-spacing: -2px; }
+.brand-copy { max-width: 560px; color: #bcd0c8; line-height: 1.7; font-size: 17px; }
+.energy-line { display: flex; gap: 8px; margin-top: 46px; }
+.energy-line span { width: 54px; height: 4px; border-radius: 4px; background: var(--color-accent); }
+.energy-line span:nth-child(2) { opacity: .55; }
+.energy-line span:nth-child(3) { opacity: .25; }
+.auth-layout__content { display: grid; place-items: center; padding: 40px; }
+.login-card { width: min(100%, 480px); padding: clamp(30px, 5vw, 56px); border: 1px solid #d9ded3; border-radius: 24px; background: rgba(255,255,255,.88); box-shadow: 0 24px 70px rgba(21,48,40,.09); backdrop-filter: blur(14px); }
+.login-card h2 { margin: 10px 0 8px; font-size: 38px; font-weight: 600; letter-spacing: -1px; }
+.login-card .el-alert { margin-bottom: 20px; }
+.login-button { width: 100%; height: 48px; margin-top: 6px; font-weight: 700; --el-color-primary: #245e4f; --el-color-primary-light-3: #477d6f; --el-color-primary-dark-2: #164a3d; }
+.security-note { margin: 24px 0 0; text-align: center; color: #89938d; font-size: 12px; }
+@media (max-width: 900px) {
+  .auth-layout { grid-template-columns: 1fr; }
+  .auth-layout__brand { min-height: 380px; padding: 48px 32px; }
+  .auth-layout__brand h1 { font-size: 48px; }
+  .auth-layout__content { padding: 32px 20px 56px; }
+}

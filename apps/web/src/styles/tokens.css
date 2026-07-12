@@ -1,0 +1,12 @@
+:root {
+  font-family: Calibri, "Segoe UI", Arial, sans-serif;
+  color: #10231f;
+  background: #f3f5ef;
+  font-synthesis: none;
+  --color-brand-dark: #0d382f;
+  --color-brand-deep: #071f1c;
+  --color-accent: #cbe85d;
+  --color-surface: rgba(255, 255, 255, .84);
+  --color-border: #d8ded3;
+  --shadow-card: 0 14px 40px rgba(20, 46, 38, .05);
+}

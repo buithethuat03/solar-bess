@@ -1,0 +1,7 @@
+extends:
+  - recommended
+
+rules:
+  info-license: off
+  tag-description: off
+  no-unused-components: off
