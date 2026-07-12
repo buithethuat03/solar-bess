@@ -1,9 +1,9 @@
 # Documentation Index — Solar & BESS Project Management Platform
 
 > **Purpose:** Mục lục, thứ tự đọc, dependency, trạng thái, phiên bản và reviewer của toàn bộ bộ tài liệu phát triển phần mềm.
-> **Scope:** Governance, baseline, docs/00…16, OpenAPI và changelog; gồm base/auth, US-001, operational foundation/core US-003 đã deploy EC2 test và US-004 Approved/Build-ready; full story validation còn tiếp tục.
-> **Source:** [AGENTS.md](../AGENTS.md), [Documentation Plan](./00-documentation-plan.md), [Program ExecPlan](../.agent/execplans/2026-07-11-platform-delivery-program.md), [Operational ExecPlan](../.agent/execplans/2026-07-11-operational-foundation.md), [US-003 ExecPlan](../.agent/execplans/2026-07-11-project-controls-us003.md), [US-004 ExecPlan](../.agent/execplans/2026-07-12-risk-issue-change-us004.md).
-> **Version:** 1.1
+> **Scope:** Governance, baseline, docs/00…17, OpenAPI và changelog; gồm EC2 self-hosted CI/CD repository implementation; full story/production validation còn tiếp tục.
+> **Source:** [AGENTS.md](../AGENTS.md), [Documentation Plan](./00-documentation-plan.md), [Program ExecPlan](../.agent/execplans/2026-07-11-platform-delivery-program.md), [CI/CD ExecPlan](../.agent/execplans/2026-07-12-main-self-hosted-cicd.md).
+> **Version:** 1.2
 > **Status:** Draft
 > **Owner:** Product Operations / Documentation Owner (cá nhân: TBD)
 > **Updated:** 2026-07-12
@@ -40,10 +40,11 @@
 | 14 | [11 — Workflows and State Machines](./11-workflows-and-state-machines.md) | 26 formal workflows/Mermaid and approval rules | Draft; WF-003 core Implemented; WF-015/021 US-004 Approved | 0.7 / 2026-07-12 | 02–05/09 | Process owners, Internal Control |
 | 15 | [12 — Product Backlog](./12-product-backlog.md) | 37 US, 177 AC, DoR/DoD and phase split | Draft; US-003 core In Progress; US-004 Approved/Build-ready | 0.7 / 2026-07-12 | 02–11 | PO, Delivery, Engineering, QA |
 | 16 | [13 — Test Strategy](./13-test-strategy.md) | Test levels and 233 TEST scenarios | Draft; core US-003 partial evidence; US-004 verification Approved/Planned | 1.3 / 2026-07-12 | 04/08–12 | QA, Security, SRE, OT, business |
-| 17 | [14 — DevOps and Deployment](./14-devops-and-deployment.md) | Environments, CI/CD, rollout/recovery/release | Draft; base/US-001/operational/core US-003 deployed EC2 test | 0.7 / 2026-07-12 | 06/09/13 | Platform, SRE, Security, QA |
+| 17 | [14 — DevOps and Deployment](./14-devops-and-deployment.md) | Environments, CI/CD, rollout/recovery/release | Draft; self-hosted workflow/script implemented, first run Pending | 0.8 / 2026-07-12 | 06/09/13 | Platform, SRE, Security, QA |
 | 18 | [15 — Traceability Matrix](./15-traceability-matrix.md) | End-to-end chain, gap and contradiction audit | Draft; core US-003 implemented; US-004 exact trace Approved | 0.9 / 2026-07-12 | 01–14 | PO, BA, QA, Architecture |
 | 19 | [16 — Open Questions and Decisions](./16-open-questions-and-decisions.md) | Consolidated assumptions/questions/decisions/risks/data needs | Draft/Living; US-004 decisions/dependencies explicit | 0.6 / 2026-07-12 | 00–15 | All decision owners |
-| 20 | [CHANGELOG](./CHANGELOG.md) | Repository documentation and scope history | Living | 2026-07-11 | Every change | PO, Documentation Owner |
+| 20 | [17 — Self-hosted CI/CD Runbook](./17-self-hosted-cicd-runbook.md) | Runner registration, pipeline, deploy/recovery operations | Implemented in repository; first GitHub run Pending | 0.1 / 2026-07-12 | 14 | Platform, repository admin, Security |
+| 21 | [CHANGELOG](./CHANGELOG.md) | Repository documentation and scope history | Living | 2026-07-12 | Every change | PO, Documentation Owner |
 
 ## 3. Dependency graph
 
@@ -143,3 +144,4 @@ Canonical owner rules are defined in [00-documentation-plan.md](./00-documentati
 | 0.9 | 2026-07-12 | Codex | Ghi core US-003/operational deployment, API-141 và exact validation evidence | Core Implemented/deployed EC2 test; không claim full US-003 Pass |
 | 1.0 | 2026-07-12 | Codex | Đồng bộ API-142, Dashboard alert lane, exact unit counts và trạng thái M3 local/deploy | Không đổi phạm vi; latest M3 image và full runtime evidence vẫn pending |
 | 1.1 | 2026-07-12 | Codex | Đồng bộ US-004 SRS/domain/architecture/data/API/security/UX/workflow/backlog/test/trace/decision và 159 API/112 DB IDs | Build-ready EC2 test; không claim US-004/Claim implementation hoặc test Pass |
+| 1.2 | 2026-07-12 | Codex | Thêm self-hosted CI/CD runbook và trạng thái workflow/script/first GitHub run chính xác | Không đổi phạm vi nghiệp vụ; production supply chain vẫn Proposed |

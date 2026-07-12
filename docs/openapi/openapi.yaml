@@ -8661,7 +8661,7 @@ components:
         actorId: {type: string, format: uuid}
         effectiveActorId: {type: [string, 'null'], format: uuid}
         versionNo: {type: integer, minimum: 1}
-        summary: {type: string, maxLength: 2000, description: Safe redacted event summary, not raw audit payload}
+        summary: {type: string, maxLength: 2000, description: 'Safe redacted event summary, not raw audit payload'}
         occurredAt: {type: string, format: date-time}
         correlationId: {type: string}
       additionalProperties: false

@@ -1,0 +1,75 @@
+name: Main CI/CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: solar-bess-ec2-main
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    name: CI
+    runs-on: [self-hosted, linux, x64, solar-bess-deploy]
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify toolchain
+        run: |
+          node --version
+          npm --version
+          docker compose version
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Start disposable integration dependencies
+        run: |
+          sudo -n docker compose --project-name solar-bess-ci -f docker-compose.test.yml down --volumes --remove-orphans
+          sudo -n docker compose --project-name solar-bess-ci -f docker-compose.test.yml up -d --wait postgres-test redis-test
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Integration tests
+        run: npm run test:integration
+
+      - name: Validate OpenAPI
+        run: npm run openapi:lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Stop disposable integration dependencies
+        if: always()
+        run: sudo -n docker compose --project-name solar-bess-ci -f docker-compose.test.yml down --volumes --remove-orphans
+
+  deploy:
+    name: Deploy EC2 test
+    needs: ci
+    runs-on: [self-hosted, linux, x64, solar-bess-deploy]
+    timeout-minutes: 30
+    environment: ec2-test
+    steps:
+      - name: Checkout verified commit
+        uses: actions/checkout@v4
+
+      - name: Deploy and verify
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+          DEPLOY_ENV_FILE: /home/ec2-user/SOLAR_BESS_WEB/.env
+          DEPLOY_STATE_DIR: /home/ec2-user/SOLAR_BESS_WEB/.deploy
+        run: ./scripts/deploy-ec2.sh

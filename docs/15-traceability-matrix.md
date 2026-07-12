@@ -96,7 +96,8 @@ This is the primary chain. API/DB/SEC ranges are capability surfaces; exact oper
 | NFR-012; SEC-122 | Generic command idempotency | DB-104; operation-level `Idempotency-Key`, request hash và stable result | TEST-180/185 | Approved/Planned | Retention/capacity TBD |
 | SEC-103/118; US-020 | Shared login quota/session dependency | Redis rate-limit state; không tạo API mới | TEST-200/231 | Approved/Planned, fail closed | Redis HA/persistence TBD |
 | ADR-002/004; SEC-105…111 | Database tenant reference invariant | Composite `(tenant_id, referenced_id)` FK; không đổi public API | TEST-202…208 | Approved/Planned | Topology/RLS TBD |
-| NFR-021/023; ADR-001 | API/worker runtime contract | PostgreSQL + Redis + BullMQ; worker process/container riêng | TEST-194/196 và operational smoke | Approved/Planned | Hosted CI/HA/SLO Proposed |
+| NFR-021/023; ADR-001 | API/worker runtime + main CI/CD contract | PostgreSQL + Redis + BullMQ; worker process/container riêng; self-hosted workflow + SHA image rollout | TEST-194/196 và operational smoke | Runtime deployed; CI/CD repository implementation, first GitHub run Pending | Registry/HA/SLO Proposed |
+| BR-040; NFR-007/023; SEC-124; US-024 | Controlled EC2 test delivery | `.github/workflows/main-cicd.yml`; `scripts/deploy-ec2.sh`; không đổi DB/API | TEST-196; TEST-221 subset | Implemented in repository; runner/branch protection Pending | Full supply-chain/production Proposed |
 | US-003 | Schedule contract | DB-101 + schedule-alert subset DB-105; API-023/024/034…037/140…142 | TEST-010…013 written; final runtime execution pending | Core Implemented/deployed, story not fully Pass | Proposed |
 | US-022/023/031…037 | ID stability only | DB-106…111 reserved; phần Notification ngoài schedule của DB-105 thuộc US-022 | ID/link audit; feature TEST giữ Draft | Documented/Not implemented | Proposed |
 
@@ -243,3 +244,4 @@ Deferred does not mean silently complete:
 | 0.7 | 2026-07-12 | Codex | Thêm API-141 và ghi evidence core US-003/operational deployment đúng mức | Core Implemented/deployed; không claim full TEST-010…013 hoặc positive AC-012 trước runtime/US-004 |
 | 0.8 | 2026-07-12 | Codex | Thêm API-142 audited look-ahead export và Dashboard schedule alert lane vào direct US-003 trace | Core M3 surface complete hơn; full runtime/story Pass vẫn pending |
 | 0.9 | 2026-07-12 | Codex | Khóa exact direct/dependency trace US-004, cấp DB-112/API-143…159 và nối public approved-change/reverse baseline trace | Approved/Build-ready; không claim US-004/Claim/test execution |
+| 1.0 | 2026-07-12 | Codex | Thêm trace self-hosted main CI/CD EC2 test tới BR-040/NFR-007/023/SEC-124/US-024/TEST-196/221 | Repository implementation; first GitHub run và production supply chain chưa claim Pass |

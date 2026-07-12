@@ -18,6 +18,32 @@ File này ghi lịch sử thay đổi phạm vi, tài liệu và governance củ
 - **Trạng thái:** Proposed | Approved | Rejected | Implemented
 ```
 
+## 2026-07-12 — Sửa projection correction progress để đóng CI gate
+
+- **Loại:** Functional; Test; API contract correction; không thay đổi phạm vi nghiệp vụ baseline.
+- **Người yêu cầu/phê duyệt:** Người dùng yêu cầu hoàn tất CI/CD ngày 2026-07-12; sửa theo canonical `TEST-011`/`DB-021` explicit-null correction contract.
+- **Mã bị ảnh hưởng:** `FR-019`, `FR-021`, `US-003`, `AC-011`, `DB-021`, `API-037`, `TEST-010`, `TEST-011`, `TEST-185`.
+- **Trước thay đổi:** Optional DTO field `undefined` bị nhận nhầm là explicit value; null trong correction basis bị `??` thay bằng current activity, khiến correction lịch sử kế thừa actual finish mới và reopen làm mất actual start. CSV integration expectation không khớp fixture `ACT_A`.
+- **Sau thay đổi:** Chỉ giá trị được gửi, kể cả explicit `null`, mới thay basis; correction giữ chính xác null/value của target; reopen completion giữ actual start và xóa explicit actual finish. CSV assertion dùng code từ canonical test fixture.
+- **Lý do:** Bảo toàn append-only correction/projection theo `DB-021` và đóng integration gate mà không nới validation.
+- **Artefact bị ảnh hưởng:** Project Controls service/integration test, OpenAPI description quoting và CI/CD validation evidence.
+- **Migration/tương thích:** Không đổi schema/API shape; sửa runtime projection semantics đúng contract đã phê duyệt.
+- **Validation:** API integration 35/35, toàn bộ unit 100/100 và worker integration 7/7 pass; OpenAPI valid.
+- **Trạng thái:** Implemented và deployed EC2 test trong release `cicd-setup-20260712`.
+
+## 2026-07-12 — Thiết lập self-hosted CI/CD cho main trên EC2 test
+
+- **Loại:** DevOps; Security; Governance; Documentation; không thay đổi phạm vi nghiệp vụ baseline.
+- **Người yêu cầu/phê duyệt:** Người dùng yêu cầu trực tiếp ngày 2026-07-12 cho repository và máy EC2 test hiện tại.
+- **Mã bị ảnh hưởng:** `BR-040`, `NFR-007`, `NFR-021`, `NFR-023`, `SEC-124`, `ADR-001`, `US-024`, `AC-113…AC-116`, `TEST-196`, `TEST-221`; không cấp requirement/API/DB ID mới.
+- **Trước thay đổi:** Repository chưa có GitHub Actions; deploy Compose thực hiện thủ công, image không có commit tag/release lock/automatic rollback. Năm runtime container đang healthy nhưng máy chưa đăng ký Actions runner.
+- **Sau thay đổi:** Thêm workflow push `main` self-hosted chạy npm CI gates trước deploy; application image tag theo SHA; rollout serialized giữ project/volume `solar_bess_web`; health/HTTP smoke và automatic application-image rollback; có runbook đăng ký runner/branch protection/recovery.
+- **Lý do:** Tự động hóa kiểm chứng và deploy EC2 test sau push `main` theo yêu cầu người dùng, vẫn fail closed và không mở OT write path.
+- **Artefact bị ảnh hưởng:** `.github/workflows/main-cicd.yml`, `scripts/deploy-ec2.sh`, `docker-compose.yml`, ExecPlan CI/CD, DevOps/Traceability/Open Questions/INDEX/runbook/changelog.
+- **Migration/tương thích:** Không tạo schema/API migration. API tiếp tục chạy pending TypeORM migration; rollback không tự down schema nên migration tương lai phải backward-compatible. Compose project cố định giữ volumes hiện hữu.
+- **Validation:** `npm ci` cài 995 package, audit 0 vulnerability; lint/typecheck pass; unit API 47/47 + Web 32/32 + Worker 21/21; integration API 35/35 + Worker 7/7; OpenAPI valid với 15 non-blocking warning; build toàn workspace, shell syntax, Compose config và diff check pass. `deploy-ec2.sh` rollout release `cicd-setup-20260712`; năm runtime service healthy, `/web-health` và `/health` smoke pass. Runner registration/first GitHub run/branch protection còn Pending.
+- **Trạng thái:** Implemented và local runtime-validated cho EC2 test; GitHub activation In Progress; production/registry/IaC/SBOM/signing vẫn Proposed/TBD.
+
 ## 2026-07-12 — Hoàn tất canonical documentation gate cho US-004 Risk, Issue và Change
 
 - **Loại:** Requirement; Architecture; Data; API; Security; UX; Workflow; Test; Documentation; không thay đổi phạm vi nghiệp vụ baseline.

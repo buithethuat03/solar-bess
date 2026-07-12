@@ -142,7 +142,7 @@ ADR-001…ADR-010 vẫn Proposed cho toàn platform/production. Implementation p
 | RFI dedicated entity | Existing Document+Workflow may suffice | Use Document type + WF-016 | Engineering/Data |
 | Direct OT control | Explicitly out of scope | No endpoint/UI/message/credential | Separate future safety program |
 | Exact legal/tax/tariff rules | Project/effective-date specific | Versioned config/TBD, no hard-code | Legal/Finance/Energy |
-| Hosted CI/CD/registry/IaC/SBOM/signing | Local command/toolchain exists nhưng chưa có hosted evidence | Mark Planned/not run; không ghi Implemented | Platform/Security before production |
+| Self-hosted CI/CD/registry/IaC/SBOM/signing | EC2 workflow/script đã materialize; runner/first GitHub run và production supply-chain evidence chưa có | EC2 implementation không đồng nghĩa hosted Pass/production; registry/IaC/signing giữ Planned | Platform/Security; repository admin đăng ký runner |
 
 ## 7. Risks
 
@@ -250,3 +250,4 @@ CMMS SoR; AlarmCase/source acknowledgment; ServiceIncident/SLA/downtime; WO prio
 | 0.4 | 2026-07-12 | Codex | Ghi quyết định Project Controls M0: calendar/import/baseline/SoD/dependency và DB-105 alert boundary | US-003 Approved/Build-ready; positive rebaseline/AC-013 dependency vẫn explicit |
 | 0.5 | 2026-07-12 | Codex | Ghi core Project Controls/worker deployed và API-141 stable correction history | Không đóng giả positive rebaseline/full story; production vẫn Proposed |
 | 0.6 | 2026-07-12 | Codex | Ghi quyết định US-004 aggregate/scoring/closure/SoD/package scope/Claim dependency/public rebaseline contract | US-004 Build-ready cho EC2 test; không claim implementation/production acceptance |
+| 0.7 | 2026-07-12 | Codex | Chốt self-hosted runner/main CI/CD profile cho EC2 test và giữ registry/signing/IaC production là Open Question | Workflow/script Implemented; runner/first GitHub run Pending, không claim production |

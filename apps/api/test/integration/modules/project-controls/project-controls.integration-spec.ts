@@ -212,7 +212,7 @@ describe('Project Controls API integration — TEST-010…013/185/193/195', () =
       .query({ dataDate: '2026-07-12', lookAheadDays: 21 })
       .expect('Content-Type', /text\/csv/).expect(200);
     expect(exported.text.startsWith('\uFEFF')).toBe(true);
-    expect(exported.text).toContain('"TASK_FOUNDATION"');
+    expect(exported.text).toContain('"ACT_A"');
 
     const [evidence] = await dataSource.query<Array<{
       schedules: string;

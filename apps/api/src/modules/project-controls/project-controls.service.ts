@@ -650,14 +650,17 @@ export class ProjectControlsService {
           });
         }
         const basis = correctionTarget ?? currentProjection;
-        const hasActualStart = Object.prototype.hasOwnProperty.call(input, 'actualStart');
-        const hasActualFinish = Object.prototype.hasOwnProperty.call(input, 'actualFinish');
+        // ValidationPipe/class-transformer may materialize optional DTO fields as
+        // own properties with value undefined. Only a supplied value (including
+        // explicit null) may replace the correction basis.
+        const hasActualStart = input.actualStart !== undefined;
+        const hasActualFinish = input.actualFinish !== undefined;
         const actualStart = hasActualStart
           ? input.actualStart?.slice(0, 10) ?? null
-          : basis?.actualStart ?? activity.actualStart;
+          : basis ? basis.actualStart : activity.actualStart;
         const actualFinish = hasActualFinish
           ? input.actualFinish?.slice(0, 10) ?? null
-          : basis?.actualFinish ?? activity.actualFinish;
+          : basis ? basis.actualFinish : activity.actualFinish;
         const evidenceRefs = input.evidenceRefs ?? basis?.evidenceRefs ?? [];
         if (Number(input.percentComplete) === 100 && (
           !actualStart || !actualFinish || evidenceRefs.length === 0

@@ -1,10 +1,10 @@
 # DevOps and Deployment — Nền tảng Solar & BESS
 
 > **Purpose:** Định nghĩa environment, source/build governance, CI/CD gates, artifact/migration/deployment/rollback, feature flags, secrets/IaC, observability, backup/DR và release checklist.
-> **Scope:** Operating model toàn platform; implementation profile cho base/auth, US-001, operational foundation và core US-003 đã deploy EC2 test. Production thật, hosted CI và IaC vẫn Proposed/ngoài approval hiện tại.
+> **Scope:** Operating model toàn platform; implementation profile cho base/auth, US-001, operational foundation/core US-003 và self-hosted CI/CD EC2 test. Production thật, registry và IaC vẫn Proposed/ngoài approval hiện tại.
 > **Source:** [SRS](./04-SRS.md), [Architecture](./06-solution-architecture.md), [Security](./09-security-and-permissions.md), [Test Strategy](./13-test-strategy.md), [Operational Foundation ExecPlan](../.agent/execplans/2026-07-11-operational-foundation.md), ADR-001…ADR-010, NFR-006…010/021/023 và SEC-115…132.
-> **Version:** 0.7
-> **Status:** Draft toàn platform; base/auth, US-001, operational foundation và core US-003 EC2 test Implemented/deployed; production Proposed
+> **Version:** 0.8
+> **Status:** Draft toàn platform; GitHub Actions workflow/script self-hosted EC2 test Implemented, runner registration/first hosted run Pending; production Proposed
 > **Owner:** Platform Engineering / SRE / Release Management (cá nhân: TBD)
 > **Updated:** 2026-07-12
 > **Approval:** Operational foundation/core US-003 EC2 test Approved — Product Owner delegated; production TBD — Architecture, Engineering, SRE, Security, QA và Data Owner
@@ -53,11 +53,11 @@ Proposed model: protected main/trunk; short-lived feature/fix branches; pull req
 | Dependency | Lock/resolution file, SBOM, license/security review |
 | Release tag | Annotated/signed mechanism TBD; references artifact digest and changelog |
 
-GitHub Actions là tech-stack direction, nhưng repository/hosted workflow, branch protection, registry và signing evidence chưa tồn tại; vì vậy CI hosted vẫn **Planned**, không được ghi Implemented.
+GitHub Actions self-hosted workflow và deploy script cho EC2 test đã materialize trong repository. Runner registration, first GitHub execution và branch protection còn **Pending**; registry/signing/provenance và production CI/CD vẫn **Proposed**, không được suy rộng từ EC2 test.
 
 ## 4. CI pipeline
 
-Sơ đồ dưới là target pipeline. Các command local đã có execution evidence ở mục 4.1; hosted CI workflow, SBOM/signing/provenance và automated deployment chưa được triển khai nên giữ trạng thái **Planned**.
+Sơ đồ dưới là target pipeline. Subset install/lint/type/unit/integration/OpenAPI/build và automated Docker Compose deployment đã được triển khai cho self-hosted EC2 test; SBOM/signing/provenance, scan đầy đủ và production promotion vẫn **Planned/Proposed**.
 
 ```mermaid
 flowchart LR
@@ -96,6 +96,14 @@ flowchart LR
 | Core Project Controls deploy 2026-07-12 | Workspace build; migration/seed; `docker compose up -d --wait`; public root/login/health | PostgreSQL/Redis/API/worker/web healthy; HTTP 200 tại `54.255.223.131`; final US-003 integration/E2E vẫn pending |
 
 When code begins, PR cannot merge until lint, type-check, unit and required integration gates run and results are reported. A skipped gate needs reason, owner, expiry and risk decision.
+
+### 4.2 Self-hosted EC2 test pipeline
+
+- `.github/workflows/main-cicd.yml` chỉ nhận push `main` hoặc manual dispatch, chạy trên label dedicated `solar-bess-deploy`; không chạy pull request/fork code có Docker/deploy privilege.
+- Job `CI` dùng lockfile, disposable PostgreSQL/Redis và chạy đủ command mục 4.1. Job `Deploy EC2 test` phụ thuộc CI thành công.
+- `scripts/deploy-ec2.sh` đọc env/secret ngoài Git, khóa deploy đồng thời, giữ Compose project hiện hữu `solar_bess_web`, tag image bằng commit SHA, chờ health và smoke `/web-health` + `/health`.
+- Trước rollout, image đang chạy được tag làm recovery point. Failure tự khôi phục application image; database migration không tự down và bắt buộc backward-compatible/forward-fix.
+- Cài runner, preflight, branch protection và recovery theo [runbook self-hosted CI/CD](./17-self-hosted-cicd-runbook.md). Chưa ghi hosted Pass cho tới khi runner online và có first-run evidence.
 
 ## 5. Quality and security gates
 
@@ -337,7 +345,7 @@ Security incident response owns containment/evidence; SRE owns service recovery;
 | Cost ceiling/team skills/managed vs self-hosted choices? | Finance/Engineering | Technology |
 | Disaster/incident exercise cadence and notification policy? | Security/BCM/Legal | Compliance |
 | Production Redis HA/persistence/eviction, BullMQ retention/concurrency/capacity và worker scaling? | SRE/Architecture/Security | Production acceptance; không chặn EC2 test |
-| Hosted CI workflow, branch protection, registry, SBOM/signing/provenance và IaC rollout? | Platform/Security | Production pipeline; hiện Planned |
+| First GitHub self-hosted run và branch protection? Registry, SBOM/signing/provenance và IaC production rollout? | Platform/Security | EC2 runner/first run Pending; production supply chain Planned |
 
 ## 19. Changelog
 
@@ -350,3 +358,4 @@ Security incident response owns containment/evidence; SRE owns service recovery;
 | 0.5 | 2026-07-11 | Codex | Ghi US-001 migration rollback, no-cache image verification, E2E fixture cleanup và EC2 public rollout | Test deployment Implemented; HTTPS/CI/IaC/SBOM production vẫn TBD |
 | 0.6 | 2026-07-11 | Codex | Chốt operational foundation PostgreSQL/Redis/BullMQ/worker, DB-102…104, composite tenant FK và runtime rollout cho EC2 test | Approved/Planned; DB-101/105…111 chỉ reserve; production/hosted CI vẫn Proposed/Planned |
 | 0.7 | 2026-07-12 | Codex | Ghi Redis/worker/outbox + core US-003 Compose deployment, health/public smoke và Nest 11 literal-colon route fix | EC2 test Implemented/deployed; production/hosted CI/HTTPS vẫn Proposed |
+| 0.8 | 2026-07-12 | Codex | Thêm main self-hosted CI/CD, SHA image, serialized rollout, health/smoke/rollback và runner runbook | Repository implementation cho EC2 test; runner registration/first GitHub run Pending; production vẫn Proposed |
