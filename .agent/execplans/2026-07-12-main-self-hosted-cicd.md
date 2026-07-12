@@ -1,6 +1,6 @@
 # ExecPlan — CI/CD self-hosted cho nhánh main trên EC2 test
 
-> **Status:** In Progress
+> **Status:** Completed
 > **Owner:** Platform Engineering / repository owner
 > **Created:** 2026-07-12
 > **Updated:** 2026-07-12
@@ -153,12 +153,13 @@ Runner checkout tách khỏi deployment config. Script chỉ đọc `.env` cố 
 | 2026-07-12 | Chạy local CI gates | `npm ci` 995 packages/0 vulnerabilities; lint/typecheck pass; unit 100/100; build pass; integration 33/35; OpenAPI 1 error/15 warnings | Sửa Project Controls integration fixture/state expectation và OpenAPI schema trước deploy |
 | 2026-07-12 | Xác nhận runtime không bị tác động khi CI fail | `/web-health` OK; `/health` trả database/redis OK; năm runtime service healthy | Giữ nguyên release hiện tại, không bypass deploy gate |
 | 2026-07-12 | Đóng CI blocker và rollout bằng script mới | lint/typecheck/build pass; unit 100/100; API integration 35/35; worker integration 7/7; OpenAPI valid với 15 warning; release `cicd-setup-20260712`, năm service healthy, HTTP smoke pass | Đăng ký runner và chạy GitHub workflow lần đầu |
+| 2026-07-12 | Đăng ký runner và first GitHub run | Runner v2.335.1 systemd active/enabled; run `29178873783`: CI Succeeded, Deploy EC2 test Succeeded; release `f1e33428a0534e0519d0cede8125fa5fa7e9344e`, năm service healthy | Branch protection là repository governance follow-up, không chặn CI/CD runtime |
 
 ## 15. Kết quả và bàn giao
 
-- Outcome: Repository CI/CD implementation và local EC2 rollout validation hoàn tất; GitHub activation còn runner registration/first run.
+- Outcome: CI/CD self-hosted cho push `main` hoàn tất và có GitHub end-to-end execution evidence.
 - File tạo: `.github/workflows/main-cicd.yml`, `scripts/deploy-ec2.sh`, `docs/17-self-hosted-cicd-runbook.md`, ExecPlan này. File sửa: `docker-compose.yml`, DevOps/Traceability/Open Questions/INDEX/CHANGELOG. Không đổi tên/xóa file.
 - Test/validation: install/lint/type/unit/integration/OpenAPI/build/static Compose/shell và runtime deploy/smoke pass; OpenAPI còn 15 non-blocking warning thuộc US-004 contract.
 - Changelog/traceability: đã cập nhật.
 - Assumption/TBD/Open Question: xem mục 5.
-- Follow-up: đăng ký runner bằng one-time token, chạy GitHub workflow lần đầu và bật branch protection.
+- Follow-up: repository admin bật branch protection/required `CI`; production registry/signing/IaC vẫn ngoài scope.

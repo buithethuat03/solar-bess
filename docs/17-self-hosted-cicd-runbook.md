@@ -4,12 +4,12 @@
 > **Scope:** EC2 test duy nhất; không phải production, registry/IaC/SBOM/signing vẫn TBD.
 > **Source:** `BR-040`, `NFR-007`, `NFR-021`, `NFR-023`, `SEC-124`, `ADR-001`, `TEST-196`, `TEST-221`, [DevOps](./14-devops-and-deployment.md) và [ExecPlan](../.agent/execplans/2026-07-12-main-self-hosted-cicd.md).
 > **Version:** 0.1
-> **Status:** Implemented in repository; runner registration/first GitHub run Pending
+> **Status:** Implemented; runner online và first GitHub CI/CD run Pass
 > **Owner:** Platform Engineering / repository owner
 > **Updated:** 2026-07-12
 > **Approval:** Người dùng yêu cầu trực tiếp cho EC2 test; production TBD
 
-> **Current status (2026-07-12):** Local CI và deploy script pass; release `cicd-setup-20260712` healthy. OpenAPI còn 15 non-blocking warning; runner registration/first GitHub run Pending.
+> **Current status (2026-07-12):** Runner `solar-bess-ec2-test` v2.335.1 active/enabled. GitHub run `29178873783` có CI và Deploy EC2 test Succeeded; release `f1e33428a0534e0519d0cede8125fa5fa7e9344e` healthy. OpenAPI còn 15 non-blocking warning.
 
 ## 1. Runtime contract
 

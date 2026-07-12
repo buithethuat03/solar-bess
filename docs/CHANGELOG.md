@@ -42,7 +42,8 @@ File này ghi lịch sử thay đổi phạm vi, tài liệu và governance củ
 - **Artefact bị ảnh hưởng:** `.github/workflows/main-cicd.yml`, `scripts/deploy-ec2.sh`, `docker-compose.yml`, ExecPlan CI/CD, DevOps/Traceability/Open Questions/INDEX/runbook/changelog.
 - **Migration/tương thích:** Không tạo schema/API migration. API tiếp tục chạy pending TypeORM migration; rollback không tự down schema nên migration tương lai phải backward-compatible. Compose project cố định giữ volumes hiện hữu.
 - **Validation:** `npm ci` cài 995 package, audit 0 vulnerability; lint/typecheck pass; unit API 47/47 + Web 32/32 + Worker 21/21; integration API 35/35 + Worker 7/7; OpenAPI valid với 15 non-blocking warning; build toàn workspace, shell syntax, Compose config và diff check pass. `deploy-ec2.sh` rollout release `cicd-setup-20260712`; năm runtime service healthy, `/web-health` và `/health` smoke pass. Runner registration/first GitHub run/branch protection còn Pending.
-- **Trạng thái:** Implemented và local runtime-validated cho EC2 test; GitHub activation In Progress; production/registry/IaC/SBOM/signing vẫn Proposed/TBD.
+- **Hosted evidence:** Runner `solar-bess-ec2-test` v2.335.1 được đăng ký/cài systemd active+enabled. GitHub run `29178873783` từ push `f1e33428a0534e0519d0cede8125fa5fa7e9344e`: job CI Succeeded, job Deploy EC2 test Succeeded; SHA release được ghi nhận, năm service healthy và `/health` database/Redis OK.
+- **Trạng thái:** Implemented và end-to-end validated cho EC2 test; branch protection là governance follow-up; production/registry/IaC/SBOM/signing vẫn Proposed/TBD.
 
 ## 2026-07-12 — Hoàn tất canonical documentation gate cho US-004 Risk, Issue và Change
 

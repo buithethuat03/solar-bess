@@ -40,10 +40,10 @@
 | 14 | [11 — Workflows and State Machines](./11-workflows-and-state-machines.md) | 26 formal workflows/Mermaid and approval rules | Draft; WF-003 core Implemented; WF-015/021 US-004 Approved | 0.7 / 2026-07-12 | 02–05/09 | Process owners, Internal Control |
 | 15 | [12 — Product Backlog](./12-product-backlog.md) | 37 US, 177 AC, DoR/DoD and phase split | Draft; US-003 core In Progress; US-004 Approved/Build-ready | 0.7 / 2026-07-12 | 02–11 | PO, Delivery, Engineering, QA |
 | 16 | [13 — Test Strategy](./13-test-strategy.md) | Test levels and 233 TEST scenarios | Draft; core US-003 partial evidence; US-004 verification Approved/Planned | 1.3 / 2026-07-12 | 04/08–12 | QA, Security, SRE, OT, business |
-| 17 | [14 — DevOps and Deployment](./14-devops-and-deployment.md) | Environments, CI/CD, rollout/recovery/release | Draft; self-hosted workflow/script implemented, first run Pending | 0.8 / 2026-07-12 | 06/09/13 | Platform, SRE, Security, QA |
+| 17 | [14 — DevOps and Deployment](./14-devops-and-deployment.md) | Environments, CI/CD, rollout/recovery/release | Draft; self-hosted EC2 CI/CD Implemented, first run Pass | 0.8 / 2026-07-12 | 06/09/13 | Platform, SRE, Security, QA |
 | 18 | [15 — Traceability Matrix](./15-traceability-matrix.md) | End-to-end chain, gap and contradiction audit | Draft; core US-003 implemented; US-004 exact trace Approved | 0.9 / 2026-07-12 | 01–14 | PO, BA, QA, Architecture |
 | 19 | [16 — Open Questions and Decisions](./16-open-questions-and-decisions.md) | Consolidated assumptions/questions/decisions/risks/data needs | Draft/Living; US-004 decisions/dependencies explicit | 0.6 / 2026-07-12 | 00–15 | All decision owners |
-| 20 | [17 — Self-hosted CI/CD Runbook](./17-self-hosted-cicd-runbook.md) | Runner registration, pipeline, deploy/recovery operations | Implemented in repository; first GitHub run Pending | 0.1 / 2026-07-12 | 14 | Platform, repository admin, Security |
+| 20 | [17 — Self-hosted CI/CD Runbook](./17-self-hosted-cicd-runbook.md) | Runner registration, pipeline, deploy/recovery operations | Implemented; runner online, first GitHub run Pass | 0.1 / 2026-07-12 | 14 | Platform, repository admin, Security |
 | 21 | [CHANGELOG](./CHANGELOG.md) | Repository documentation and scope history | Living | 2026-07-12 | Every change | PO, Documentation Owner |
 
 ## 3. Dependency graph

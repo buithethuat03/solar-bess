@@ -4,7 +4,7 @@
 > **Scope:** Operating model toàn platform; implementation profile cho base/auth, US-001, operational foundation/core US-003 và self-hosted CI/CD EC2 test. Production thật, registry và IaC vẫn Proposed/ngoài approval hiện tại.
 > **Source:** [SRS](./04-SRS.md), [Architecture](./06-solution-architecture.md), [Security](./09-security-and-permissions.md), [Test Strategy](./13-test-strategy.md), [Operational Foundation ExecPlan](../.agent/execplans/2026-07-11-operational-foundation.md), ADR-001…ADR-010, NFR-006…010/021/023 và SEC-115…132.
 > **Version:** 0.8
-> **Status:** Draft toàn platform; GitHub Actions workflow/script self-hosted EC2 test Implemented, runner registration/first hosted run Pending; production Proposed
+> **Status:** Draft toàn platform; GitHub Actions self-hosted EC2 test Implemented và first end-to-end run Pass; production Proposed
 > **Owner:** Platform Engineering / SRE / Release Management (cá nhân: TBD)
 > **Updated:** 2026-07-12
 > **Approval:** Operational foundation/core US-003 EC2 test Approved — Product Owner delegated; production TBD — Architecture, Engineering, SRE, Security, QA và Data Owner
@@ -103,7 +103,7 @@ When code begins, PR cannot merge until lint, type-check, unit and required inte
 - Job `CI` dùng lockfile, disposable PostgreSQL/Redis và chạy đủ command mục 4.1. Job `Deploy EC2 test` phụ thuộc CI thành công.
 - `scripts/deploy-ec2.sh` đọc env/secret ngoài Git, khóa deploy đồng thời, giữ Compose project hiện hữu `solar_bess_web`, tag image bằng commit SHA, chờ health và smoke `/web-health` + `/health`.
 - Trước rollout, image đang chạy được tag làm recovery point. Failure tự khôi phục application image; database migration không tự down và bắt buộc backward-compatible/forward-fix.
-- Cài runner, preflight, branch protection và recovery theo [runbook self-hosted CI/CD](./17-self-hosted-cicd-runbook.md). Chưa ghi hosted Pass cho tới khi runner online và có first-run evidence.
+- Runner `solar-bess-ec2-test` v2.335.1 chạy systemd dưới `ec2-user`; first run `29178873783` có CI/CD Succeeded. Preflight, branch protection và recovery theo [runbook self-hosted CI/CD](./17-self-hosted-cicd-runbook.md).
 
 ## 5. Quality and security gates
 

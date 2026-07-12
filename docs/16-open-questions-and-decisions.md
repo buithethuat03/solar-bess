@@ -142,7 +142,7 @@ ADR-001…ADR-010 vẫn Proposed cho toàn platform/production. Implementation p
 | RFI dedicated entity | Existing Document+Workflow may suffice | Use Document type + WF-016 | Engineering/Data |
 | Direct OT control | Explicitly out of scope | No endpoint/UI/message/credential | Separate future safety program |
 | Exact legal/tax/tariff rules | Project/effective-date specific | Versioned config/TBD, no hard-code | Legal/Finance/Energy |
-| Self-hosted CI/CD/registry/IaC/SBOM/signing | EC2 workflow/script đã materialize; runner/first GitHub run và production supply-chain evidence chưa có | EC2 implementation không đồng nghĩa hosted Pass/production; registry/IaC/signing giữ Planned | Platform/Security; repository admin đăng ký runner |
+| Self-hosted CI/CD/registry/IaC/SBOM/signing | EC2 runner/first GitHub run đã Pass; production supply-chain evidence chưa có | Không suy rộng EC2 Pass thành production; registry/IaC/signing giữ Planned | Platform/Security trước production |
 
 ## 7. Risks
 

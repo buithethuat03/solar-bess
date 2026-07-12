@@ -97,7 +97,7 @@ This is the primary chain. API/DB/SEC ranges are capability surfaces; exact oper
 | SEC-103/118; US-020 | Shared login quota/session dependency | Redis rate-limit state; không tạo API mới | TEST-200/231 | Approved/Planned, fail closed | Redis HA/persistence TBD |
 | ADR-002/004; SEC-105…111 | Database tenant reference invariant | Composite `(tenant_id, referenced_id)` FK; không đổi public API | TEST-202…208 | Approved/Planned | Topology/RLS TBD |
 | NFR-021/023; ADR-001 | API/worker runtime + main CI/CD contract | PostgreSQL + Redis + BullMQ; worker process/container riêng; self-hosted workflow + SHA image rollout | TEST-194/196 và operational smoke | Runtime deployed; CI/CD repository implementation, first GitHub run Pending | Registry/HA/SLO Proposed |
-| BR-040; NFR-007/023; SEC-124; US-024 | Controlled EC2 test delivery | `.github/workflows/main-cicd.yml`; `scripts/deploy-ec2.sh`; không đổi DB/API | TEST-196; TEST-221 subset | Implemented in repository; runner/branch protection Pending | Full supply-chain/production Proposed |
+| BR-040; NFR-007/023; SEC-124; US-024 | Controlled EC2 test delivery | `.github/workflows/main-cicd.yml`; `scripts/deploy-ec2.sh`; không đổi DB/API | TEST-196; TEST-221 subset | Implemented; runner online, first GitHub CI/CD run Pass; branch protection follow-up | Full supply-chain/production Proposed |
 | US-003 | Schedule contract | DB-101 + schedule-alert subset DB-105; API-023/024/034…037/140…142 | TEST-010…013 written; final runtime execution pending | Core Implemented/deployed, story not fully Pass | Proposed |
 | US-022/023/031…037 | ID stability only | DB-106…111 reserved; phần Notification ngoài schedule của DB-105 thuộc US-022 | ID/link audit; feature TEST giữ Draft | Documented/Not implemented | Proposed |
 
