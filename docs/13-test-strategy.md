@@ -3,8 +3,8 @@
 > **Purpose:** Định nghĩa test levels, environments, data, automation, entry/exit, defects và 233 high-level test scenarios truy tới 177 AC, 24 NFR và 32 SEC.
 > **Scope:** Test design toàn platform; execution evidence cho base/auth, US-001, operational foundation/US-003 và US-004. US-004 lint/type/unit/full isolated-port integration/migration/OpenAPI/build pre-push evidence đã Pass; remaining TEST-014…017 matrix, full E2E và actual GitHub Actions/EC2 deployment Pending. Production verification vẫn Proposed.
 > **Source:** [SRS](./04-SRS.md), [Data Model](./07-data-model.md), [API/OpenAPI](./08-api-specification.md), [Security](./09-security-and-permissions.md), [UX](./10-ux-information-architecture.md), [Workflows](./11-workflows-and-state-machines.md), [Backlog](./12-product-backlog.md), [Operational Foundation ExecPlan](../.agent/execplans/2026-07-11-operational-foundation.md), [US-003 ExecPlan](../.agent/execplans/2026-07-11-project-controls-us003.md).
-> **Version:** 1.7
-> **Status:** Draft toàn platform; Swagger current/design separation TEST-197 local unit/integration Pass; TEST-014…017 Partial, full E2E và production acceptance chưa Pass
+> **Version:** 1.8
+> **Status:** Draft toàn platform; Swagger current/design separation TEST-197 EC2 test deployed/verified; TEST-014…017 Partial, full E2E và production acceptance chưa Pass
 > **Owner:** QA/Test Architecture (cá nhân: TBD)
 > **Updated:** 2026-07-18
 > **Approval:** Operational foundation EC2 test và US-003/US-004 test design/local implementation Approved — Product Owner delegated; full acceptance/deployment/toàn platform/production TBD/Pending — QA Lead, Security, Architecture, Process Owners và OT Owner
@@ -384,7 +384,7 @@ UAT scripts are role-based: Executive/PMO, PM/Project Controls, Document/Contrac
 
 - Scope: `NFR-024`/`TEST-197`; canonical `docs/openapi/openapi.yaml` được load fail-fast một lần. `/api/docs/` dẫn xuất đúng 51 implemented operation; `/api/design-docs/` giữ 163 path operation + API-126 webhook = 164 API thiết kế.
 - Test bắt buộc đếm 51/164, xác nhận login có trong current view, planned `/v1/me/permissions` và webhook không lọt vào current view, mọi current operation có marker implemented, cả hai UI/YAML/assets cùng parse được.
-- Root lint/type/build/OpenAPI, unit 172/172, isolated full integration 61/61, focused dual-view integration 9/9 và production-image Nginx local/public EC2 worktree smoke đều Pass; smoke xác nhận cả hai UI/CSS/init/YAML, CSP/no-store và exact count 51/164. GitHub commit CI/CD release vẫn Pending tại thời điểm ghi entry. `scripts/deploy-ec2.sh` kiểm cả hai UI/YAML với bounded retry và tự fail/rollback khi feature flag bật.
+- Root lint/type/build/OpenAPI, unit 172/172, isolated full integration 61/61, focused dual-view integration 9/9 và production-image Nginx local/public EC2 worktree smoke đều Pass. GitHub Actions run `29633937535` CI + Deploy EC2 test Pass cho release `a54f487d040f0fa5125e7a954d71c0d85f09e1b5`; post-deploy public smoke xác nhận cả hai UI/CSS/init/YAML, CSP/no-store và exact count 51/164. `scripts/deploy-ec2.sh` kiểm cả hai UI/YAML với bounded retry và tự fail/rollback khi feature flag bật.
 
 ### Execution/verification — US-003 Project Controls, cập nhật 2026-07-18
 
@@ -475,3 +475,4 @@ UAT scripts are role-based: Executive/PMO, PM/Project Controls, Document/Contrac
 | 1.5 | 2026-07-18 | Codex | Ghi exact US-004 pre-push evidence và matrix TEST-012/014…017 Partial | Không đổi test catalog; lint/type/unit 168/integration 60/migration 7/OpenAPI/build Pass; full E2E và actual GitHub Actions/EC2 deployment Pending |
 | 1.6 | 2026-07-18 | Codex | Ghi TEST-197 cho canonical Swagger loader/runtime publication và full local/container evidence | Không đổi test catalog; root unit 171/full integration 61/OpenAPI/build và production-image/Nginx worktree smoke Pass; commit CI/CD Pending |
 | 1.7 | 2026-07-18 | Codex | Mở rộng TEST-197 cho current 51-operation view và complete 164-API design view | Không đổi test catalog; exact marker/count/negative filtering và dual HTTP publication được kiểm tự động |
+| 1.8 | 2026-07-18 | Codex | Ghi CI/CD run 29633937535 và post-deploy public evidence cho dual Swagger | Không đổi test catalog; CI/deploy và exact 51/164 runtime verification Pass trên EC2 test |

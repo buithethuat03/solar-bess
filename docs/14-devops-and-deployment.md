@@ -3,8 +3,8 @@
 > **Purpose:** Định nghĩa environment, source/build governance, CI/CD gates, artifact/migration/deployment/rollback, feature flags, secrets/IaC, observability, backup/DR và release checklist.
 > **Scope:** Operating model toàn platform; implementation profile cho base/auth, US-001, operational foundation/core US-003, US-004 local implementation và self-hosted CI/CD EC2 test. Production thật, registry và IaC vẫn Proposed/ngoài approval hiện tại.
 > **Source:** [SRS](./04-SRS.md), [Architecture](./06-solution-architecture.md), [Security](./09-security-and-permissions.md), [Test Strategy](./13-test-strategy.md), [Operational Foundation ExecPlan](../.agent/execplans/2026-07-11-operational-foundation.md), [US-004 ExecPlan](../.agent/execplans/2026-07-12-risk-issue-change-us004.md), ADR-001…ADR-010, NFR-006…010/021/023 và SEC-115…132.
-> **Version:** 1.1
-> **Status:** Draft toàn platform; Swagger current/design split implemented/tested local, commit CI/CD release Pending; production Proposed
+> **Version:** 1.2
+> **Status:** Draft toàn platform; Swagger current/design split implemented/tested/deployed EC2 test; production Proposed
 > **Owner:** Platform Engineering / SRE / Release Management (cá nhân: TBD)
 > **Updated:** 2026-07-18
 > **Approval:** Operational foundation/core US-003 EC2 test và US-004 local implementation Approved — Product Owner delegated; US-004 current deployment và production TBD/Pending — Architecture, Engineering, SRE, Security, QA và Data Owner
@@ -96,7 +96,7 @@ flowchart LR
 | Core Project Controls deploy 2026-07-12 | Workspace build; migration/seed; `docker compose up -d --wait`; public root/login/health | PostgreSQL/Redis/API/worker/web healthy; HTTP 200 tại `54.255.223.131`; current isolated integration Pass, full US-003 story E2E vẫn Pending |
 | US-004 pre-push close-out 2026-07-18 | lint/type/unit/integration/OpenAPI/build; migrations; isolated CI-like stack | Post-fix lint/type/unit 168/build Pass; exact-port full integration 60 Pass trước final branch hardening; backend HTTP 6/6 và Web focused 4/4/full 55 post-fix Pass; RiskChange migration 7/7; OpenAPI Pass; isolated stack 15433/16380 Pass. Actual GitHub Actions rerun/deploy/EC2/public/full E2E Pending |
 | Swagger publication pre-push 2026-07-18 | lint/type/unit/integration/OpenAPI/build; production images; Nginx/public smoke | Root lint/type/build/OpenAPI Pass; unit 171; isolated full integration 61; UI/CSS/init JS/YAML HTTP 200 with CSP/no-store; commit CI/CD run Pending |
-| Swagger current/design split pre-push 2026-07-18 | marker/route audit; lint/type/unit/integration/OpenAPI/build; production images; dual-view Nginx/public smoke | 51/51 business controller routes marked current; design 164; root lint/type/build/OpenAPI Pass; unit 172; isolated full integration 61; focused dual-view 9/9; local/public UI/CSS/init/YAML HTTP 200 with CSP/no-store; commit CI/CD run Pending |
+| Swagger current/design split release 2026-07-18 | marker/route audit; lint/type/unit/integration/OpenAPI/build; production images; dual-view Nginx/public smoke | 51/51 business controller routes marked current; design 164; root lint/type/build/OpenAPI Pass; unit 172; isolated full integration 61; focused dual-view 9/9; GitHub Actions `29633937535` CI/deploy Pass; SHA `a54f487…` API/worker/web healthy; post-deploy public UI/CSS/init/YAML HTTP 200 with CSP/no-store và exact 51/164 |
 
 When code begins, PR cannot merge until lint, type-check, unit and required integration gates run and results are reported. A skipped gate needs reason, owner, expiry and risk decision.
 
@@ -104,7 +104,7 @@ When code begins, PR cannot merge until lint, type-check, unit and required inte
 
 - `.github/workflows/main-cicd.yml` chỉ nhận push `main` hoặc manual dispatch, chạy trên label dedicated `solar-bess-deploy`; không chạy pull request/fork code có Docker/deploy privilege.
 - Job `CI` dùng lockfile, disposable PostgreSQL/Redis và chạy đủ command mục 4.1. Job `Deploy EC2 test` phụ thuộc CI thành công.
-- `docker-compose.test.yml` parameterizes host ports. Main CI reserves isolated PostgreSQL/Redis host ports `15433/16380`, injects matching integration environment and passes `TEST_*` through privilege boundary via `sudo -n env ...`, avoiding collision with local `5433/6380` on the same self-hosted runner. Exact CI-like preflight after forward migrations Pass; actual GitHub Actions push/deploy remains Pending.
+- `docker-compose.test.yml` parameterizes host ports. Main CI reserves isolated PostgreSQL/Redis host ports `15433/16380`, injects matching integration environment and passes `TEST_*` through privilege boundary via `sudo -n env ...`, avoiding collision with local `5433/6380` on the same self-hosted runner. Exact CI-like preflight after forward migrations Pass; current GitHub Actions run `29633937535` CI và EC2 deploy đều Pass. Branch protection follow-up vẫn Pending.
 - `scripts/deploy-ec2.sh` đọc env/secret ngoài Git, khóa deploy đồng thời, giữ Compose project hiện hữu `solar_bess_web`, tag image bằng commit SHA, chờ health và smoke `/web-health` + `/health`.
 - Trước rollout, image đang chạy được tag làm recovery point. Failure tự khôi phục application image; database migration không tự down và bắt buộc backward-compatible/forward-fix.
 - Runner `solar-bess-ec2-test` v2.335.1 chạy systemd dưới `ec2-user`; first run `29178873783` có CI/CD Succeeded. Preflight, branch protection và recovery theo [runbook self-hosted CI/CD](./17-self-hosted-cicd-runbook.md).
@@ -381,3 +381,4 @@ Security incident response owns containment/evidence; SRE owns service recovery;
 | 0.9 | 2026-07-18 | Codex | Ghi US-004 completed local gate/migration/rollout boundary; parameterize ports, isolate CI PostgreSQL/Redis 15433/16380 và preserve `TEST_*` qua `sudo -n env` | Không đổi deployment scope; pre-push gate Pass, actual GitHub Actions/EC2 deploy/public smoke/full E2E Pending, production Proposed |
 | 1.0 | 2026-07-18 | Codex | Thêm canonical Swagger/OpenAPI runtime publication, env gate, Nginx proxy, image asset và deploy smoke | Không đổi business/API operation scope; local TEST-197 Pass, commit deploy/public smoke Pending tại thời điểm ghi |
 | 1.1 | 2026-07-18 | Codex | Tách `/api/docs` current 51-operation view khỏi `/api/design-docs` complete 164-API view; mở rộng Nginx/deploy smoke | Không đổi business scope/schema; production expose vẫn cần HTTPS và access policy |
+| 1.2 | 2026-07-18 | Codex | Ghi immutable SHA release, GitHub Actions 29633937535 và post-deploy dual-Swagger public verification | EC2 test deployed/healthy; production expose vẫn cần HTTPS và access policy |

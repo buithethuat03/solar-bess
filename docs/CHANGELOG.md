@@ -18,6 +18,19 @@ File này ghi lịch sử thay đổi phạm vi, tài liệu và governance củ
 - **Trạng thái:** Proposed | Approved | Rejected | Implemented
 ```
 
+## 2026-07-18 — Deploy current/design Swagger lên EC2 test
+
+- **Loại:** DevOps; Test; Documentation; không thay đổi phạm vi nghiệp vụ baseline.
+- **Người yêu cầu/phê duyệt:** Người dùng/Product Owner yêu cầu tách Swagger và commit để CI/CD triển khai; thực hiện ngày 2026-07-18.
+- **Mã bị ảnh hưởng:** `NFR-024`, `TEST-197`; không cấp requirement/API ID mới.
+- **Trước thay đổi:** Current/design split đã qua local/container/public worktree preflight nhưng commit release còn Pending.
+- **Sau thay đổi:** Commit `a54f487d040f0fa5125e7a954d71c0d85f09e1b5` được GitHub Actions run `29633937535` CI và deploy thành công; API/worker/web chạy đúng immutable SHA, healthy. Public current Swagger trả 51 operations và design Swagger trả đủ 164 API IDs.
+- **Lý do:** Đóng evidence release thay vì chỉ ghi nhận pre-commit worktree smoke.
+- **Artefact bị ảnh hưởng:** Test Strategy, DevOps, INDEX và Changelog; không đổi runtime source/OpenAPI/schema.
+- **Migration/tương thích:** Không có migration mới; deploy script chạy forward-compatible migration workflow hiện hữu. `/api/docs/` và `/api/design-docs/` giữ contract đã công bố trong commit chức năng.
+- **Validation:** Workflow CI/Deploy Pass; post-deploy root/health HTTP 200; cả hai Swagger UI/CSS/init/YAML HTTP 200; OpenAPI 0.9.1; CSP/no-store Pass; current login present, planned permission/webhook excluded; design planned permission/webhook present; exact 51/164 count Pass.
+- **Trạng thái:** Implemented/deployed EC2 test; production HTTPS/access policy vẫn TBD theo artefact hiện hữu.
+
 ## 2026-07-18 — Tách current API Swagger khỏi full design Swagger
 
 - **Loại:** API metadata; DevOps; Test; Documentation; không thay đổi phạm vi nghiệp vụ baseline.
