@@ -2,7 +2,7 @@ openapi: 3.1.0
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 info:
   title: Solar & BESS Project Management Platform API
-  version: 0.9.0
+  version: 0.9.1
   description: >-
     Draft vendor-neutral contract. Unknown domain fields remain TBD. PM/O&M operations
     cannot start, stop, reset, bypass, clear source alarms, or send BESS/OT setpoints.
@@ -36,6 +36,7 @@ paths:
       summary: "Đăng nhập local cho base/test profile"
       operationId: api_137_post_v1_auth_login
       x-api-id: "API-137"
+      x-implementation-status: implemented
       x-permission: "public"
       x-data-scope: "tenant resolved server-side from tenantCode"
       x-idempotency: "not required; rate limited"
@@ -70,6 +71,7 @@ paths:
       summary: "Rotate refresh JWT và cấp access JWT mới"
       operationId: api_138_post_v1_auth_refresh
       x-api-id: "API-138"
+      x-implementation-status: implemented
       x-permission: "valid refresh session"
       x-data-scope: "signed tenant/user/session claims"
       x-idempotency: "single-use rotation"
@@ -98,6 +100,7 @@ paths:
       summary: "Thu hồi refresh session và xóa cookie"
       operationId: api_139_post_v1_auth_logout
       x-api-id: "API-139"
+      x-implementation-status: implemented
       x-permission: "refresh session if present"
       x-data-scope: "signed tenant/user/session claims"
       x-idempotency: "idempotent"
@@ -122,6 +125,7 @@ paths:
       summary: "Đọc identity, tenant context và profile hiệu lực"
       operationId: api_001_get_v1_me
       x-api-id: "API-001"
+      x-implementation-status: implemented
       x-permission: "authenticated"
       x-data-scope: "current tenant/user"
       x-idempotency: "safe"
@@ -242,6 +246,7 @@ paths:
       summary: "Liệt kê Company theo scope"
       operationId: api_004_get_v1_companies
       x-api-id: "API-004"
+      x-implementation-status: implemented
       x-permission: "organization.read"
       x-data-scope: "tenant/company"
       x-idempotency: "safe"
@@ -279,6 +284,7 @@ paths:
       summary: "Tạo Company master"
       operationId: api_005_post_v1_companies
       x-api-id: "API-005"
+      x-implementation-status: implemented
       x-permission: "organization.create"
       x-data-scope: "tenant"
       x-idempotency: "required"
@@ -324,6 +330,7 @@ paths:
       summary: "Liệt kê LegalEntity theo scope"
       operationId: api_006_get_v1_legal_entities
       x-api-id: "API-006"
+      x-implementation-status: implemented
       x-permission: "legalEntity.read"
       x-data-scope: "tenant/legal entity"
       x-idempotency: "safe"
@@ -361,6 +368,7 @@ paths:
       summary: "Đăng ký LegalEntity bằng stable identity"
       operationId: api_007_post_v1_legal_entities
       x-api-id: "API-007"
+      x-implementation-status: implemented
       x-permission: "legalEntity.create"
       x-data-scope: "tenant/company"
       x-idempotency: "required"
@@ -680,6 +688,7 @@ paths:
       summary: "Đọc trạng thái dịch vụ không lộ nội bộ"
       operationId: api_014_get_v1_system_status
       x-api-id: "API-014"
+      x-implementation-status: implemented
       x-permission: "systemStatus.read"
       x-data-scope: "tenant/service tier"
       x-idempotency: "safe"
@@ -718,6 +727,7 @@ paths:
       summary: "Liệt kê portfolio và aggregate được phép"
       operationId: api_015_get_v1_portfolios
       x-api-id: "API-015"
+      x-implementation-status: implemented
       x-permission: "portfolio.read"
       x-data-scope: "tenant/portfolio"
       x-idempotency: "safe"
@@ -755,6 +765,7 @@ paths:
       summary: "Tạo portfolio"
       operationId: api_016_post_v1_portfolios
       x-api-id: "API-016"
+      x-implementation-status: implemented
       x-permission: "portfolio.create"
       x-data-scope: "tenant"
       x-idempotency: "required"
@@ -800,6 +811,7 @@ paths:
       summary: "Liệt kê project theo filter/cursor"
       operationId: api_017_get_v1_projects
       x-api-id: "API-017"
+      x-implementation-status: implemented
       x-permission: "project.read"
       x-data-scope: "tenant/legal entity/portfolio"
       x-idempotency: "safe"
@@ -837,6 +849,7 @@ paths:
       summary: "Tạo project master"
       operationId: api_018_post_v1_projects
       x-api-id: "API-018"
+      x-implementation-status: implemented
       x-permission: "project.create"
       x-data-scope: "tenant/portfolio/legal entity"
       x-idempotency: "required"
@@ -888,6 +901,7 @@ paths:
       summary: "Đọc project overview và data freshness"
       operationId: api_019_get_v1_projects_projectid
       x-api-id: "API-019"
+      x-implementation-status: implemented
       x-permission: "project.read"
       x-data-scope: "project"
       x-idempotency: "safe"
@@ -925,6 +939,7 @@ paths:
       summary: "Cập nhật project master bằng If-Match"
       operationId: api_020_patch_v1_projects_projectid
       x-api-id: "API-020"
+      x-implementation-status: implemented
       x-permission: "project.update"
       x-data-scope: "project/field"
       x-idempotency: "required"
@@ -977,6 +992,7 @@ paths:
       summary: "Liệt kê site"
       operationId: api_021_get_v1_projects_projectid_sites
       x-api-id: "API-021"
+      x-implementation-status: implemented
       x-permission: "site.read"
       x-data-scope: "project/site"
       x-idempotency: "safe"
@@ -1014,6 +1030,7 @@ paths:
       summary: "Tạo site"
       operationId: api_022_post_v1_projects_projectid_sites
       x-api-id: "API-022"
+      x-implementation-status: implemented
       x-permission: "site.create"
       x-data-scope: "project"
       x-idempotency: "required"
@@ -1172,6 +1189,7 @@ paths:
       summary: "Upsert project party và RACI có hiệu lực"
       operationId: api_025_put_v1_projects_projectid_parties_partyid
       x-api-id: "API-025"
+      x-implementation-status: implemented
       x-permission: "projectParty.manage"
       x-data-scope: "project/package"
       x-idempotency: "required"

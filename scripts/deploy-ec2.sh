@@ -73,8 +73,12 @@ curl --fail --silent --show-error --retry 10 --retry-delay 2 http://127.0.0.1/we
 curl --fail --silent --show-error --retry 10 --retry-delay 2 http://127.0.0.1/health >/dev/null
 if [[ "$({ set -a; source "$ENV_FILE"; set +a; printf '%s' "${SWAGGER_ENABLED:-true}"; })" == true ]]; then
   curl --fail --silent --show-error --retry 10 --retry-delay 2 http://127.0.0.1/api/docs/ \
-    | grep -F 'Solar & BESS API Documentation' >/dev/null
+    | grep -F 'Solar & BESS Implemented API Documentation' >/dev/null
   curl --fail --silent --show-error --retry 10 --retry-delay 2 http://127.0.0.1/api/docs/openapi.yaml \
+    | grep '^openapi: 3.1.0$' >/dev/null
+  curl --fail --silent --show-error --retry 10 --retry-delay 2 http://127.0.0.1/api/design-docs/ \
+    | grep -F 'Solar & BESS API Design Documentation' >/dev/null
+  curl --fail --silent --show-error --retry 10 --retry-delay 2 http://127.0.0.1/api/design-docs/openapi.yaml \
     | grep '^openapi: 3.1.0$' >/dev/null
 fi
 

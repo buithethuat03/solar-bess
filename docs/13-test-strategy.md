@@ -3,8 +3,8 @@
 > **Purpose:** Định nghĩa test levels, environments, data, automation, entry/exit, defects và 233 high-level test scenarios truy tới 177 AC, 24 NFR và 32 SEC.
 > **Scope:** Test design toàn platform; execution evidence cho base/auth, US-001, operational foundation/US-003 và US-004. US-004 lint/type/unit/full isolated-port integration/migration/OpenAPI/build pre-push evidence đã Pass; remaining TEST-014…017 matrix, full E2E và actual GitHub Actions/EC2 deployment Pending. Production verification vẫn Proposed.
 > **Source:** [SRS](./04-SRS.md), [Data Model](./07-data-model.md), [API/OpenAPI](./08-api-specification.md), [Security](./09-security-and-permissions.md), [UX](./10-ux-information-architecture.md), [Workflows](./11-workflows-and-state-machines.md), [Backlog](./12-product-backlog.md), [Operational Foundation ExecPlan](../.agent/execplans/2026-07-11-operational-foundation.md), [US-003 ExecPlan](../.agent/execplans/2026-07-11-project-controls-us003.md).
-> **Version:** 1.6
-> **Status:** Draft toàn platform; US-001 evidence Completed; US-004 local pre-push gate Completed; Swagger publication TEST-197 local unit/integration Pass; TEST-014…017 Partial, full E2E và actual deployment chưa Pass
+> **Version:** 1.7
+> **Status:** Draft toàn platform; Swagger current/design separation TEST-197 local unit/integration Pass; TEST-014…017 Partial, full E2E và production acceptance chưa Pass
 > **Owner:** QA/Test Architecture (cá nhân: TBD)
 > **Updated:** 2026-07-18
 > **Approval:** Operational foundation EC2 test và US-003/US-004 test design/local implementation Approved — Product Owner delegated; full acceptance/deployment/toàn platform/production TBD/Pending — QA Lead, Security, Architecture, Process Owners và OT Owner
@@ -382,9 +382,9 @@ UAT scripts are role-based: Executive/PMO, PM/Project Controls, Document/Contrac
 
 ### Execution/verification — Swagger/OpenAPI runtime publication, cập nhật 2026-07-18
 
-- Scope: `NFR-024`/`TEST-197`; canonical `docs/openapi/openapi.yaml` được load fail-fast và publish tại `/api/docs/` + `/api/docs/openapi.yaml`, không generate contract song song.
-- Local evidence: root lint/type/build/OpenAPI Pass; unit API **15 suites/55**, Web **20/55**, Worker **12/61** = **171** Pass; full integration API **8 suites/50** + Worker **3/11** = **61** Pass. Trong đó loader unit **3/3** và Identity/Swagger integration **9/9** kiểm UI HTML, same-origin CSS asset, YAML parse lại thành OpenAPI 3.1.0 và known auth path.
-- Production Docker image + Nginx worktree smoke Pass cho UI, CSS, init JS và YAML ở local/public EC2 IP; GitHub commit CI/CD release vẫn Pending tại thời điểm ghi entry. `scripts/deploy-ec2.sh` có bounded retry và tự fail/rollback nếu Swagger UI/YAML không đạt khi feature flag bật.
+- Scope: `NFR-024`/`TEST-197`; canonical `docs/openapi/openapi.yaml` được load fail-fast một lần. `/api/docs/` dẫn xuất đúng 51 implemented operation; `/api/design-docs/` giữ 163 path operation + API-126 webhook = 164 API thiết kế.
+- Test bắt buộc đếm 51/164, xác nhận login có trong current view, planned `/v1/me/permissions` và webhook không lọt vào current view, mọi current operation có marker implemented, cả hai UI/YAML/assets cùng parse được.
+- Root lint/type/build/OpenAPI, unit 172/172, isolated full integration 61/61, focused dual-view integration 9/9 và production-image Nginx local/public EC2 worktree smoke đều Pass; smoke xác nhận cả hai UI/CSS/init/YAML, CSP/no-store và exact count 51/164. GitHub commit CI/CD release vẫn Pending tại thời điểm ghi entry. `scripts/deploy-ec2.sh` kiểm cả hai UI/YAML với bounded retry và tự fail/rollback khi feature flag bật.
 
 ### Execution/verification — US-003 Project Controls, cập nhật 2026-07-18
 
@@ -474,3 +474,4 @@ UAT scripts are role-based: Executive/PMO, PM/Project Controls, Document/Contrac
 | 1.4 | 2026-07-18 | Codex | Đồng bộ TEST-012…017 với API-149 union/mixed-payload denial, DB-113 immutable multi-cycle history, DB-105 typed non-null derivation và API-157 full-filter version-grouped 25+25 heatmap | Không đổi test catalog; US-004 vẫn Approved/Planned, chưa claim execution/implementation |
 | 1.5 | 2026-07-18 | Codex | Ghi exact US-004 pre-push evidence và matrix TEST-012/014…017 Partial | Không đổi test catalog; lint/type/unit 168/integration 60/migration 7/OpenAPI/build Pass; full E2E và actual GitHub Actions/EC2 deployment Pending |
 | 1.6 | 2026-07-18 | Codex | Ghi TEST-197 cho canonical Swagger loader/runtime publication và full local/container evidence | Không đổi test catalog; root unit 171/full integration 61/OpenAPI/build và production-image/Nginx worktree smoke Pass; commit CI/CD Pending |
+| 1.7 | 2026-07-18 | Codex | Mở rộng TEST-197 cho current 51-operation view và complete 164-API design view | Không đổi test catalog; exact marker/count/negative filtering và dual HTTP publication được kiểm tự động |

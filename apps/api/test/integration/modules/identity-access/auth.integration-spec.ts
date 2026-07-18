@@ -10,6 +10,8 @@ import { loadAppConfig } from 'src/config/environment';
 import { LocalCredentialEntity, TenantEntity, UserAccountEntity } from 'src/database/entities';
 import { runTestMigrations } from 'test/setup/run-migrations';
 import { load } from 'js-yaml';
+import type { OpenAPIObject } from '@nestjs/swagger';
+import { countOpenApiOperations } from 'src/openapi/swagger';
 
 const tenantId = randomUUID();
 const userId = randomUUID();
@@ -89,18 +91,33 @@ describe('Auth API integration — TEST-230…233', () => {
     expect(ipEvidence.session_ip).not.toContain('127.0.0.1');
   });
 
-  it('TEST-197/NFR-024: publishes Swagger UI and the canonical OpenAPI 3.1 YAML', async () => {
+  it('TEST-197/NFR-024: separates implemented Swagger from the complete design contract', async () => {
     const page = await request(app.getHttpServer()).get('/api/docs/').expect(200)
       .expect('Content-Type', /text\/html/);
-    expect(page.text).toContain('Solar & BESS API Documentation');
+    expect(page.text).toContain('Solar & BESS Implemented API Documentation');
 
     await request(app.getHttpServer()).get('/api/docs/swagger-ui.css').expect(200)
       .expect('Content-Type', /text\/css/);
+    await request(app.getHttpServer()).get('/api/docs/swagger-ui-init.js').expect(200)
+      .expect('Content-Type', /javascript/);
     const specification = await request(app.getHttpServer()).get('/api/docs/openapi.yaml').expect(200)
       .expect('Content-Type', /yaml/);
-    const parsed = load(specification.text) as { openapi?: string; paths?: Record<string, unknown> };
-    expect(parsed.openapi).toBe('3.1.0');
-    expect(parsed.paths?.['/v1/auth/login']).toBeDefined();
+    const implemented = load(specification.text) as OpenAPIObject;
+    expect(implemented.openapi).toBe('3.1.0');
+    expect(implemented.paths['/v1/auth/login']).toBeDefined();
+    expect(implemented.paths['/v1/me/permissions']).toBeUndefined();
+    expect(countOpenApiOperations(implemented)).toBe(51);
+
+    const designPage = await request(app.getHttpServer()).get('/api/design-docs/').expect(200)
+      .expect('Content-Type', /text\/html/);
+    expect(designPage.text).toContain('Solar & BESS API Design Documentation');
+    await request(app.getHttpServer()).get('/api/design-docs/swagger-ui.css').expect(200)
+      .expect('Content-Type', /text\/css/);
+    await request(app.getHttpServer()).get('/api/design-docs/swagger-ui-init.js').expect(200)
+      .expect('Content-Type', /javascript/);
+    const designSpecification = await request(app.getHttpServer())
+      .get('/api/design-docs/openapi.yaml').expect(200).expect('Content-Type', /yaml/);
+    expect(countOpenApiOperations(load(designSpecification.text) as OpenAPIObject)).toBe(164);
   });
 
   it('TEST-231: returns generic denial and creates no session', async () => {

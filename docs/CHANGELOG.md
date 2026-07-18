@@ -18,6 +18,19 @@ File này ghi lịch sử thay đổi phạm vi, tài liệu và governance củ
 - **Trạng thái:** Proposed | Approved | Rejected | Implemented
 ```
 
+## 2026-07-18 — Tách current API Swagger khỏi full design Swagger
+
+- **Loại:** API metadata; DevOps; Test; Documentation; không thay đổi phạm vi nghiệp vụ baseline.
+- **Người yêu cầu/phê duyệt:** Người dùng/Product Owner xác nhận current Swagger chỉ nên hiển thị API đã triển khai và đồng ý giữ full design ở view riêng ngày 2026-07-18.
+- **Mã bị ảnh hưởng:** `NFR-024`, `TEST-197`; metadata implementation của `API-001`, `API-004…007`, `API-014…022`, `API-025`, `API-137…139`; không cấp API ID mới.
+- **Trước thay đổi:** `/api/docs/` hiển thị toàn bộ 164 API thiết kế; OpenAPI chỉ có 33 marker implemented và thiếu 18 auth/system/project operations đã có controller.
+- **Sau thay đổi:** OpenAPI 0.9.1 có đúng 51 controller-backed marker. `/api/docs/` dẫn xuất current view 51 operations; `/api/design-docs/` giữ đủ 163 path operations + API-126 webhook = 164 API IDs. Ba health probe technical không nằm trong business Swagger.
+- **Lý do:** Không để người dùng Swagger hiểu nhầm API thiết kế là endpoint đã hoạt động, đồng thời vẫn bảo toàn contract tương lai để review.
+- **Artefact bị ảnh hưởng:** OpenAPI/API/Test/DevOps/Trace/INDEX/Changelog; Nest Swagger filter, Nginx, deploy smoke và automated tests.
+- **Migration/tương thích:** Không đổi path/schema/database; `/api/docs/` intentionally thu hẹp danh sách, full design chuyển sang additive `/api/design-docs/`. Consumer cần full contract phải đổi URL publication.
+- **Validation hiện có:** Redocly, root lint/type/build Pass; marker audit 51 unique implemented/164 total; unit API 56 + Web 55 + Worker 61 = 172; isolated full integration API 50 + Worker 11 = 61 và focused dual-Swagger/Auth 9/9 Pass. Production images build thành công; Nginx/local và public EC2 worktree smoke cả hai UI/CSS/init/YAML, CSP/no-store và exact 51/164 count đều Pass. Commit CI/CD release Pending tại thời điểm ghi.
+- **Trạng thái:** Local implementation/test/container/public worktree smoke Implemented; commit deployment Pending tại thời điểm ghi.
+
 ## 2026-07-18 — Publish canonical OpenAPI 3.1 qua Swagger UI
 
 - **Loại:** API tooling; DevOps; Test; Documentation; không thay đổi phạm vi nghiệp vụ baseline.

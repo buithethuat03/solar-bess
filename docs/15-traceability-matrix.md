@@ -3,7 +3,7 @@
 > **Purpose:** Cung cấp chuỗi truy vết Business Goal → BR → FR/NFR → UC → WF → US → AC → API → DB → SEC → TEST → Release và công khai mọi gap/mâu thuẫn.
 > **Scope:** Toàn bộ artefact Draft và implementation profiles; matrix dùng range inclusive. US-001 và operational foundation/core US-003 đã deploy EC2 test; US-004 Implemented local với acceptance Partial và deployment Pending; production vẫn Proposed.
 > **Source:** [Vision](./01-product-vision-and-scope.md), [BRD](./02-BRD.md), [PRD](./03-PRD.md), [SRS](./04-SRS.md), [Domain](./05-domain-model.md), [Architecture](./06-solution-architecture.md), [Data](./07-data-model.md), [API](./08-api-specification.md), [Security](./09-security-and-permissions.md), [UX](./10-ux-information-architecture.md), [Workflow](./11-workflows-and-state-machines.md), [Backlog](./12-product-backlog.md), [Test](./13-test-strategy.md), [Operational Foundation ExecPlan](../.agent/execplans/2026-07-11-operational-foundation.md), [US-003 ExecPlan](../.agent/execplans/2026-07-11-project-controls-us003.md), [US-004 ExecPlan](../.agent/execplans/2026-07-12-risk-issue-change-us004.md).
-> **Version:** 1.5
+> **Version:** 1.6
 > **Status:** Draft toàn platform; US-001/operational foundation/US-003 core Implemented; US-004 Implemented local, TEST-014…017 Partial và GitHub Actions/EC2 deployment Pending; production Proposed
 > **Owner:** Product Operations / Business Analysis / QA (cá nhân: TBD)
 > **Updated:** 2026-07-18
@@ -159,7 +159,7 @@ This is the primary chain. API/DB/SEC ranges are capability surfaces; exact oper
 | NFR-001…024 | BR/ARC/SEC Source mappings in PRD | TEST-174…197 one-to-one | 24/24 |
 | SEC-101…132 | BR/FR/NFR/API and Source SEC-001…008 | TEST-198…229 one-to-one | 32/32 |
 | ADR-001…010 | ARC-001…010 | NFR/SEC/architecture evidence; TEST ranges where applicable | 10/10 Proposed; acceptance TBD |
-| API-001…164 | Each x-related-requirements/data/security | OpenAPI x-api-id + API/contract/security tests | 164/164 have requirement; 33 implemented operation markers include API-008/036/038/143…164; acceptance status remains test-specific |
+| API-001…164 | Each x-related-requirements/data/security | OpenAPI x-api-id + API/contract/security tests | 164/164 have requirement; 51 current controller-backed operations have implemented marker and 113 remain design-only; acceptance status remains test-specific |
 | DB-001…113 | Domain/BR/FR/NFR trace in dictionary/operational plan | API/OpenAPI, aggregate/internal relationship or explicit reservation | 113/113 referenced outside owner; DB-101…105 and DB-112/113 materialized local; DB-106…111 reserved; forward reconcile tested local, actual deploy Pending |
 | AC-001…177 | US-001…037/source GWT + approved auth delta | TEST-001…173 + TEST-230…233 | 177/177 mapped |
 
@@ -256,3 +256,4 @@ Deferred does not mean silently complete:
 | 1.3 | 2026-07-18 | Codex | Thêm exact trace cho DB-065 residual SoR/versioned Action promotion và in-place DB-105 source/scope generalization | Không đổi requirement/AC; migration/runtime/test evidence vẫn pending |
 | 1.4 | 2026-07-18 | Codex | Cấp trace DB-113 closure-cycle history, API-149 command union và API-157 full-filter/version-grouped heatmap; đồng bộ registry DB-001…113 | Không đổi requirement/AC; đóng ambiguity semantic trước M1 |
 | 1.5 | 2026-07-18 | Codex | Ghi implementation trace API-008/036/038/143…164, DB-065…067/112/113/generalized DB-105, pre-push Pass và exact TEST-012/014…017 Partial evidence | Không đổi requirement/AC; unit 168/integration 60/migration 7/build Pass, actual GitHub Actions/EC2 deployment/full E2E Pending |
+| 1.6 | 2026-07-18 | Codex | Reconcile 51 controller-backed API implementation markers và tách current/design Swagger publication trace | Không đổi API/requirement count; backfill status metadata cho 18 auth/system/project operations đã triển khai |

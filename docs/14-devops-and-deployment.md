@@ -3,8 +3,8 @@
 > **Purpose:** Định nghĩa environment, source/build governance, CI/CD gates, artifact/migration/deployment/rollback, feature flags, secrets/IaC, observability, backup/DR và release checklist.
 > **Scope:** Operating model toàn platform; implementation profile cho base/auth, US-001, operational foundation/core US-003, US-004 local implementation và self-hosted CI/CD EC2 test. Production thật, registry và IaC vẫn Proposed/ngoài approval hiện tại.
 > **Source:** [SRS](./04-SRS.md), [Architecture](./06-solution-architecture.md), [Security](./09-security-and-permissions.md), [Test Strategy](./13-test-strategy.md), [Operational Foundation ExecPlan](../.agent/execplans/2026-07-11-operational-foundation.md), [US-004 ExecPlan](../.agent/execplans/2026-07-12-risk-issue-change-us004.md), ADR-001…ADR-010, NFR-006…010/021/023 và SEC-115…132.
-> **Version:** 1.0
-> **Status:** Draft toàn platform; self-hosted pipeline/historical first run, US-004 isolated CI-like pre-push gate và Swagger local production-image/Nginx smoke Implemented/Pass; current Swagger commit CI/CD release Pending; production Proposed
+> **Version:** 1.1
+> **Status:** Draft toàn platform; Swagger current/design split implemented/tested local, commit CI/CD release Pending; production Proposed
 > **Owner:** Platform Engineering / SRE / Release Management (cá nhân: TBD)
 > **Updated:** 2026-07-18
 > **Approval:** Operational foundation/core US-003 EC2 test và US-004 local implementation Approved — Product Owner delegated; US-004 current deployment và production TBD/Pending — Architecture, Engineering, SRE, Security, QA và Data Owner
@@ -84,7 +84,7 @@ flowchart LR
 | Install | `npm ci` | Pass 2026-07-11; lockfile reproducible |
 | Format/lint | `npm run lint` | Pass, zero warning |
 | Type-check/compile | `npm run typecheck`; `npm run build` | Type-check API/Web/Worker Pass; build API/Web/Worker Pass, Web 1,697 modules |
-| Unit/property | `npm run test:unit` | Swagger pre-commit: API 15 suites/55, Web 20 files/55, Worker 12 suites/61 = 171 Pass; prior US-004 focused closure exact-payload 4/4 |
+| Unit/property | `npm run test:unit` | Swagger split pre-commit: API 15 suites/56, Web 20 files/55, Worker 12 suites/61 = 172 Pass; prior US-004 focused closure exact-payload 4/4 |
 | Integration/API | `npm run test:integration` | Swagger pre-commit exact isolated ports: API 8 suites/50 + Worker 3 suites/11 = 61 Pass; Identity/Swagger suite 9/9 gồm UI/assets/YAML |
 | UI/E2E/accessibility | `npm run test:e2e` | 3/3 pass: auth 2 + Project Master create/activate/Site/party/archive 1 |
 | Security scans | TBD SAST/SCA/secret/DAST/container/IaC | Not run |
@@ -96,6 +96,7 @@ flowchart LR
 | Core Project Controls deploy 2026-07-12 | Workspace build; migration/seed; `docker compose up -d --wait`; public root/login/health | PostgreSQL/Redis/API/worker/web healthy; HTTP 200 tại `54.255.223.131`; current isolated integration Pass, full US-003 story E2E vẫn Pending |
 | US-004 pre-push close-out 2026-07-18 | lint/type/unit/integration/OpenAPI/build; migrations; isolated CI-like stack | Post-fix lint/type/unit 168/build Pass; exact-port full integration 60 Pass trước final branch hardening; backend HTTP 6/6 và Web focused 4/4/full 55 post-fix Pass; RiskChange migration 7/7; OpenAPI Pass; isolated stack 15433/16380 Pass. Actual GitHub Actions rerun/deploy/EC2/public/full E2E Pending |
 | Swagger publication pre-push 2026-07-18 | lint/type/unit/integration/OpenAPI/build; production images; Nginx/public smoke | Root lint/type/build/OpenAPI Pass; unit 171; isolated full integration 61; UI/CSS/init JS/YAML HTTP 200 with CSP/no-store; commit CI/CD run Pending |
+| Swagger current/design split pre-push 2026-07-18 | marker/route audit; lint/type/unit/integration/OpenAPI/build; production images; dual-view Nginx/public smoke | 51/51 business controller routes marked current; design 164; root lint/type/build/OpenAPI Pass; unit 172; isolated full integration 61; focused dual-view 9/9; local/public UI/CSS/init/YAML HTTP 200 with CSP/no-store; commit CI/CD run Pending |
 
 When code begins, PR cannot merge until lint, type-check, unit and required integration gates run and results are reported. A skipped gate needs reason, owner, expiry and risk decision.
 
@@ -112,9 +113,9 @@ When code begins, PR cannot merge until lint, type-check, unit and required inte
 
 - `SWAGGER_ENABLED` mặc định fail-closed `false` khi API chạy độc lập; Compose EC2 test truyền `true` nếu env không override. Production phải quyết định explicit và cần HTTPS cùng network/reverse-proxy access policy trước khi expose.
 - API image chứa canonical `docs/openapi/openapi.yaml`; startup fail nếu file thiếu, YAML lỗi hoặc không phải OpenAPI 3.1.x có `info.title` và `paths`.
-- Nginx same-origin proxy `/api/docs` tới API. Human UI ở `/api/docs/`; machine-readable contract ở `/api/docs/openapi.yaml`. CSP giữ script/connect self-only, frame deny và response no-store.
-- Deploy smoke dùng bounded curl retry cho cả UI title lẫn `openapi: 3.1.0`; khi flag tắt thì bỏ qua đúng hai check này. Failure khi flag bật kích hoạt application-image rollback hiện có.
-- Đây là publication của contract Draft 164 operation; 33 implemented markers mới là implementation claim. Không được diễn giải việc route Swagger healthy thành toàn bộ operation đã triển khai hoặc `TEST-014…017` Pass.
+- Nginx same-origin proxy `/api/docs` và `/api/design-docs` tới API. Current UI/YAML chỉ có 51 controller-backed operations; design UI/YAML có đủ 164 API IDs. CSP giữ script/connect self-only, frame deny và response no-store.
+- Deploy smoke dùng bounded curl retry cho title và OpenAPI version của cả hai view; khi flag tắt thì bỏ qua đúng nhóm Swagger checks. Failure khi flag bật kích hoạt application-image rollback hiện có.
+- Ba health route `/health`, `/health/live`, `/health/ready` là technical probes và không được đưa vào business Swagger. Không được diễn giải design Swagger healthy thành toàn bộ 164 API đã triển khai hoặc `TEST-014…017` Pass.
 
 ## 5. Quality and security gates
 
@@ -379,3 +380,4 @@ Security incident response owns containment/evidence; SRE owns service recovery;
 | 0.8 | 2026-07-12 | Codex | Thêm main self-hosted CI/CD, SHA image, serialized rollout, health/smoke/rollback và runner runbook | Repository implementation cho EC2 test; runner registration/first GitHub run Pending; production vẫn Proposed |
 | 0.9 | 2026-07-18 | Codex | Ghi US-004 completed local gate/migration/rollout boundary; parameterize ports, isolate CI PostgreSQL/Redis 15433/16380 và preserve `TEST_*` qua `sudo -n env` | Không đổi deployment scope; pre-push gate Pass, actual GitHub Actions/EC2 deploy/public smoke/full E2E Pending, production Proposed |
 | 1.0 | 2026-07-18 | Codex | Thêm canonical Swagger/OpenAPI runtime publication, env gate, Nginx proxy, image asset và deploy smoke | Không đổi business/API operation scope; local TEST-197 Pass, commit deploy/public smoke Pending tại thời điểm ghi |
+| 1.1 | 2026-07-18 | Codex | Tách `/api/docs` current 51-operation view khỏi `/api/design-docs` complete 164-API view; mở rộng Nginx/deploy smoke | Không đổi business scope/schema; production expose vẫn cần HTTPS và access policy |

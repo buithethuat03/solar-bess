@@ -3,8 +3,8 @@
 > **Purpose:** Định nghĩa conventions, authentication/authorization, tenant context, error/idempotency/file/webhook/audit/versioning và danh mục 164 API operations, đồng bộ với OpenAPI 3.1.
 > **Scope:** Business/API contract vendor-neutral cho PM Web, O&M và inbound read-only integration; schema nhỏ chưa rõ được đánh dấu TBD. Không có endpoint điều khiển BESS/OT.
 > **Source:** [SRS](./04-SRS.md), [Domain Model](./05-domain-model.md), [Architecture](./06-solution-architecture.md), [Data Model](./07-data-model.md), [PRD](./03-PRD.md), [OpenAPI 3.1](./openapi/openapi.yaml).
-> **Version:** 1.4
-> **Status:** Draft toàn platform; US-001 và US-003 core APIs Implemented; API-008/036/038/143…164 Implemented local cho US-004; canonical OpenAPI runtime publication Implemented local; TEST-014…017 acceptance Partial và EC2 deployment Pending
+> **Version:** 1.5
+> **Status:** Draft toàn platform; 51 current runtime API operations được đánh dấu Implemented và tách khỏi full 164-operation design contract; TEST-014…017 acceptance Partial và production vẫn Pending
 > **Owner:** API Architecture / Domain Teams (cá nhân: TBD)
 > **Updated:** 2026-07-18
 > **Approval:** Product Owner delegated approval cho US-003/US-004 EC2 test contract và local implementation; EC2 deployment/acceptance đầy đủ cùng production authority matrix vẫn Pending/TBD
@@ -316,9 +316,9 @@ API-125 accepts only allowlisted gateway/tag events containing externalEventId, 
 
 ## 13. OpenAPI conformance
 
-[openapi.yaml](./openapi/openapi.yaml) version 0.9.0 declares OpenAPI 3.1.0, JSON Schema 2020-12 dialect, all 164 unique x-api-id/operationId values, security schemes, common parameters/responses/schemas and the API-126 webhook. API-008/023/024/034…038/140…164 that belong to the implemented slices carry `x-implementation-status: implemented`; API-036 includes both INITIAL and approved-Change-backed positive REBASELINE locally. Other unapproved domain schemas may remain GenericCommand/TBD. This marker is implementation evidence, not a blanket `TEST-014…017` acceptance or EC2 deployment claim.
+[openapi.yaml](./openapi/openapi.yaml) version 0.9.1 declares OpenAPI 3.1.0, JSON Schema 2020-12 dialect, all 164 unique x-api-id/operationId values, security schemes, common parameters/responses/schemas and the API-126 webhook. Exactly 51 controller-backed operations — API-001, API-004…008, API-014…025, API-034…038 and API-137…164 — carry `x-implementation-status: implemented`. API-036 includes both INITIAL and approved-Change-backed positive REBASELINE locally. Other unapproved domain schemas may remain GenericCommand/TBD. Marker status is implementation evidence, not a blanket `TEST-014…017` acceptance claim.
 
-Khi `SWAGGER_ENABLED=true`, API runtime fail-fast load trực tiếp canonical file trên và phục vụ Swagger UI tại `/api/docs/`, cùng machine-readable YAML tại `/api/docs/openapi.yaml`. Runtime không gọi `SwaggerModule.createDocument` và không tạo contract thứ hai từ decorator. Hai route này là technical publication surface của `NFR-024`/`TEST-197`, không phải business operation mới nên không cấp `API-*`; toàn bộ operation hiển thị vẫn giữ `x-api-id` canonical. Contract đang là Draft: UI có đủ 164 operation đã thiết kế nhưng chỉ những operation có `x-implementation-status: implemented` mới là implementation claim.
+Khi `SWAGGER_ENABLED=true`, API runtime fail-fast load canonical file một lần rồi dẫn xuất hai view: `/api/docs/` và `/api/docs/openapi.yaml` chỉ chứa 51 operation có marker implemented; `/api/design-docs/` và `/api/design-docs/openapi.yaml` giữ toàn bộ 164 API thiết kế, gồm API-126 webhook. Runtime không gọi `SwaggerModule.createDocument` và không tạo contract độc lập từ decorator. Bốn route publication là technical surface của `NFR-024`/`TEST-197`, không phải business operation mới nên không cấp `API-*`.
 
 ## 14. Assumptions
 
@@ -365,3 +365,4 @@ Khi `SWAGGER_ENABLED=true`, API runtime fail-fast load trực tiếp canonical f
 | 1.2 | 2026-07-18 | Codex | Tách API-149 thành four-command union, cấp DB-113 closure-cycle response và chốt API-157 full-filter/version-grouped 5×5 heatmap; OpenAPI 0.8.2 | Không đổi operation/requirement count; loại mixed-decision/history/page ambiguity |
 | 1.3 | 2026-07-18 | Codex | Ghi local implementation API-008/036/038/143…164, positive rebaseline, concrete identity/baseline responses và OpenAPI 0.9.0 với 33 implemented operations | Không đổi scope/operation count; local pre-push integration/build Pass, TEST-014…017 Partial và actual EC2 deployment Pending |
 | 1.4 | 2026-07-18 | Codex | Publish canonical OpenAPI 3.1 qua Swagger UI `/api/docs/` và YAML `/api/docs/openapi.yaml`, có env gate và fail-fast loader | Không thêm/đổi API operation hoặc business scope; local TEST-197 loader/HTTP publication Pass, deployment Pending tại thời điểm commit |
+| 1.5 | 2026-07-18 | Codex | Tách current Swagger 51 implemented operations khỏi design Swagger đủ 164 API; backfill 18 marker auth/system/project đã triển khai trong OpenAPI 0.9.1 | Không thêm operation/schema/business scope; sửa metadata trạng thái theo controller runtime và ngăn current docs hiển thị API chưa có |
