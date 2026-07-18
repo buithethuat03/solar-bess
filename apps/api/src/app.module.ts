@@ -8,6 +8,7 @@ import { IdentityAccessModule } from './modules/identity-access/identity-access.
 import { OperationalFoundationModule } from './modules/operational-foundation/operational-foundation.module';
 import { ProjectManagementModule } from './modules/project-management/project-management.module';
 import { ProjectControlsModule } from './modules/project-controls/project-controls.module';
+import { RiskChangeModule } from './modules/risk-change/risk-change.module';
 
 @Module({
   imports: [
@@ -18,7 +19,8 @@ import { ProjectControlsModule } from './modules/project-controls/project-contro
     OperationalFoundationModule,
     IdentityAccessModule,
     ProjectManagementModule,
-    ProjectControlsModule
+    ProjectControlsModule,
+    RiskChangeModule
   ]
 })
 export class AppModule implements NestModule {

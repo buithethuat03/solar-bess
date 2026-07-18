@@ -3,10 +3,10 @@
 > **Purpose:** Mô tả kiến trúc logic, deployment, data flow, multi-tenant, integration, IT/OT separation, resilience và các Architecture Decision Record cho yêu cầu trong SRS/Domain Model.
 > **Scope:** Kiến trúc vendor-neutral cho PM Web, O&M monitoring và read-only OT ingestion; kèm implementation profile NestJS/TypeORM/PostgreSQL cho base/auth, US-001, operational foundation và US-004 Risk/Issue/Change trên EC2 test.
 > **Source:** [AGENTS.md](../AGENTS.md), [PRD](./03-PRD.md), [SRS](./04-SRS.md), [Domain Model](./05-domain-model.md), [Baseline](./Đề%20xuất%20tính%20năng%20nền%20tảng%20Solar%20và%20BESS.md).
-> **Version:** 0.7
-> **Status:** Draft toàn platform; base/auth và US-001 Implemented; operational foundation/core US-003 deployed; US-004 architecture Approved/Build-ready cho EC2 test
+> **Version:** 0.8
+> **Status:** Draft toàn platform; base/auth, US-001 và core US-003 deployed; US-004 modular architecture Implemented local, acceptance Partial và EC2 deployment Pending
 > **Owner:** Solution Architecture (cá nhân: TBD)
-> **Updated:** 2026-07-12
+> **Updated:** 2026-07-18
 > **Approval:** Product Owner delegated approval cho EC2 test profile ngày 2026-07-11; production vẫn Proposed và chờ Architecture/Security/Data/SRE
 
 ## 1. Architecture principles và constraints
@@ -186,7 +186,7 @@ Feature module dùng convention NestJS và có thể chứa controller/service/t
 
 Backend test tree nằm ngoài production source và phản chiếu module/config concern: `test/unit/{architecture,config,modules}`, `test/integration/modules`, `test/setup`, `test/config`. Unit và integration có Jest config/testMatch/setup riêng; không đặt test production behavior lẫn trong `src` hoặc để mọi file ở root `test`.
 
-US-004 thêm `modules/risk-change` nhưng không tạo microservice hoặc custom repository layer. Module sở hữu DB-065/066/067/112 qua TypeORM registration và export duy nhất application port `APPROVED_CHANGE_READER`. Project Controls gọi port với `EntityManager` đang chạy DB-104 transaction; nó không import `ChangeRequestEntity`, không query private Risk/Change table. Chiều ngược lại, baseline history do Project Controls cung cấp qua API-159; Risk/Change không query private schedule table.
+US-004 đã materialize `modules/risk-change` trong modular monolith, không tạo microservice hoặc custom repository layer. Module sở hữu DB-065/066/067/112/113 qua TypeORM registration và export duy nhất application port `APPROVED_CHANGE_READER`. Project Controls gọi port với `EntityManager` đang chạy DB-104 transaction; nó không import `ChangeRequestEntity`, không query private Risk/Change table. Chiều ngược lại, baseline history do Project Controls cung cấp qua API-159; Risk/Change không query private schedule table. Identity sở hữu API-008 scoped assignee; worker sở hữu generalized DB-105 projection/scan; Vue dùng các API concrete mà không vượt module boundary.
 
 Business mutation vẫn theo `state + DB-098 audit + DB-102 outbox` atomic. Worker dùng DB-103 và generalized DB-105 để project overdue action với current tenant/project/package recipient; projection có thể rebuild và không thay source state. Không container/route/event nào nối PM Web tới OT command.
 
@@ -589,3 +589,4 @@ Không chọn vendor chỉ vì phổ biến; selection cần constraints, benchm
 | 0.5 | 2026-07-11 | Codex | Ghi Project Management Nest module, centralized TypeORM entities/migration, permission guard và Vue Project views/API | US-001 Implemented; không mở microservice/OT path |
 | 0.6 | 2026-07-11 | Codex | Chấp nhận EC2 test operational profile PostgreSQL/Redis/BullMQ/outbox/worker, command idempotency, runtime contract và tenant hardening | Product Owner delegated approval chỉ cho test; production/CI/HA vẫn Proposed; không đổi phạm vi nghiệp vụ hoặc OT boundary |
 | 0.7 | 2026-07-12 | Codex | Chốt US-004 modular boundary, public ApprovedChangeReader, Project Controls-owned reverse trace và shared audit/outbox/notification flow | Build-ready EC2 test; không mở microservice, private-table coupling, Claim hoặc OT command |
+| 0.8 | 2026-07-18 | Codex | Ghi local implementation của RiskChangeModule, TypeORM aggregates, Identity assignee dependency, ApprovedChangeReader→Project Controls và worker/DB-105 projection | Không đổi kiến trúc/scope; acceptance Partial và GitHub Actions/EC2 deployment Pending, production Proposed |

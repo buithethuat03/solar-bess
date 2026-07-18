@@ -12,6 +12,9 @@ import type { WorkerLogger } from './worker-logger';
 import {
   ScheduleAlertProcessor, ScheduleAlertScanner
 } from './schedule-alert.processor';
+import {
+  RiskChangeAlertProcessor, RiskChangeAlertScanner
+} from './risk-change-alert.processor';
 
 export class WorkerRuntime {
   private readonly pool: Pool;
@@ -21,6 +24,7 @@ export class WorkerRuntime {
   private readonly relay: OutboxRelay;
   private readonly consumer: FoundationConsumer;
   private readonly scheduleAlertScanner: ScheduleAlertScanner;
+  private readonly riskChangeAlertScanner: RiskChangeAlertScanner;
   private server: Server | null = null;
   private started = false;
   private stopping = false;
@@ -58,9 +62,15 @@ export class WorkerRuntime {
       config.consumption.leaseMs
     );
     const scheduleAlertProcessor = new ScheduleAlertProcessor(config, logger);
-    this.consumer = new FoundationConsumer(store, config, logger, [scheduleAlertProcessor]);
+    const riskChangeAlertProcessor = new RiskChangeAlertProcessor(config, logger);
+    this.consumer = new FoundationConsumer(store, config, logger, [
+      scheduleAlertProcessor, riskChangeAlertProcessor
+    ]);
     this.scheduleAlertScanner = new ScheduleAlertScanner(
       this.pool, scheduleAlertProcessor, config, logger
+    );
+    this.riskChangeAlertScanner = new RiskChangeAlertScanner(
+      this.pool, riskChangeAlertProcessor, config, logger
     );
   }
 
@@ -71,6 +81,7 @@ export class WorkerRuntime {
     await this.consumer.start();
     this.relay.start();
     this.scheduleAlertScanner.start();
+    this.riskChangeAlertScanner.start();
     await this.startHealthServer();
     this.started = true;
     this.logger.info('worker_started', {
@@ -89,6 +100,7 @@ export class WorkerRuntime {
     await this.closeHealthServer().catch((error: unknown) => errors.push(error));
     await this.relay.stop().catch((error: unknown) => errors.push(error));
     await this.scheduleAlertScanner.stop().catch((error: unknown) => errors.push(error));
+    await this.riskChangeAlertScanner.stop().catch((error: unknown) => errors.push(error));
     await this.consumer.close(this.config.shutdownTimeoutMs).catch((error: unknown) => errors.push(error));
     const closed = await Promise.allSettled([
       this.publisher.close(this.config.shutdownTimeoutMs),
@@ -104,6 +116,7 @@ export class WorkerRuntime {
     if (
       !this.started || this.stopping || !this.relay.isRunning()
       || !this.consumer.isRunning() || !this.scheduleAlertScanner.isRunning()
+      || !this.riskChangeAlertScanner.isRunning()
     ) return false;
     const [databaseReady, redisReply] = await Promise.all([
       this.repository.ready(),

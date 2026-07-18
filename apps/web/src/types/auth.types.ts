@@ -30,8 +30,17 @@ export interface AuthIdentity {
   tenant: AuthTenant;
   roles: string[];
   permissions: string[];
-  scopes: Array<{ roleCode: string; scopeType: 'TENANT' | 'PORTFOLIO' | 'PROJECT'; scopeId: string | null }>;
+  scopes: AuthScope[];
   correlationId: string;
+}
+
+export type AuthScopeType = 'TENANT' | 'PORTFOLIO' | 'PROJECT' | 'PACKAGE';
+
+export interface AuthScope {
+  roleCode: string;
+  permissions: string[];
+  scopeType: AuthScopeType;
+  scopeId: string | null;
 }
 
 export interface ApiAuthContext {

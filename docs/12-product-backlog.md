@@ -3,11 +3,11 @@
 > **Purpose:** Chuyển 37 source stories thành backlog Epic → Capability → Feature → US → AC → Technical Task, giữ nguyên 173 Given/When/Then nguồn và bổ sung 4 AC được phê duyệt cho base auth MVP.
 > **Scope:** Backlog planning-level; story point sơ bộ; không phải sprint commitment hoặc production-code authorization.
 > **Source:** [PRD](./03-PRD.md), [SRS](./04-SRS.md), [Domain Model](./05-domain-model.md), [API](./08-api-specification.md), [Security](./09-security-and-permissions.md), [UX](./10-ux-information-architecture.md), [Workflows](./11-workflows-and-state-machines.md), baseline US-E01…US-E37.
-> **Version:** 0.7
-> **Status:** Draft toàn backlog; US-001/auth Implemented; US-003 core Implemented/deployed; US-004 Approved/Build-ready cho EC2 test
+> **Version:** 1.1
+> **Status:** Draft toàn backlog; US-001/auth và US-003 core Implemented; US-004 Implemented local, acceptance TEST-014…017 Partial và GitHub Actions/EC2 deployment Pending
 > **Owner:** Product Owner / Delivery Lead (cá nhân: TBD)
-> **Updated:** 2026-07-12
-> **Approval:** US-003/US-004 documentation/implementation profile — Product Owner delegated; full story acceptance còn pending; phần còn lại TBD — Product Owner, Process Owners, Architecture, UX, Engineering, QA và Security
+> **Updated:** 2026-07-18
+> **Approval:** US-003/US-004 local implementation profile — Product Owner delegated; US-004 full story acceptance/deployment còn Pending; phần còn lại TBD — Product Owner, Process Owners, Architecture, UX, Engineering, QA và Security
 
 ## 1. Backlog hierarchy and governance
 
@@ -148,25 +148,26 @@ All AC and mapped TEST pass; negative permission/tenant/concurrency/idempotency/
 <a id="us-004"></a>
 ### US-004 — Risk, issue và change control
 
+- **Delivery status:** **Local implementation/pre-push gate complete; acceptance In Progress** ngày 2026-07-18. API-008/036/038/143…164, DB-065…067/112/113/generalized DB-105, migrations qua 1783736000000, worker projection và Vue slice đã materialize/test. Evidence: post-fix lint/typecheck/build Pass; unit 168, gồm Web full 55/focused closure exact-payload 4/4 và backend focused HTTP closure 6/6. Exact CI-port full integration API 49 + Worker 11 = 60 Pass trước final branch hardening; RiskChange migration 7/7; OpenAPI Pass, Web 1,697 modules. Remaining TEST-014…017 branches, actual GitHub Actions rerun/EC2 deployment/public smoke và full E2E Pending; story chưa `Done`/`Pass`.
 - **Source:** US-E04; source heading/priority: Risk, issue và change control (`RSK-*`, `PRJ-*`, `CST-*`) — Must/MVP, Dùng chung, Quản lý dự án.
 - **Epic → Capability → Feature:** Risk/Issue/Change → RSK, PRJ, CST → Risk, issue và change control.
 - **Persona:** Project Manager.
 - **User story:** As a Project Manager, I want quản lý riêng risk, issue và change nhưng liên kết chúng, so that đội dự án xử lý đúng bản chất và lượng hóa ảnh hưởng trước khi ra quyết định.
 - **Business value:** đội dự án xử lý đúng bản chất và lượng hóa ảnh hưởng trước khi ra quyết định.
 - **Trace:** BR-022, BR-031, BR-032; FR-098…FR-105; UC-004; WF-015/WF-021. API/DB/SEC follow related artefacts; TEST forward reference.
-- **Direct/dependency boundary:** AC-014…017 materialize Risk/Issue/Change qua `DB-065…067/112` và `API-038/143…158`; Project Controls sở hữu reverse baseline query `API-159`; `DB-068 Claim/FR-103` chờ Contract/Legal slice, còn external-source adapters của FR-105 chờ delivery/obligation/NCR/punch. Không dependency nào được trình bày như story implementation đã Pass.
+- **Direct/dependency boundary:** AC-014…017 materialize Risk/Issue/Action/Change/closure history qua `DB-065…067/112/113` và direct `API-038/143…158/160…164`; `API-008` là Identity dependency truy vấn assignee active theo capability/exact package. Project Controls sở hữu implemented local consumer `API-036` và reverse baseline query `API-159`; `DB-068 Claim/FR-103` chờ Contract/Legal slice, còn external-source adapters của FR-105 chờ delivery/obligation/NCR/punch. Implementation/dependency status không đồng nghĩa TEST-014…017 đã Pass.
 - **Phase/priority/story points:** **MVP**; Must/MVP; **5 points preliminary**.
-- **Normal flow:** team ghi nhận, PM phân tích/assign, owner thực hiện response, risk owner đánh giá residual và PM/committee đóng.
+- **Normal flow:** team ghi nhận Risk/Issue, dùng list/detail để phân tích và assign đúng actor qua scoped `user.read`; owner thực hiện Action đến DONE cùng optional versioned residual proposal. DONE không đổi Risk score; independent full-project VERIFIED atomically promote proposal vào DB-065 hoặc authorized CANCELLED kết thúc Action. PM chỉ request Risk closure từ MONITORING/Issue từ RESOLVED và independent full-project approver quyết định; mỗi request/decision nằm trong DB-113 append-only cycle để reopen/re-close không mất evidence. Change được đánh giá đủ sáu chiều, submit/approve độc lập; chỉ approved Change có `schedule.requiresRebaseline=true` mới cấp provenance cho Project Controls tạo REBASELINE và truy ngược qua `API-159`.
 - **Exception flow:** confidential legal/commercial risk bị giới hạn nhóm; duplicate được link/merge nhưng không mất audit; overdue critical tự escalation.
-- **Permission:** mọi thành viên được đề xuất theo phạm vi; PM/risk manager chỉnh taxonomy và owner; only approver đóng high/critical; bên ngoài chỉ xem item được chia sẻ rõ ràng.
+- **Permission:** mọi thành viên có primitive phù hợp được đề xuất theo phạm vi; PM/risk manager chỉnh taxonomy và owner; package-only actor chỉ đọc/ghi exact package và không thấy project-level/null. Change submit/decision, Risk/Issue closure decision, Action VERIFIED/CANCELLED và project-level item cần full-project assignment; independent actor/SoD vẫn bắt buộc. Bên ngoài chỉ xem item được chia sẻ rõ ràng.
 - **Audit:** State/decision/create-update/export/AI/safety/financial actions record actor/effective actor, object/version, result and correlation; sensitive export/download/admin is audited.
 - **Notification:** Committed workflow/domain events notify current authorized recipients; reminder/escalation never auto-approves or closes source state.
 - **Dependencies:** Finance rules, contract/legal entities, decimal/FX and ERP ownership.
 - **Risk:** Risk/Issue bị trộn; package-only assignment bị nâng thành project-wide; closure/change tự duyệt; approved impact hoặc baseline bị ghi đè; alert duplicate/stale recipient; Claim bị hiểu nhầm là đã hoàn thành.
 - **Story-specific DoR:** Owner confirms state, authority, source data and calculation/evidence rules; unresolved item is explicit TBD/Open Question.
 - **Story-specific DoD:** Standard DoD plus all AC below, related policy/workflow/audit/notification and trace links verified.
-- **Technical Tasks:** implement `DB-065…067/112` và generalize DB-105 projection; concrete `API-038/143…159`; pure exposure/state policy; tenant/project/package scope + granular permission/SoD/version/idempotency; Risk Occurred→Issue link; action/history/closure; Change source/evidence/impact/decision; public approved-change reader + positive rebaseline/reverse trace; worker dedup alert; Vue register/Command Center; unit/integration/E2E/security/migration/rollback/deploy evidence.
-- **Approved configuration:** probability và cost/schedule/HSE impact integer 1…5; server tính `impactRating=max(dimensions)` rồi exposure = probability × impactRating; money `numeric(19,4)` + currency; `RISK_HIGH_EXPOSURE_THRESHOLD=15`, `RISK_CRITICAL_EXPOSURE_THRESHOLD=20`, `RISK_ACTION_ALERT_SCAN_INTERVAL_MS=60000`, `RISK_THRESHOLD_VERSION=RISK_THRESHOLDS_V1`; invalid/range-inconsistent value fails startup. Permissions `riskChange.read/create/manage/submit/approve/requestClosure/close/closeCritical`; mọi closure cần evidence, verified actions và approver khác creator/owner/requester; package-only assignment chỉ exact package, Change approval/project-level item cần full-project scope.
+- **Technical Tasks:** implement `DB-065…067/112/113`; rename/generalize DB-105 in-place với nullable package/activity, typed/non-null source derivation, deterministic source-derived priority, source scope trigger/index và schedule-row-compatible down; concrete direct `API-038/143…158/160…164`, scoped `user.read` assignee dependency `API-008`, approved-change reader + conditional full-project `API-036` REBASELINE và Project Controls-owned reverse trace `API-159`; pure exposure/state policy + DB-065 residual SoR/versioned Action promotion; tenant/project/package scope + granular permission/SoD/version/idempotency; DB-113 append-only deterministic closure/reopen; API-149 mutually exclusive command DTOs; cursor-bounded closure detail/action reads; full-filter/version-grouped 5×5 heatmap; terminal completion/verification/cancellation facts; Change partial draft/snapshot/hashes; worker dedup alert; Vue register/heatmap/Command Center; unit/integration/E2E/security/migration/rollback/deploy evidence.
+- **Approved configuration:** probability và cost/schedule/HSE impact integer 1…5; server tính `impactRating=max(dimensions)` rồi exposure = probability × impactRating; money `numeric(19,4)` + currency; `RISK_HIGH_EXPOSURE_THRESHOLD=15`, `RISK_CRITICAL_EXPOSURE_THRESHOLD=20`, `RISK_CHANGE_ALERT_SCAN_INTERVAL_MS=60000`, `RISK_CHANGE_THRESHOLD_VERSION=RISK_CHANGE_THRESHOLDS_V1`; invalid/range-inconsistent value fails startup. Permissions `riskChange.read/create/manage/submit/approve/requestClosure/close/closeCritical`; mọi closure cần request/decision evidence và approver khác creator/current owner/requester. Action DONE cần completion evidence; chỉ VERIFIED hoặc authorized CANCELLED sau full-project independent verification mới thỏa closure, trạng thái khác block. Change submit/decision và mọi closure decision cần full-project scope; `sourceBaselineId` chỉ bắt buộc khi schedule impact yêu cầu rebaseline, còn API-036 REBASELINE chỉ nhận approved Change đủ điều kiện và lấy reason/impact từ immutable snapshot.
 
 #### Acceptance Criteria for US-004
 
@@ -1221,6 +1222,7 @@ Points are relative, not duration. Two-squad roadmap requires capacity/skills/de
 | Technical tasks receive no ID family | Governance/Engineering | Tooling |
 | TEST IDs assigned in document 13 | QA | Trace |
 | US-003 core đã Implemented/deployed nhưng full story chưa có đủ runtime/positive rebaseline evidence | Product Owner/QA | Không được báo Done/Pass sớm |
+| US-004 local implementation/pre-push gate đã hoàn tất nhưng TEST-014…017 branch matrix, actual GitHub Actions/EC2 deployment/public smoke và full E2E chưa đủ | Product Owner/QA/Data/Platform | Giữ story In Progress; không báo Done/Pass hoặc deployed sớm |
 
 ## 10. Open Questions
 
@@ -1248,3 +1250,7 @@ Points are relative, not duration. Two-squad roadmap requires capacity/skills/de
 | 0.5 | 2026-07-11 | Codex | Duyệt documentation gate US-003 và khóa calendar/CPM/weight/import/SoD/API-data-test/dependency contract | Build-ready; chưa Implemented/Done, không ghi test Pass |
 | 0.6 | 2026-07-12 | Codex | Ghi core US-003 implementation/deploy và API-141 progress history | Core In Progress; chưa Done/Pass trước full runtime evidence và US-004 positive rebaseline |
 | 0.7 | 2026-07-12 | Codex | Duyệt canonical gate US-004, concretize direct/dependency/API/data/config/SoD/closure/rebaseline tasks | Build-ready cho AC-014…017 EC2 test; Claim/FR-105 adapters chưa Implemented |
+| 0.8 | 2026-07-18 | Codex | Đồng bộ final US-004 contract với direct API-160…164, API-008 assignee dependency, API-159 reverse trace, Action DONE/VERIFIED/authorized CANCELLED và conditional REBASELINE | Không đổi AC/phạm vi baseline; contract build-ready rõ đủ list/detail/closure/provenance, chưa claim implementation/test Pass |
+| 0.9 | 2026-07-18 | Codex | Chốt DB-065 residual SoR/versioned promotion, deterministic closure/reopen, terminal Action, minimal scoped user.read và physical DB-105 generalization tasks | Không đổi AC; loại bỏ implementation ambiguity trước M1 |
+| 1.0 | 2026-07-18 | Codex | Bổ sung DB-113 append-only closure history, API-149 four-command union và API-157 full-filter/version-grouped heatmap vào DoR/task US-004 | Không đổi AC/phạm vi baseline; làm acceptance/test path không mất history hoặc phụ thuộc cursor page |
+| 1.1 | 2026-07-18 | Codex | Ghi US-004 local implementation/API-data-worker-Vue evidence, completed pre-push gate và delivery status In Progress | Không đổi AC/scope; unit 168/integration 60/migration 7/build Pass; TEST-014…017 Partial và actual EC2 deployment/full E2E Pending |

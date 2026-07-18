@@ -3,11 +3,11 @@
 > **Purpose:** Định nghĩa sitemap, navigation, screen inventory, user flows, textual wireframes, responsive/accessibility/UI states và design-system requirements.
 > **Scope:** PM Web/PWA, O&M monitoring và read-only BESS/OT views; không tạo control UI cho BESS.
 > **Source:** [Vision & Scope](./01-product-vision-and-scope.md), [PRD](./03-PRD.md), [SRS](./04-SRS.md), [Security](./09-security-and-permissions.md), baseline Source Wireframes WF-01…WF-14.
-> **Version:** 0.4
-> **Status:** Draft toàn platform; core Project Schedule UX Implemented/deployed; US-004 Risk/Issue/Change UX Approved/Build-ready, chưa Implemented; accessibility/E2E acceptance pending
+> **Version:** 0.6
+> **Status:** Draft toàn platform; core Project Schedule deployed; US-004 Risk/Issue/Action/Change UX Implemented local; formal accessibility/E2E acceptance và EC2 deployment Pending
 > **Owner:** Product Design / UX Research (cá nhân: TBD)
-> **Updated:** 2026-07-12
-> **Approval:** Project Schedule implementation và US-004 EC2 UX contract theo delegated Product Owner authority; US-004 implementation/formal UX/accessibility acceptance vẫn pending
+> **Updated:** 2026-07-18
+> **Approval:** Project Schedule và US-004 local UX implementation theo delegated Product Owner authority; full UX/accessibility acceptance và EC2 deployment vẫn Pending
 
 ## 1. UX principles
 
@@ -185,24 +185,24 @@ Global tenant switch is permission-aware, confirms unsaved work and clears tenan
 
 - **Source/audience:** WF-09 Source Wireframe; PM/Risk Owner.
 - **Route/context:** `/projects/:projectId/risk-change?tab=risks`; tenant/project/package selector, scoring/threshold version, as-of và current permission state luôn hiển thị. Package-only actor chỉ thấy package được gán; project-level/null và package khác không hiện count/title/filter option.
-- **Layout/content:** Accessible 5×5 heat map có text/table alternative; toggle inherent/residual; register theo code/category/status/owner/review date; detail drawer cho cause–event–impact, probability/impact 1…5, cost/schedule/HSE rating, response strategy/plan, trigger, contingency, DB-112 action/evidence/history và linked Issue/Change.
-- **Primary actions:** Create, assess, assign/treat, update residual, create/verify action, mark Occurred bằng cách create/link Issue cùng scope, request closure và tạo Change draft. APPROVE closure là action độc lập chỉ hiện với `riskChange.close`; HIGH/CRITICAL cần thêm `riskChange.closeCritical`.
-- **Integrity/permission/exception:** Score = probability × impact và luôn kèm label/version; color không là tín hiệu duy nhất. Occurred không đồng nghĩa Closed. Closure form bắt evidence và liệt kê action chưa VERIFIED; creator/current owner/requester không thấy enabled decision control. Approved closure, history và evidence không sửa tại chỗ.
+- **Layout/content:** Accessible heatmap có text/table alternative và toggle inherent/residual. API-157 không dựng từ current API-143 page: nó aggregate toàn authorized Risk filter và hiển thị selector cho từng `scoringVersion/thresholdVersion` group; mỗi group render đủ 25 inherent + 25 residual cells kể cả count zero và `residualMissingCount`. Register row/RiskSummary luôn hiển thị scoringVersion, hỗ trợ inherent cùng nullable residual fields; thiếu residual hiển thị “Chưa đánh giá”, không thay bằng zero/inherent. Register dùng `reviewBefore`, summary dùng `riskReviewBefore`. `API-160` detail hiển thị scoring facts, evidence/history, linked records và authorized DB-113 closure-cycle page theo sequence; timeline tải tiếp bằng opaque `nextCursor` (50 mặc định/100 tối đa) đến null, scalar closure chỉ là “Latest”. `API-163/164` cung cấp Action list/detail; assignee picker chỉ nhận `id/displayName`.
+- **Primary actions:** Create, assess, assign/treat, direct authoritative residual reassessment qua `API-144` khi là full-project actor, mark Occurred, request closure và tạo Change draft. API-149 UI dùng bốn form/action tách biệt: routine sửa editable fields; Complete gửi DONE/evidence và optional residual proposal + `residualRiskVersion`; Verify chỉ gửi expectedVersion/status/evidence và promote proposal đã lưu; Cancel chỉ gửi expectedVersion/status/evidence/reason. Verify/Cancel tuyệt đối không gửi owner/title/due/residual, không cho mixed payload; SoD banner dùng pre-command owner/completedBy. DONE không đổi Risk summary. VERIFIED/CANCELLED chỉ hiện cho full-project independent actor, là terminal và không còn edit/PATCH control. Request closure chỉ hiện khi Risk MONITORING; APPROVE cần quyền close/closeCritical phù hợp.
+- **Integrity/permission/exception:** `DB-065` Risk là residual SoR. Inherent/residual score luôn kèm label/version; color không là tín hiệu duy nhất. Direct reassessment bắt reason/evidence/expected Risk version và không hiện cho package-only actor. API-157 giữ cùng authorized filters nhưng không để count/zero/version group làm lộ hidden rows. Closure request tạo DB-113 cycle mới; decision complete cycle một lần, RETURN/REJECT về MONITORING; completed cycle/evidence read-only, scalar latest chỉ projection. DB-098 audit tab tách khỏi closure evidence timeline.
 - **States:** IDENTIFIED/ASSESSED/TREATING/MONITORING/CLOSURE_PENDING/CLOSED/OCCURRED; loading/empty/filtered empty/denied/version conflict/stale notification rõ theo mục 8. DB-068 Claim tab/count không được dựng giả.
 - **Responsive:** Desktop full register/heatmap/edit/decision; tablet review/detail/action; mobile read và update own action/evidence/request closure, không closure decision/Change approval. Không offline approve/close.
-- **Trace:** BR-022/031/032; FR-098/099/104; UC-004; US-004; WF-021; AC-014/015/017; DB-065/098/105/112; SEC-105…111/114/118.
+- **Trace:** BR-022/031/032; FR-098/099/104; UC-004; US-004; WF-021; AC-014/015/017; API-008/143/144/148/149/154/157/158/160/163/164; DB-005…007/065/098/105/112/113; SEC-105…111/114/118.
 
 <a id="screen-12"></a>
 ### 5.12 Issue Register
 
 - **Source/audience:** WF-10 Source Wireframe; Project team.
 - **Route/context:** `/projects/:projectId/risk-change?tab=issues`; giữ tenant/project/package scope như Risk tab và deep-link bằng stable issue ID/filter.
-- **Layout/content:** KPI severity/aging/overdue; table/Kanban có actual impact, root cause, owner, target, status; drawer có DB-112 action, decision/evidence/history, optional source Risk và linked Change. Không hiển thị probability/inherent fields của Risk trong Issue form.
-- **Primary actions:** Report, triage, assign, update/resolve, create/verify action, request closure, explicit reopen với evidence và tạo Change draft. Khi tạo từ occurred Risk, source/evidence/package link được snapshot nhưng hai register vẫn tách.
-- **Integrity/permission/exception:** Create yêu cầu actual impact/root cause; source Risk phải cùng tenant/project/package. Closure chỉ quyết định độc lập sau evidence và action bắt buộc VERIFIED; Issue CRITICAL cần `riskChange.closeCritical`. Reopen giữ closure history; legal Claim fields/count masked/absent vì DB-068 là dependency.
-- **States:** REPORTED/TRIAGED/IN_PROGRESS/RESOLVED/CLOSURE_PENDING/VERIFIED/CLOSED/REOPENED; return closure về RESOLVED; REOPENED chuyển IN_PROGRESS bằng explicit action.
+- **Layout/content:** KPI severity/aging/overdue; table/Kanban có severity/owner/target/status. `API-161` detail tách Issue/resolution facts, scalar latest closure projection và authorized immutable DB-113 cycle page theo `sequenceNo/id`; “Tải thêm” theo opaque cursor đến null, không dựng array unbounded. Reopen/re-close hiện cycle mới, không ghi đè timeline cũ. DB-098 audit timeline là tab riêng, không thay closure evidence. Action list/detail dùng `API-163/164`. Không hiển thị probability/inherent fields của Risk trong Issue form.
+- **Primary actions:** Report, triage, assign, update/resolve, create/complete/verify hoặc authorized-cancel Action, request closure chỉ khi RESOLVED, explicit reopen CLOSED với evidence và tạo Change draft. RESOLVED bắt resolution summary/evidence; khi tạo từ occurred Risk, source/evidence/package link được snapshot nhưng hai register vẫn tách. VERIFIED/CANCELLED Action là terminal, không còn PATCH control.
+- **Integrity/permission/exception:** Create yêu cầu description/occurredAt/actual impact/root cause; source Risk phải cùng tenant/project/package. Closure chỉ quyết định độc lập sau evidence và mọi Action ở VERIFIED/authorized-CANCELLED; Issue CRITICAL cần `riskChange.closeCritical`. Resolution facts tách khỏi closure request/decision facts; reopen giữ closure history; legal Claim fields/count masked/absent vì DB-068 là dependency.
+- **States:** REPORTED/TRIAGED/IN_PROGRESS/RESOLVED/CLOSURE_PENDING/CLOSED/REOPENED; request inserts next DB-113 sequence, decision fills it once; APPROVE đóng atomically, RETURN/REJECT về RESOLVED. CLOSED → REOPENED bắt evidence; re-close append cycle mới, các cycle cũ vẫn read-only, rồi REOPENED chuyển IN_PROGRESS bằng explicit action.
 - **Responsive:** Desktop full register/edit/decision; tablet review/detail/action; mobile read/update own action/evidence/request closure, không closure decision/Change approval. Không offline approve/close.
-- **Trace:** BR-022/031/032; FR-100/104; UC-004; US-004; WF-021; AC-014/015/017; DB-066/098/105/112; SEC-105…111/114/118.
+- **Trace:** BR-022/031/032; FR-100/104; UC-004; US-004; WF-021; AC-014/015/017; API-008/145…149/155/157/158/161/163/164; DB-005…007/066/098/105/112/113; SEC-105…111/114/118.
 
 <a id="screen-13"></a>
 ### 5.13 Commissioning Dashboard
@@ -269,13 +269,13 @@ Global tenant switch is permission-aware, confirms unsaved work and clears tenan
 
 - **Source/audience:** Bổ sung từ RSK-004/005; Requester, PM, Engineering, Cost, Legal/Contract, QA/HSE, independent Change Approver.
 - **Route/context:** `/projects/:projectId/risk-change?tab=changes`; tenant/project/package, source/current baseline, source Risk/Issue và permission/SoD banner luôn hiển thị. Baseline picker/history đọc qua `API-159` của Project Controls; UI không gọi private RiskChange repository/query.
-- **Layout/content:** Register code/status/source/package/requester/submitted date; impact panel bắt đủ scope, schedule, cost `numeric(19,4)` + currency, quality, HSE, contract; source/evidence snapshot, options/recommendation, source-baseline/current-baseline comparison, schedule-impact summary, decision history/hash và two-way Risk/Issue link.
+- **Layout/content:** API-151 register dùng safe summary code/status/source/package/requester/submitted date; `API-162` detail hiển thị source/evidence snapshot, options/recommendation, partial impact draft, frozen six-dimension impact/approval snapshot + hashes, source-baseline/current-baseline comparison, schedule-impact summary, decision facts và two-way Risk/Issue link. Scope/schedule/cost `numeric(19,4)` + currency/quality/HSE/contract được nhập thành panel độc lập để DRAFT/ASSESSED lưu từng phần.
 - **Primary actions:** Create manual hoặc “Tạo change request” từ Risk/Issue; assess; submit; independent APPROVE/RETURN/REJECT; sau APPROVE mở Project Schedule rebaseline với immutable change reference. Package-only actor có thể tạo/manage package draft nhưng không submit/approve; project-level/null Change và mọi decision cần full-project assignment.
-- **Integrity/permission/exception:** Create-from-source kế thừa tenant/project/package và copy opaque evidence refs, không tự approve/close source. Submit bị chặn khi thiếu bất kỳ impact dimension/source baseline áp dụng; decision actor khác requester/submitter. Approved impact/approval snapshot/hash bất biến. Rebaseline hiển thị `NOT_FOUND_OR_SCOPE_MISMATCH`, `NOT_APPROVED`, `BASELINE_MISMATCH` hoặc `SCHEDULE_IMPACT_NOT_APPROVED` mà không rò record, và không tạo baseline một phần.
+- **Integrity/permission/exception:** Create-from-source kế thừa tenant/project/package và copy opaque evidence refs, không tự approve/close source. Submit bị chặn khi thiếu recommendation hoặc bất kỳ impact dimension; sourceBaseline chỉ bắt khi schedule.requiresRebaseline = true. Mọi decision bắt comment và actor khác requester/submitter. APPROVE khóa impact/approval snapshot/hash, ghi decisionVersion và server derive `scheduleImpactApproved`; UI không cho sửa derived flag. REBASELINE chỉ gửi change reference/data date/expected schedule version, không gửi reason/impact free-text; stable denial không rò record và không tạo baseline một phần.
 - **States:** DRAFT → ASSESSED → SUBMITTED → APPROVED/RETURNED/REJECTED; RETURNED → ASSESSED. IMPLEMENTED/CLOSED chỉ qua downstream command rõ ràng, không tự đổi khi approve/rebaseline. Loading/empty/denied/version conflict/SoD/configuration error giữ form không nhạy cảm.
 - **Responsive:** Desktop/tablet support assess/review/diff; mobile read-only decision queue/detail và draft evidence update theo quyền, không submit/approve/rebaseline. Không offline decision.
 - **Dependency boundary:** Claim/Variation/notice/quantum/negotiation (`DB-068`, FR-103) chưa materialize; IA chỉ có dependency label/link tới future Contract/Legal slice, không tab giả hoặc KPI zero giả.
-- **Trace:** BR-018/022/031/032; FR-101/102/104; UC-003/004; US-003/004; WF-003/015; AC-012/016; API-038/143…157/159; DB-020/067/098; SEC-105…111/114/118/119.
+- **Trace:** BR-018/022/031/032; FR-101/102/104; UC-003/004; US-003/004; WF-003/015; AC-012/016; API-038/150…153/156/157…159/162; DB-020/067/098; SEC-105…111/114/118/119.
 
 ## 6. Core user flows
 
@@ -311,7 +311,7 @@ flowchart LR
  J --> K[Committed schedule alert and look-ahead]
 ```
 
-PREVIEW không ghi dữ liệu; COMMIT, submit, decision và progress là các command riêng có audit/correlation. Luồng rebaseline chỉ đi tới decision khi có approved `DB-067`; alert chỉ được giao sau committed event qua dependency `DB-102…104` và schedule projection `DB-105`.
+PREVIEW không ghi dữ liệu; COMMIT, submit, decision và progress là các command riêng có audit/correlation. Luồng rebaseline chỉ đi tới decision khi có approved `DB-067`; alert chỉ được giao sau committed event qua dependency `DB-102…104` và schedule subset `sourceType=ScheduleActivity` trong generalized `DB-105 notifications`.
 
 ### 6.3 Document upload/review/issue
 
@@ -374,12 +374,12 @@ flowchart LR
 ```mermaid
 flowchart LR
  A[Create Risk or Issue in authorized project/package] --> B[Assess and assign owner/actions]
- B --> C[Update action/evidence and residual or actual impact]
+ B --> C[Update action/evidence; residual stays Risk-owned]
  C --> D{Event occurred or change needed?}
  D -- Risk occurred --> E[Atomically create/link Issue; Risk OCCURRED]
  D -- Change needed --> F[Create Change draft with source/evidence/package snapshot]
  E --> F
- F --> G[Complete six impact dimensions + source baseline]
+ F --> G[Complete recommendation + six dimensions; source baseline iff rebaseline]
  G --> H[Full-project actor submits]
  H --> I{Independent decision}
  I -- return/reject --> G
@@ -389,13 +389,15 @@ flowchart LR
  L --> M{APPROVED_CHANGE_READER permits?}
  M -- no --> N[Stable denial; zero baseline write]
  M -- yes --> O[WF-003 creates new immutable rebaseline]
- C --> P[Request closure with evidence]
- P --> Q{Independent close + all required actions VERIFIED?}
- Q -- no/return --> C
- Q -- yes --> R[Closed; history retained]
+ C --> P[Request closure inserts next DB-113 cycle]
+ P --> Q{Independent close + all actions VERIFIED or authorized CANCELLED?}
+ Q -- Risk return/reject --> S[Risk MONITORING]
+ Q -- Issue return/reject --> T[Issue RESOLVED]
+ Q -- yes --> R[Fill cycle decision once; Closed]
+ R --> U[Issue reopen with evidence; re-close appends next cycle]
 ```
 
-Committed action due/threshold events mới tạo alert; Dashboard/Notification deep-link giữ `tab`, source ID và filter nhưng server re-check current tenant/project/package permission. Mark-read/acknowledge không sửa Risk/Issue/Action/Change. Package-only actor dừng ở package create/manage/request-closure; submit/decision/rebaseline và project-level/null record cần full-project assignment.
+Committed events mới tạo typed alert: Schedule OVERDUE/NEAR_CRITICAL, Risk RISK_REVIEW_DUE, Issue ISSUE_TARGET_DUE, Action ACTION_OVERDUE, Change CHANGE_DECISION_PENDING. UI chỉ hiển thị server-derived priority và non-null dueAt/dataDate/thresholdVersion: OVERDUE/Action là HIGH; NEAR_CRITICAL/Change là NORMAL; Risk HIGH khi effective band HIGH|CRITICAL; Issue HIGH khi severity HIGH|CRITICAL; các Risk/Issue khác NORMAL. Date/version lấy schedule finish/dataDate/threshold; Risk/Issue/Action source date + primary-Site business date + Risk/Change version; Change submittedAt business date cho due/data. Browser không sửa các field này. Dashboard/deep-link re-check current scope; acknowledge không sửa source. Package-only actor dừng ở package create/manage/request-closure; submit/decision/rebaseline và project-level/null record cần full-project assignment.
 
 ## 7. Health Score UX
 
@@ -459,6 +461,8 @@ Collect screen/action/job outcome, filter use, task lead time, validation/confli
 | US-004 EC2 V1 dùng score 1…5, HIGH từ 15, CRITICAL từ 20 và luôn hiện threshold version | Product Owner delegated | Heatmap/closure labels; policy đổi không rewrite history |
 | US-004 mobile cho phép read/action/evidence/request closure nhưng không Change/closure decision hoặc rebaseline | Product Owner delegated | Responsive/action visibility |
 
+US-004 local UI đã có API/types, route Risk/Change theo project, Risk/Issue registers, detail deep links, Action/closure/Change panels, immutable closure timeline, version-grouped heatmap, Dashboard lane và Schedule rebaseline form chỉ gửi approved Change reference. Closure commands dùng discriminated exact-payload types; post-fix Web full 20 files/55 tests và focused RiskForm/IssueForm component tests 4/4 xác nhận không phát sinh field thừa, routine payload không đổi. Component/API tests còn cover isolated Action commands, RETURNED→ASSESSED submit guard, scoped decision visibility, numeric decimal string, closure cursor, heatmap alternatives, dashboard drill-down và mobile decision suppression; focused HTTP evidence cover Risk reopen→second closure cycle cùng immutable history. Playwright hiện có một broad Risk→Issue/Action→Change submit/independent approval journey; nó chưa cover Action CANCEL, positive rebaseline trong cùng journey hoặc full accessibility/remaining closure-decision matrix, nên TEST-014…017 UX acceptance remains Partial.
+
 ## 14. Open Questions
 
 | Open Question | Owner | Blocks |
@@ -486,3 +490,5 @@ Collect screen/action/job outcome, filter use, task lead time, validation/confli
 | 0.3 | 2026-07-12 | Codex | Ghi Schedule route/view, scoped actions, preserved mutation form, baseline SoD metadata và API-141 correction picker đã deploy | Core Implemented; Dashboard/export/full accessibility E2E còn pending; không mở rộng OT |
 | 0.1 | 2026-07-11 | Codex | Tạo IA và 18 textual wireframes including WF-01…WF-14 | Adds Contract/Inbox/Report/App shell; no OT control |
 | 0.4 | 2026-07-12 | Codex | Cụ thể hóa Risk/Issue/Change route, package visibility, action/closure/SoD, alerts/Command Center, approved-change rebaseline flow và screen 19; giữ Claim dependency explicit | US-004 UX Approved/Build-ready; chưa implementation/accessibility/E2E Pass; không tạo Claim/OT control UI |
+| 0.5 | 2026-07-18 | Codex | Đồng bộ final US-004 UX với API-149 four-form payload, DB-113 closure-cycle timeline, typed/non-null DB-105 alerts, full-filter version-grouped 25+25 API-157 heatmap, safe API-008 và immutable rebaseline | Không đổi baseline scope; UX contract build-ready, implementation/accessibility/E2E evidence vẫn pending |
+| 0.6 | 2026-07-18 | Codex | Ghi local routes/forms/deep links/Dashboard/Schedule integration, permission/mobile guards và component/API/Playwright evidence hiện có | Không đổi UX scope; full accessibility, closure/rebaseline E2E và EC2 deployment Pending |

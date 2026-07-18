@@ -14,7 +14,10 @@ const roleCatalog = [
       'site.read', 'site.create', 'projectParty.manage', 'systemStatus.read',
       'package.read', 'package.create', 'schedule.read', 'schedule.manage',
       'schedule.import', 'baseline.submit', 'baseline.approve',
-      'progress.record', 'progress.correct'
+      'progress.record', 'progress.correct', 'user.read',
+      'riskChange.read', 'riskChange.create', 'riskChange.manage', 'riskChange.submit',
+      'riskChange.approve', 'riskChange.requestClosure', 'riskChange.close',
+      'riskChange.closeCritical'
     ]
   },
   {
@@ -23,22 +26,31 @@ const roleCatalog = [
       'project.update', 'site.read', 'site.create', 'projectParty.manage',
       'package.read', 'package.create', 'schedule.read', 'schedule.manage',
       'schedule.import', 'baseline.submit', 'baseline.approve',
-      'progress.record', 'progress.correct'
+      'progress.record', 'progress.correct', 'user.read',
+      'riskChange.read', 'riskChange.create', 'riskChange.manage', 'riskChange.submit',
+      'riskChange.approve', 'riskChange.requestClosure', 'riskChange.close',
+      'riskChange.closeCritical'
     ]
   },
   {
     code: 'EXECUTIVE', name: 'Executive',
-    permissions: ['portfolio.read', 'project.read', 'package.read', 'schedule.read']
+    permissions: [
+      'portfolio.read', 'project.read', 'package.read', 'schedule.read', 'riskChange.read'
+    ]
   },
   {
     code: 'PROJECT_CONTROLS', name: 'Project Controls', permissions: [
       'package.read', 'package.create', 'schedule.read', 'schedule.manage',
-      'schedule.import', 'baseline.submit', 'progress.record', 'progress.correct'
+      'schedule.import', 'baseline.submit', 'progress.record', 'progress.correct',
+      'user.read', 'riskChange.read', 'riskChange.create', 'riskChange.manage',
+      'riskChange.requestClosure'
     ]
   },
   {
     code: 'PACKAGE_OWNER', name: 'Package Owner', permissions: [
-      'package.read', 'schedule.read', 'progress.record'
+      'package.read', 'schedule.read', 'progress.record', 'user.read',
+      'riskChange.read', 'riskChange.create', 'riskChange.manage',
+      'riskChange.requestClosure'
     ]
   },
   {
@@ -59,7 +71,7 @@ export async function seedProjectMaster(
     role = await roleRepository.save({
       ...(role ?? { id: randomUUID(), tenantId: tenant.id }),
       code: definition.code, name: definition.name, permissions: [...definition.permissions],
-      policyVersion: 2, status: MasterRecordStatus.ACTIVE
+      policyVersion: 3, status: MasterRecordStatus.ACTIVE
     });
     if (definition.code === 'PMO' || definition.code === 'TENANT_ADMIN') {
       const assignment = await assignmentRepository.findOneBy({

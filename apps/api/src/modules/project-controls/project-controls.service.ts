@@ -15,13 +15,17 @@ import {
   BaselineStatus, BaselineType, CompanyEntity, DependencyType, PackageEntity, PackageStatus,
   ProgressUpdateEntity, ProjectEntity, ProjectRecordStatus, ProjectScheduleEntity,
   ProjectScheduleStatus, ScheduleActivityEntity, ScheduleBaselineEntity,
-  ScheduleNotificationEntity, ScheduleSourceFormat, UserAccountEntity, WbsNodeEntity,
+  NotificationSourceType, ScheduleNotificationEntity, ScheduleSourceFormat,
+  UserAccountEntity, WbsNodeEntity,
   WbsNodeStatus
 } from '../../database/entities';
 import type { AuthContext } from '../identity-access/auth.types';
 import { PermissionService } from '../identity-access/permission.service';
 import { CommandReceiptService } from '../operational-foundation/command-receipt.service';
 import { OutboxService } from '../operational-foundation/outbox.service';
+import {
+  APPROVED_CHANGE_READER, type ApprovedChangeForRebaseline, type ApprovedChangeReader
+} from '../risk-change/approved-change-reader.port';
 import { DayLevelCalendar } from './domain/calendar-calculator';
 import {
   calculateCriticalPath, CPM_FORMULA_VERSION, CriticalPathValidationError,
@@ -38,7 +42,7 @@ import {
   BaselineTypeDto, CreatePackageDto, DraftModeDto, DraftSourceFormatDto,
   LookAheadExportQueryDto,
   PackageListQueryDto, ProgressHistoryQueryDto, ProgressUpdateDto, ScheduleQueryDto,
-  SubmitScheduleBaselineDto
+  ScheduleBaselineListQueryDto, SubmitScheduleBaselineDto
 } from './dto/project-controls.dto';
 
 interface RequestContext extends AuthContext { correlationId: string }
@@ -91,6 +95,8 @@ export class ProjectControlsService {
     @InjectRepository(AuditEventEntity)
     private readonly audits: Repository<AuditEventEntity>,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
+    @Inject(APPROVED_CHANGE_READER)
+    private readonly approvedChanges: ApprovedChangeReader,
     private readonly permissions: PermissionService,
     private readonly commands: CommandReceiptService,
     private readonly outbox: OutboxService
@@ -203,7 +209,10 @@ export class ProjectControlsService {
           order: { baselineNumber: 'DESC' }
         }),
       this.notifications.find({
-        where: { tenantId: context.tenantId, projectId, recipientUserId: context.userId },
+        where: {
+          tenantId: context.tenantId, projectId, recipientUserId: context.userId,
+          sourceType: NotificationSourceType.SCHEDULE_ACTIVITY
+        },
         order: { dueAt: 'ASC' }
       })
     ]);
@@ -275,7 +284,11 @@ export class ProjectControlsService {
         && row.plannedStart <= lookAheadEnd
       )),
       alerts: alerts
-        .filter((row) => visibleActivityIds.has(row.activityId) && row.dataDate === dataDate)
+        .filter((row) => (
+          row.activityId !== null
+          && visibleActivityIds.has(row.activityId)
+          && row.dataDate === dataDate
+        ))
         .map((row) => this.notificationView(row)),
       calculatedAt: new Date().toISOString(),
       formulaVersion: this.config.schedule.calculationVersion,
@@ -349,17 +362,49 @@ export class ProjectControlsService {
     });
   }
 
+  async listBaselinesByApprovedChange(
+    context: RequestContext,
+    projectId: string,
+    query: ScheduleBaselineListQueryDto
+  ): Promise<{
+    items: ReturnType<ProjectControlsService['baselineView']>[];
+    nextCursor: string | null;
+  }> {
+    await this.requireProject(context.tenantId, projectId);
+    const packageScope = await this.permissions.packageScopeIds(
+      context, 'schedule.read', projectId
+    );
+    if (packageScope !== null) {
+      await this.denyScope(context, 'PROJECT', projectId, 'PROJECT_SCOPE_DENIED');
+    }
+    await this.approvedChanges.assertReferenceForBaselineHistory(this.baselines.manager, {
+      tenantId: context.tenantId,
+      projectId,
+      changeRequestId: query.approvedChangeRequestId
+    });
+    const rows = await this.baselines.find({
+      where: {
+        tenantId: context.tenantId,
+        projectId,
+        approvedChangeRequestId: query.approvedChangeRequestId,
+        ...(query.cursor ? { id: MoreThan(query.cursor) } : {})
+      },
+      order: { id: 'ASC' },
+      take: query.limit + 1
+    });
+    const hasMore = rows.length > query.limit;
+    const page = hasMore ? rows.slice(0, query.limit) : rows;
+    return {
+      items: page.map((row) => this.baselineView(row)),
+      nextCursor: hasMore ? page.at(-1)?.id ?? null : null
+    };
+  }
+
   async submitBaseline(
     context: RequestContext, projectId: string, input: SubmitScheduleBaselineDto,
     idempotencyKey: string
   ) {
-    if (input.baselineType === BaselineTypeDto.REBASELINE) {
-      throw new UnprocessableEntityException({
-        code: 'CHANGE_APPROVAL_REQUIRED',
-        message: 'Rebaseline cần Change Request đã được phê duyệt từ US-004',
-        retryable: false
-      });
-    }
+    this.assertBaselineRequestShape(input);
     return this.commands.execute({
       context,
       operation: `schedule-baseline.submit:${projectId}`,
@@ -408,32 +453,88 @@ export class ProjectControlsService {
           });
         }
         const baselineRepository = manager.getRepository(ScheduleBaselineEntity);
-        const existingInitial = await baselineRepository.existsBy({
-          tenantId: context.tenantId, projectId, baselineType: BaselineType.INITIAL,
-          status: In([BaselineStatus.SUBMITTED, BaselineStatus.APPROVED])
-        });
-        if (existingInitial) {
-          throw new ConflictException({
-            code: 'BASELINE_STATE_INVALID',
-            message: 'Dự án đã có initial baseline đang chờ hoặc đã phê duyệt',
-            retryable: false
+        let approvedChange: ApprovedChangeForRebaseline | null = null;
+        let replacesBaselineId: string | null = null;
+        if (input.baselineType === BaselineTypeDto.INITIAL) {
+          const existingInitial = await baselineRepository.existsBy({
+            tenantId: context.tenantId, projectId, baselineType: BaselineType.INITIAL,
+            status: In([BaselineStatus.SUBMITTED, BaselineStatus.APPROVED])
           });
+          if (existingInitial) {
+            throw new ConflictException({
+              code: 'BASELINE_STATE_INVALID',
+              message: 'Dự án đã có initial baseline đang chờ hoặc đã phê duyệt',
+              retryable: false
+            });
+          }
+        } else {
+          const currentBaseline = await baselineRepository.findOne({
+            where: {
+              tenantId: context.tenantId, projectId, status: BaselineStatus.APPROVED
+            },
+            lock: { mode: 'pessimistic_write' }
+          });
+          if (!currentBaseline) {
+            throw new ConflictException({
+              code: 'BASELINE_MISMATCH',
+              message: 'Dự án chưa có current baseline để thực hiện rebaseline',
+              retryable: false
+            });
+          }
+          approvedChange = await this.approvedChanges.resolveForRebaseline(manager, {
+            tenantId: context.tenantId,
+            projectId,
+            changeRequestId: input.approvedChangeRequestId!,
+            currentBaselineId: currentBaseline.id
+          });
+          replacesBaselineId = currentBaseline.id;
+          const pendingForChange = await baselineRepository.existsBy({
+            tenantId: context.tenantId,
+            projectId,
+            approvedChangeRequestId: approvedChange.id,
+            status: BaselineStatus.SUBMITTED
+          });
+          if (pendingForChange) {
+            throw new ConflictException({
+              code: 'BASELINE_STATE_INVALID',
+              message: 'Approved Change đã có rebaseline đang chờ quyết định',
+              retryable: false
+            });
+          }
         }
         const [{ next }] = await manager.query<Array<{ next: string }>>(
           `SELECT (COALESCE(MAX(baseline_number), 0) + 1)::text AS next
            FROM schedule_baselines WHERE tenant_id = $1 AND project_id = $2`,
           [context.tenantId, projectId]
         );
-        const snapshot = this.baselineSnapshot(
+        const scheduleSnapshot = this.baselineSnapshot(
           schedule, wbs, activeActivities, activeDependencies, schedule.versionNo + 1
         );
+        const snapshot = approvedChange ? {
+          ...scheduleSnapshot,
+          approvedChange: {
+            id: approvedChange.id,
+            code: approvedChange.code,
+            title: approvedChange.title,
+            sourceBaselineId: approvedChange.sourceBaselineId,
+            impactSnapshotHash: approvedChange.impactSnapshotHash,
+            approvalSnapshotHash: approvedChange.approvalSnapshotHash,
+            decisionVersion: approvedChange.decisionVersion,
+            approvedBy: approvedChange.approvedBy,
+            approvedAt: approvedChange.approvedAt.toISOString(),
+            versionNo: approvedChange.versionNo
+          }
+        } : scheduleSnapshot;
         const row = await baselineRepository.save({
           id: randomUUID(), tenantId: context.tenantId, projectId, scheduleId: schedule.id,
-          baselineNumber: Number(next), baselineType: BaselineType.INITIAL,
+          baselineNumber: Number(next), baselineType: input.baselineType === BaselineTypeDto.INITIAL
+            ? BaselineType.INITIAL : BaselineType.REBASELINE,
           status: BaselineStatus.SUBMITTED, dataDate: input.dataDate.slice(0, 10),
-          snapshot, snapshotHash: this.hashCanonical(snapshot), reason: input.reason.trim(),
-          impactSummary: input.impactSummary.trim(), approvedChangeRequestId: null,
-          replacesBaselineId: null, createdBy: context.userId, submittedBy: context.userId,
+          snapshot, snapshotHash: this.hashCanonical(snapshot),
+          reason: approvedChange?.changeReason ?? input.reason!.trim(),
+          impactSummary: approvedChange?.scheduleImpactSummary ?? input.impactSummary!.trim(),
+          approvedChangeRequestId: approvedChange?.id ?? null,
+          replacesBaselineId, createdBy: context.userId, submittedBy: context.userId,
           submittedAt: new Date(), approvedBy: null, approvedAt: null, decisionComment: null
         });
         await scheduleRepository.update({ id: schedule.id, tenantId: context.tenantId }, {
@@ -443,7 +544,13 @@ export class ProjectControlsService {
           action: 'BASELINE_SUBMITTED', objectType: 'ScheduleBaseline', objectId: row.id,
           aggregateVersion: row.versionNo,
           eventType: 'BaselineSubmitted',
-          payload: { projectId, baselineNumber: row.baselineNumber, snapshotHash: row.snapshotHash }
+          payload: {
+            projectId,
+            baselineNumber: row.baselineNumber,
+            baselineType: row.baselineType,
+            approvedChangeRequestId: row.approvedChangeRequestId,
+            snapshotHash: row.snapshotHash
+          }
         });
         return this.baselineView(row);
       },
@@ -1540,13 +1647,37 @@ export class ProjectControlsService {
     };
   }
 
+  private assertBaselineRequestShape(input: SubmitScheduleBaselineDto): void {
+    const initial = input.baselineType === BaselineTypeDto.INITIAL;
+    const valid = initial
+      ? typeof input.reason === 'string'
+        && typeof input.impactSummary === 'string'
+        && input.approvedChangeRequestId === undefined
+      : typeof input.approvedChangeRequestId === 'string'
+        && input.reason === undefined
+        && input.impactSummary === undefined;
+    if (!valid) {
+      throw new BadRequestException({
+        code: 'BASELINE_REQUEST_INVALID',
+        message: initial
+          ? 'INITIAL chỉ nhận reason và impactSummary'
+          : 'REBASELINE chỉ nhận approvedChangeRequestId; provenance do server resolve',
+        retryable: false
+      });
+    }
+  }
+
   private baselineView(row: ScheduleBaselineEntity) {
     return {
       id: row.id, baselineNumber: row.baselineNumber, baselineType: row.baselineType,
       status: row.status, dataDate: row.dataDate, snapshotHash: row.snapshotHash,
+      reason: row.reason, impactSummary: row.impactSummary,
       approvedChangeRequestId: row.approvedChangeRequestId,
+      replacesBaselineId: row.replacesBaselineId,
       createdBy: row.createdBy, submittedBy: row.submittedBy,
+      submittedAt: row.submittedAt,
       approvedBy: row.approvedBy, approvedAt: row.approvedAt,
+      decisionComment: row.decisionComment,
       versionNo: row.versionNo
     };
   }

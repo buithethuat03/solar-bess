@@ -43,6 +43,12 @@ export interface WorkerConfig {
     alertScanIntervalMs: number;
     thresholdVersion: string;
   };
+  riskChange: {
+    highExposureThreshold: number;
+    criticalExposureThreshold: number;
+    alertScanIntervalMs: number;
+    thresholdVersion: string;
+  };
   health: { host: string; port: number };
   shutdownTimeoutMs: number;
 }
@@ -82,6 +88,14 @@ function safeName(env: Environment, name: string, fallback: string, maximum = 10
   const value = env[name]?.trim() || fallback;
   if (!new RegExp(`^[a-zA-Z0-9._-]{1,${maximum}}$`).test(value)) {
     throw new Error(`${name} must contain only safe name characters`);
+  }
+  return value;
+}
+
+function policyVersion(env: Environment, name: string, fallback: string): string {
+  const value = env[name]?.trim() || fallback;
+  if (!/^[A-Z][A-Z0-9_]{2,99}$/.test(value)) {
+    throw new Error(`${name} must contain 3 to 100 uppercase letters, digits or underscores`);
   }
   return value;
 }
@@ -128,6 +142,17 @@ export function loadWorkerConfig(
     throw new Error('Worker credentials must be mounted as secret files, not environment values');
   }
   const queueName = safeName(env, 'WORKER_QUEUE_NAME', 'domain-events');
+  const highExposureThreshold = integer(
+    env, 'RISK_HIGH_EXPOSURE_THRESHOLD', 15, 1, 24
+  );
+  const criticalExposureThreshold = integer(
+    env, 'RISK_CRITICAL_EXPOSURE_THRESHOLD', 20, 2, 25
+  );
+  if (highExposureThreshold >= criticalExposureThreshold) {
+    throw new Error(
+      'RISK_HIGH_EXPOSURE_THRESHOLD must be lower than RISK_CRITICAL_EXPOSURE_THRESHOLD'
+    );
+  }
   return {
     workerId: safeName(env, 'WORKER_ID', `${hostname()}-${process.pid}`),
     database: {
@@ -175,6 +200,16 @@ export function loadWorkerConfig(
       nearCriticalFloatDays: integer(env, 'SCHEDULE_NEAR_CRITICAL_FLOAT_DAYS', 5, 0, 30),
       alertScanIntervalMs: integer(env, 'SCHEDULE_ALERT_SCAN_INTERVAL_MS', 60_000, 1_000, 86_400_000),
       thresholdVersion: safeName(env, 'SCHEDULE_THRESHOLD_VERSION', 'SCHEDULE_THRESHOLDS_V1', 100)
+    },
+    riskChange: {
+      highExposureThreshold,
+      criticalExposureThreshold,
+      alertScanIntervalMs: integer(
+        env, 'RISK_CHANGE_ALERT_SCAN_INTERVAL_MS', 60_000, 1_000, 86_400_000
+      ),
+      thresholdVersion: policyVersion(
+        env, 'RISK_CHANGE_THRESHOLD_VERSION', 'RISK_CHANGE_THRESHOLDS_V1'
+      )
     },
     health: {
       host: host(env, 'WORKER_HEALTH_HOST', '0.0.0.0'),

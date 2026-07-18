@@ -81,4 +81,31 @@ describe('PermissionService — SEC-106/SEC-107', () => {
     await expect(service.projectScopeIds(context, 'project.read'))
       .resolves.toEqual(['project-1', 'project-2']);
   });
+
+  it('keeps permission bundles bound to each assignment scope for safe clients', async () => {
+    jest.spyOn(service, 'effectiveAssignments').mockResolvedValue([
+      {
+        roleCode: 'READER', permissions: ['riskChange.read'],
+        scopeType: AssignmentScopeType.TENANT, scopeId: null
+      },
+      {
+        roleCode: 'APPROVER', permissions: ['riskChange.approve'],
+        scopeType: AssignmentScopeType.PROJECT, scopeId: 'project-2'
+      }
+    ]);
+    await expect(service.identityPermissions(context)).resolves.toEqual({
+      roles: ['APPROVER', 'READER'],
+      permissions: ['riskChange.approve', 'riskChange.read'],
+      scopes: [
+        {
+          roleCode: 'READER', permissions: ['riskChange.read'],
+          scopeType: AssignmentScopeType.TENANT, scopeId: null
+        },
+        {
+          roleCode: 'APPROVER', permissions: ['riskChange.approve'],
+          scopeType: AssignmentScopeType.PROJECT, scopeId: 'project-2'
+        }
+      ]
+    });
+  });
 });

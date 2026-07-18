@@ -79,7 +79,7 @@ describe('ScheduleAlertProcessor PostgreSQL projection — TEST-013/194', () => 
   beforeEach(async () => {
     jest.clearAllMocks();
     await pool.query('DELETE FROM event_consumptions WHERE tenant_id = $1', [tenantId]);
-    await pool.query('DELETE FROM schedule_notifications WHERE tenant_id = $1', [tenantId]);
+    await pool.query('DELETE FROM notifications WHERE tenant_id = $1', [tenantId]);
     await pool.query('DELETE FROM transactional_outbox_events WHERE tenant_id = $1', [tenantId]);
   });
 
@@ -90,7 +90,7 @@ describe('ScheduleAlertProcessor PostgreSQL projection — TEST-013/194', () => 
       return;
     }
     await pool.query('DELETE FROM event_consumptions WHERE tenant_id = $1', [tenantId]);
-    await pool.query('DELETE FROM schedule_notifications WHERE tenant_id = $1', [tenantId]);
+    await pool.query('DELETE FROM notifications WHERE tenant_id = $1', [tenantId]);
     await pool.query('DELETE FROM transactional_outbox_events WHERE tenant_id = $1', [tenantId]);
     await pool.query('DELETE FROM activity_dependencies WHERE tenant_id = $1', [tenantId]);
     await pool.query('DELETE FROM progress_updates WHERE tenant_id = $1', [tenantId]);
@@ -121,11 +121,15 @@ describe('ScheduleAlertProcessor PostgreSQL projection — TEST-013/194', () => 
     expect(notifications).toEqual([
       {
         recipientId: activityOwnerId, alertType: 'OVERDUE', priority: 'HIGH',
-        activityId, status: 'UNREAD', thresholdVersion: config.schedule.thresholdVersion
+        packageId, activityId, sourceType: 'ScheduleActivity',
+        dueAt: '2026-07-10', dataDate: '2026-07-13',
+        status: 'UNREAD', thresholdVersion: config.schedule.thresholdVersion
       },
       {
         recipientId: projectManagerId, alertType: 'OVERDUE', priority: 'HIGH',
-        activityId, status: 'UNREAD', thresholdVersion: config.schedule.thresholdVersion
+        packageId, activityId, sourceType: 'ScheduleActivity',
+        dueAt: '2026-07-10', dataDate: '2026-07-13',
+        status: 'UNREAD', thresholdVersion: config.schedule.thresholdVersion
       }
     ].sort((left, right) => left.recipientId.localeCompare(right.recipientId)));
     expect(notifications.map((row) => row.recipientId)).not.toContain(otherPackageUserId);
@@ -308,7 +312,11 @@ describe('ScheduleAlertProcessor PostgreSQL projection — TEST-013/194', () => 
     recipientId: string;
     alertType: string;
     priority: string;
+    packageId: string | null;
     activityId: string;
+    sourceType: string;
+    dueAt: string;
+    dataDate: string;
     status: string;
     thresholdVersion: string;
   }>> {
@@ -316,14 +324,20 @@ describe('ScheduleAlertProcessor PostgreSQL projection — TEST-013/194', () => 
       recipientId: string;
       alertType: string;
       priority: string;
+      packageId: string | null;
       activityId: string;
+      sourceType: string;
+      dueAt: string;
+      dataDate: string;
       status: string;
       thresholdVersion: string;
     }>(`SELECT recipient_user_id AS "recipientId", alert_type AS "alertType",
-      priority, activity_id AS "activityId", status,
+      priority, package_id AS "packageId", activity_id AS "activityId",
+      source_type AS "sourceType", due_at::text AS "dueAt",
+      data_date::text AS "dataDate", status,
       threshold_version AS "thresholdVersion"
-      FROM schedule_notifications
-      WHERE tenant_id = $1 AND project_id = $2
+      FROM notifications
+      WHERE tenant_id = $1 AND project_id = $2 AND source_type = 'ScheduleActivity'
       ORDER BY recipient_user_id, alert_type`, [tenantId, projectId]);
     return result.rows;
   }

@@ -65,6 +65,22 @@ export class PackageListQueryDto {
   limit = 50;
 }
 
+export class ScheduleBaselineListQueryDto {
+  @IsUUID()
+  approvedChangeRequestId!: string;
+
+  @IsOptional()
+  @IsUUID()
+  cursor?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit = 50;
+}
+
 export class CreatePackageDto {
   @Transform(upper)
   @Matches(/^[A-Z0-9][A-Z0-9_-]{1,63}$/)
@@ -349,13 +365,15 @@ export class SubmitScheduleBaselineDto {
   @IsDateString()
   dataDate!: string;
 
+  @ValidateIf((value: SubmitScheduleBaselineDto) => value.baselineType === BaselineTypeDto.INITIAL)
   @IsString()
   @Length(3, 2000)
-  reason!: string;
+  reason?: string;
 
+  @ValidateIf((value: SubmitScheduleBaselineDto) => value.baselineType === BaselineTypeDto.INITIAL)
   @IsString()
   @Length(3, 4000)
-  impactSummary!: string;
+  impactSummary?: string;
 
   @ValidateIf((value: SubmitScheduleBaselineDto) => value.baselineType === BaselineTypeDto.REBASELINE)
   @IsUUID()

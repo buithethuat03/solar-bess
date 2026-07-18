@@ -122,7 +122,7 @@ onMounted(load);
 
 <template>
   <AppLayout>
-    <section class="page-heading"><div><p class="eyebrow eyebrow--accent">PROJECT MASTER</p><h1>{{ project?.name ?? 'Chi tiết dự án' }}</h1><p v-if="project" class="lead">{{ project.code }} · {{ project.type }} · {{ portfolioName }}</p></div><div class="page-heading__actions"><el-button v-if="auth.can('schedule.read')" type="primary" @click="router.push({ name: RouteName.projectSchedule, params: { projectId } })">WBS &amp; Schedule</el-button><el-button @click="router.push({ name: RouteName.projects })">Danh sách</el-button></div></section>
+    <section class="page-heading"><div><p class="eyebrow eyebrow--accent">PROJECT MASTER</p><h1>{{ project?.name ?? 'Chi tiết dự án' }}</h1><p v-if="project" class="lead">{{ project.code }} · {{ project.type }} · {{ portfolioName }}</p></div><div class="page-heading__actions"><el-button v-if="auth.can('riskChange.read')" type="primary" @click="router.push({ name: RouteName.projectRiskChange, params: { projectId }, query: { tab: 'risks' } })">Risk &amp; Change</el-button><el-button v-if="auth.can('schedule.read')" @click="router.push({ name: RouteName.projectSchedule, params: { projectId } })">WBS &amp; Schedule</el-button><el-button @click="router.push({ name: RouteName.projects })">Danh sách</el-button></div></section>
     <el-alert v-if="error" type="error" :title="error" show-icon />
     <div v-if="loading" class="loading-panel">Đang tải dự án…</div>
     <template v-else-if="project">

@@ -47,4 +47,44 @@ describe('worker secret-file configuration', () => {
       WORKER_CONCURRENCY: '0'
     }, readSecret)).toThrow('WORKER_CONCURRENCY');
   });
+
+  it('loads the approved Risk/Change alert thresholds, interval and version', () => {
+    const config = loadWorkerConfig({
+      WORKER_DATABASE_URL_FILE: '/secrets/database_url',
+      WORKER_REDIS_PASSWORD_FILE: '/secrets/redis_password',
+      RISK_HIGH_EXPOSURE_THRESHOLD: '15',
+      RISK_CRITICAL_EXPOSURE_THRESHOLD: '20',
+      RISK_CHANGE_ALERT_SCAN_INTERVAL_MS: '60000',
+      RISK_CHANGE_THRESHOLD_VERSION: 'RISK_CHANGE_THRESHOLDS_V2'
+    }, readSecret);
+
+    expect(config.riskChange).toEqual({
+      highExposureThreshold: 15,
+      criticalExposureThreshold: 20,
+      alertScanIntervalMs: 60_000,
+      thresholdVersion: 'RISK_CHANGE_THRESHOLDS_V2'
+    });
+  });
+
+  it('rejects inconsistent Risk exposure thresholds', () => {
+    expect(() => loadWorkerConfig({
+      WORKER_DATABASE_URL_FILE: '/secrets/database_url',
+      WORKER_REDIS_PASSWORD_FILE: '/secrets/redis_password',
+      RISK_HIGH_EXPOSURE_THRESHOLD: '20',
+      RISK_CRITICAL_EXPOSURE_THRESHOLD: '20'
+    }, readSecret)).toThrow('must be lower');
+  });
+
+  it.each([
+    ['RISK_CHANGE_ALERT_SCAN_INTERVAL_MS', '999'],
+    ['RISK_HIGH_EXPOSURE_THRESHOLD', '0'],
+    ['RISK_CRITICAL_EXPOSURE_THRESHOLD', '26'],
+    ['RISK_CHANGE_THRESHOLD_VERSION', 'unsafe-version']
+  ])('rejects invalid Risk/Change setting %s', (name, value) => {
+    expect(() => loadWorkerConfig({
+      WORKER_DATABASE_URL_FILE: '/secrets/database_url',
+      WORKER_REDIS_PASSWORD_FILE: '/secrets/redis_password',
+      [name]: value
+    }, readSecret)).toThrow(name);
+  });
 });

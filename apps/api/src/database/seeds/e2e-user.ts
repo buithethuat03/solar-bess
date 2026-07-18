@@ -8,7 +8,10 @@ import {
   MasterRecordStatus, RoleAssignmentEntity, RoleEntity, TenantEntity, UserAccountEntity
 } from '../entities';
 
-const email = 'e2e-runner@example.test';
+const fixtures = [
+  { email: 'e2e-runner@example.test', displayName: 'E2E Runner' },
+  { email: 'e2e-approver@example.test', displayName: 'E2E Independent Approver' }
+] as const;
 
 async function stdin(): Promise<string> {
   let value = '';
@@ -27,45 +30,68 @@ async function run(): Promise<void> {
     const tenants = await manager.getRepository(TenantEntity).findBy({ status: 'ACTIVE' });
     if (tenants.length !== 1) throw new Error(`E2E fixture requires exactly one ACTIVE test tenant; found ${tenants.length}`);
     const users = manager.getRepository(UserAccountEntity);
-    const existing = await users.findOneBy({ tenantId: tenants[0].id, normalizedEmail: email });
     if (action === 'delete') {
-      if (!existing) return;
-      await manager.getRepository(AuthenticationSessionEntity).delete({ tenantId: tenants[0].id, userAccountId: existing.id });
-      await manager.getRepository(LocalCredentialEntity).delete({ tenantId: tenants[0].id, userAccountId: existing.id });
-      await manager.getRepository(RoleAssignmentEntity).delete({ tenantId: tenants[0].id, userAccountId: existing.id });
-      await users.delete({ id: existing.id, tenantId: tenants[0].id });
+      for (const fixture of fixtures) {
+        const existing = await users.findOneBy({
+          tenantId: tenants[0].id, normalizedEmail: fixture.email
+        });
+        if (!existing) continue;
+        await manager.getRepository(AuthenticationSessionEntity).delete({
+          tenantId: tenants[0].id, userAccountId: existing.id
+        });
+        await manager.getRepository(LocalCredentialEntity).delete({
+          tenantId: tenants[0].id, userAccountId: existing.id
+        });
+        await manager.getRepository(RoleAssignmentEntity).delete({
+          tenantId: tenants[0].id, userAccountId: existing.id
+        });
+        await users.delete({ id: existing.id, tenantId: tenants[0].id });
+      }
       return;
     }
-    const user = await users.save({
-      ...(existing ?? { id: randomUUID(), tenantId: tenants[0].id }),
-      email, normalizedEmail: email, displayName: 'E2E Runner', status: 'ACTIVE', lastLoginAt: null
-    });
-    const credentials = manager.getRepository(LocalCredentialEntity);
-    const credential = await credentials.findOneBy({ tenantId: tenants[0].id, userAccountId: user.id });
-    await credentials.save({
-      id: credential?.id ?? randomUUID(), tenantId: tenants[0].id, userAccountId: user.id,
-      passwordHash: await hash(password, {
-        type: 2, memoryCost: config.auth.argonMemoryCost,
-        timeCost: config.auth.argonTimeCost, parallelism: config.auth.argonParallelism
-      }),
-      algorithm: 'argon2id', credentialVersion: (credential?.credentialVersion ?? 0) + 1,
-      changedAt: new Date()
-    });
     const role = await manager.getRepository(RoleEntity).findOneBy({
       tenantId: tenants[0].id, code: 'PMO', status: MasterRecordStatus.ACTIVE
     });
     if (!role) throw new Error('PMO role must be seeded before E2E fixture');
-    const assignments = manager.getRepository(RoleAssignmentEntity);
-    const assignment = await assignments.findOneBy({
-      tenantId: tenants[0].id, userAccountId: user.id, roleId: role.id,
-      scopeType: AssignmentScopeType.TENANT
-    });
-    await assignments.save({
-      ...(assignment ?? { id: randomUUID(), tenantId: tenants[0].id, userAccountId: user.id, roleId: role.id }),
-      scopeType: AssignmentScopeType.TENANT, scopeId: null,
-      effectiveFrom: new Date('2026-01-01T00:00:00.000Z'), effectiveTo: null,
-      status: MasterRecordStatus.ACTIVE
-    });
+    for (const fixture of fixtures) {
+      const existing = await users.findOneBy({
+        tenantId: tenants[0].id, normalizedEmail: fixture.email
+      });
+      const user = await users.save({
+        ...(existing ?? { id: randomUUID(), tenantId: tenants[0].id }),
+        email: fixture.email, normalizedEmail: fixture.email,
+        displayName: fixture.displayName, status: 'ACTIVE', lastLoginAt: null
+      });
+      const credentials = manager.getRepository(LocalCredentialEntity);
+      const credential = await credentials.findOneBy({
+        tenantId: tenants[0].id, userAccountId: user.id
+      });
+      await credentials.save({
+        id: credential?.id ?? randomUUID(), tenantId: tenants[0].id,
+        userAccountId: user.id,
+        passwordHash: await hash(password, {
+          type: 2, memoryCost: config.auth.argonMemoryCost,
+          timeCost: config.auth.argonTimeCost, parallelism: config.auth.argonParallelism
+        }),
+        algorithm: 'argon2id',
+        credentialVersion: (credential?.credentialVersion ?? 0) + 1,
+        changedAt: new Date()
+      });
+      const assignments = manager.getRepository(RoleAssignmentEntity);
+      const assignment = await assignments.findOneBy({
+        tenantId: tenants[0].id, userAccountId: user.id, roleId: role.id,
+        scopeType: AssignmentScopeType.TENANT
+      });
+      await assignments.save({
+        ...(assignment ?? {
+          id: randomUUID(), tenantId: tenants[0].id,
+          userAccountId: user.id, roleId: role.id
+        }),
+        scopeType: AssignmentScopeType.TENANT, scopeId: null,
+        effectiveFrom: new Date('2026-01-01T00:00:00.000Z'), effectiveTo: null,
+        status: MasterRecordStatus.ACTIVE
+      });
+    }
   });
   await AppDataSource.destroy();
   console.log(`E2E fixture ${action} completed; no credential value was logged`);

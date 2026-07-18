@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import AppDataSource from 'src/database/data-source';
-import { runTestMigrations } from 'test/setup/run-migrations';
+import { revertThroughMigration, runTestMigrations } from 'test/setup/run-migrations';
 
 jest.setTimeout(45_000);
 
@@ -27,7 +27,7 @@ describe('Project Controls migration — DB-012/017…021/101/105', () => {
   });
 
   it('runs down and up and restores PACKAGE scope support', async () => {
-    await AppDataSource.undoLastMigration({ transaction: 'all' });
+    await revertThroughMigration('CreateProjectControls1783730000000');
     const [down] = await AppDataSource.query<Array<{
       packages: string | null;
       schedules: string | null;
@@ -56,7 +56,7 @@ describe('Project Controls migration — DB-012/017…021/101/105', () => {
       to_regclass('public.schedule_activities')::text AS activities,
       to_regclass('public.schedule_baselines')::text AS baselines,
       to_regclass('public.progress_updates')::text AS progress,
-      to_regclass('public.schedule_notifications')::text AS notifications,
+      to_regclass('public.notifications')::text AS notifications,
       pg_get_constraintdef(oid) AS "scopeDefinition"
       FROM pg_constraint WHERE conname = 'ck_role_assignment_scope'`);
     expect(up).toMatchObject({
@@ -65,7 +65,7 @@ describe('Project Controls migration — DB-012/017…021/101/105', () => {
       activities: 'schedule_activities',
       baselines: 'schedule_baselines',
       progress: 'progress_updates',
-      notifications: 'schedule_notifications'
+      notifications: 'notifications'
     });
     expect(up.scopeDefinition).toContain('PACKAGE');
   });
@@ -195,16 +195,16 @@ describe('Project Controls migration — DB-012/017…021/101/105', () => {
       code: '23514', constraint: 'ck_schedule_activity_percent'
     });
     await expect(AppDataSource.query(
-      `INSERT INTO schedule_notifications
-        (id, tenant_id, recipient_user_id, project_id, activity_id, source_type,
+      `INSERT INTO notifications
+        (id, tenant_id, recipient_user_id, project_id, package_id, activity_id, source_type,
          source_id, alert_type, priority, object_link, reason, due_at, data_date,
          threshold_version, dedup_key)
-       VALUES ($1, $2, $3, $4, $5, 'ScheduleActivity', $5, 'OVERDUE', 'HIGH',
-         $6, 'Synthetic overdue alert', '2026-07-12', '2026-07-12', 'V1', $7)`,
-      [randomUUID(), tenantA, userB, projectA, scope.activityId,
+       VALUES ($1, $2, $3, $4, $5, $6, 'ScheduleActivity', $6, 'OVERDUE', 'HIGH',
+         $7, 'Synthetic overdue alert', '2026-07-24', '2026-07-12', 'V1', $8)`,
+      [randomUUID(), tenantA, userB, projectA, scope.packageId, scope.activityId,
         `/projects/${projectA}/schedule`, `alert-${randomUUID()}`]
     )).rejects.toMatchObject({
-      code: '23503', constraint: 'fk_schedule_notifications_tenant_recipient'
+      code: '23503', constraint: 'fk_notifications_tenant_recipient'
     });
   });
 
@@ -259,6 +259,7 @@ describe('Project Controls migration — DB-012/017…021/101/105', () => {
   }
 
   async function seedScheduleAggregate(): Promise<{
+    packageId: string;
     scheduleId: string;
     wbsId: string;
     activityId: string;
@@ -298,6 +299,6 @@ describe('Project Controls migration — DB-012/017…021/101/105', () => {
          '2026-07-13', '2026-07-24', 10, 10, 'READY', $7, $7)`,
       [activityId, tenantA, projectA, scheduleId, wbsId, packageId, userA]
     );
-    return { scheduleId, wbsId, activityId };
+    return { packageId, scheduleId, wbsId, activityId };
   }
 });

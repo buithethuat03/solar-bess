@@ -1,13 +1,13 @@
 # Traceability Matrix — Nền tảng Solar & BESS
 
 > **Purpose:** Cung cấp chuỗi truy vết Business Goal → BR → FR/NFR → UC → WF → US → AC → API → DB → SEC → TEST → Release và công khai mọi gap/mâu thuẫn.
-> **Scope:** Toàn bộ artefact Draft và implementation profiles; matrix dùng range inclusive. US-001 đã Implemented; operational foundation/core US-003 đã deploy EC2 test; US-004 Approved/Build-ready nhưng chưa Implemented; production vẫn Proposed.
+> **Scope:** Toàn bộ artefact Draft và implementation profiles; matrix dùng range inclusive. US-001 và operational foundation/core US-003 đã deploy EC2 test; US-004 Implemented local với acceptance Partial và deployment Pending; production vẫn Proposed.
 > **Source:** [Vision](./01-product-vision-and-scope.md), [BRD](./02-BRD.md), [PRD](./03-PRD.md), [SRS](./04-SRS.md), [Domain](./05-domain-model.md), [Architecture](./06-solution-architecture.md), [Data](./07-data-model.md), [API](./08-api-specification.md), [Security](./09-security-and-permissions.md), [UX](./10-ux-information-architecture.md), [Workflow](./11-workflows-and-state-machines.md), [Backlog](./12-product-backlog.md), [Test](./13-test-strategy.md), [Operational Foundation ExecPlan](../.agent/execplans/2026-07-11-operational-foundation.md), [US-003 ExecPlan](../.agent/execplans/2026-07-11-project-controls-us003.md), [US-004 ExecPlan](../.agent/execplans/2026-07-12-risk-issue-change-us004.md).
-> **Version:** 0.9
-> **Status:** Draft toàn platform; US-001 Implemented; operational foundation và US-003 core Implemented/deployed; US-004 Approved/Build-ready; production Proposed
+> **Version:** 1.5
+> **Status:** Draft toàn platform; US-001/operational foundation/US-003 core Implemented; US-004 Implemented local, TEST-014…017 Partial và GitHub Actions/EC2 deployment Pending; production Proposed
 > **Owner:** Product Operations / Business Analysis / QA (cá nhân: TBD)
-> **Updated:** 2026-07-12
-> **Approval:** Operational foundation EC2 test và US-003/US-004 documentation/implementation profile Approved — Product Owner delegated; full story/production acceptance TBD — Architecture, QA, Security và Process Owners
+> **Updated:** 2026-07-18
+> **Approval:** Operational foundation EC2 test và US-003/US-004 local implementation profile Approved — Product Owner delegated; full story/deployment/production acceptance TBD/Pending — Architecture, QA, Security và Process Owners
 
 ## 1. ID registry and canonical owner
 
@@ -18,8 +18,8 @@
 | NFR-001…024 | 24 | 03-PRD | TEST-174…197 |
 | UC-001…037 | 37 | 03-PRD | One-to-one source US-E |
 | ADR-001…010 | 10 | 06 Architecture | One-to-one ARC-001…010 |
-| DB-001…112 | 112 | 07 Data Model | DB-101…105 materialized EC2 test; DB-106…111 reserved; DB-112 allocated cho US-004 |
-| API-001…159 | 159 | 08 API/OpenAPI | x-api-id exact/unique; API-143…158 concrete planned US-004 surface; API-159 Project Controls reverse trace |
+| DB-001…113 | 113 | 07 Data Model | DB-101…105 và DB-112/113 materialized local; DB-106…111 reserved; US-004 forward reconcile đã test local, actual deploy Pending |
+| API-001…164 | 164 | 08 API/OpenAPI | x-api-id exact/unique; API-008/036/038/143…164 implemented local; direct/dependency ownership vẫn tách rõ |
 | SEC-101…132 | 32 | 09 Security | TEST-198…229 |
 | WF-001…026 | 26 | 11 Workflow | 26 Mermaid state machines |
 | US-001…037 | 37 | 12 Backlog | One-to-one US-E01…37 |
@@ -34,8 +34,8 @@ This is the primary chain. API/DB/SEC ranges are capability surfaces; exact oper
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | PM/EPC execution | BR-001, BR-031 | FR-010…FR-025 | UC-001 | WF-001 | US-001 | AC-001…AC-004 | API-003…007/API-015…025 | DB-001…013/098 | SEC-105…111/118 | TEST-001…TEST-004/202…208 | MVP; Implemented/EC2 deployed |
 | COD-to-O&M continuity | BR-032 | FR-010…FR-015, FR-019…FR-025, FR-098…FR-114 | UC-002 | WF-001 | US-002 | AC-005…AC-009 | API-015…020/API-130…136; API-017…025/API-034…038/API-130…136; API-038; API-098…105 | DB-009…013/065…068; DB-009…021/065…068; DB-065…068; DB-073…078 | SEC-105…111/118/119; SEC-105…111/118; SEC-108/109/111/114; SEC-102/108/109/111/112/118 | TEST-005…TEST-009 | MVP |
-| PM/EPC execution | BR-018, BR-032 | FR-016…FR-021; NFR-007/012/014/016/017/020…023 | UC-003 | WF-003 | US-003 | AC-010…AC-013 | **Direct:** API-023/024/034…037/140…142<br>**Dependency:** API-038 | **Direct:** DB-012/017…021/101/105<br>**Dependency:** DB-067/102…104 | SEC-105…111/118/119 | TEST-010…013/185/187/189/190/193…196 | MVP; core Implemented/deployed; full story Pass pending runtime evidence + US-004 positive rebaseline |
-| Enterprise control | BR-022, BR-031, BR-032 | FR-098…FR-105 | UC-004 | WF-015/WF-021 | US-004 | AC-014…AC-017 | **Direct:** API-038/143…158; reverse trace API-159<br>**Dependencies:** API-034…037/140, future Claim/contract API | **Direct:** DB-065…067/112/098/102…105<br>**Dependencies:** DB-020 schedule refs; DB-068/028…033 Claim/Contract | SEC-105…111/114/118/119 | TEST-014…017 plus TEST-012/185/187/189/190/193…196/202…208 | MVP; Approved/Build-ready, not Implemented |
+| PM/EPC execution | BR-018, BR-032 | FR-016…FR-021; NFR-007/012/014/016/017/020…023 | UC-003 | WF-003 | US-003 | AC-010…AC-013 | **Direct:** API-023/024/034…037/140…142<br>**Dependency:** API-038 | **Direct:** DB-012/017…021/101/105<br>**Dependency:** DB-067/102…104 | SEC-105…111/118/119 | TEST-010…013/185/187/189/190/193…196 | MVP; core Implemented/deployed; positive rebaseline focused integration implemented, same-journey/full story evidence Pending |
+| Enterprise control | BR-022, BR-031, BR-032 | FR-098…FR-105 | UC-004 | WF-015/WF-021 | US-004 | AC-014…AC-017 | **Direct:** API-038/143…158/160…164<br>**Assignee dependency:** API-008<br>**Project Controls consumer/reverse:** API-036/159<br>**Other dependencies:** API-034/035/037/140, future Claim/contract API | **Direct:** DB-065…067/112/113/098/102…105<br>**Dependencies:** DB-020 schedule refs; DB-068/028…033 Claim/Contract | SEC-105…111/114/118/119 | TEST-014…017 plus TEST-012/185/187/189/190/193…196/202…208 | MVP; local pre-push gate Pass; TEST-014…017 Partial, full E2E/actual deployment Pending |
 | Enterprise control | BR-003, BR-009, BR-011, BR-012, BR-019, BR-026, BR-035 | FR-026…FR-035 | UC-005 | WF-004…006 | US-005 | AC-018…AC-022 | API-039…052 | DB-022…027 | SEC-109/112/113/118…123/126 | TEST-018…TEST-022 | MVP |
 | Enterprise control | BR-009…BR-011, BR-022, BR-026, BR-030 | FR-036…FR-044 | UC-006 | WF-008/009 | US-006 | AC-023…AC-027 | API-053…061; API-039…052 | DB-028…033; DB-022…027 | SEC-108/109/114/118/119/126/130; SEC-109/112/113/118…123/126 | TEST-023…TEST-027 | MVP |
 | Enterprise control | BR-007, BR-015, BR-030, BR-033 | FR-053…FR-060, FR-138…FR-155 | UC-007 | WF-014 | US-007 | AC-028…AC-032 | API-062…066; API-053…061 | DB-034…040; DB-028…033 | SEC-108/109/114/118/119; SEC-108/109/114/118/119/126/130 | TEST-028…TEST-032 | MVP |
@@ -53,7 +53,7 @@ This is the primary chain. API/DB/SEC ranges are capability surfaces; exact oper
 | Enterprise control | BR-011, BR-035, BR-040 | FR-029…FR-035, FR-145, FR-151…FR-155, FR-164 | UC-019 | WF-007 | US-019 | AC-088…AC-092 | API-039…052; API-001…014; API-106…113 | DB-022…027; DB-001…008/098; DB-069…072 | SEC-109/112/113/118…123/126; SEC-101…110/118; SEC-102/106…110/118 | TEST-088…TEST-092 | MVP |
 | Enterprise control | BR-033, BR-040 | FR-146…FR-155, NFR-008…NFR-013 | UC-020 | WF-026 | US-020 | AC-093…AC-097, AC-174…177 | API-001…014, API-137…139 | DB-001…008/098…100 | SEC-101…110/117/118 | TEST-093…TEST-097, TEST-230…233 | MVP; base auth slice Approved |
 | Enterprise control | BR-011, BR-033…BR-035, BR-040 | FR-143, FR-154, FR-161, NFR-022 | UC-021 | Audit flow | US-021 | AC-098…AC-102 | API-001…014; API-106…113; API-039…052 | DB-001…008/098; DB-069…072; DB-022…027 | SEC-101…110/118; SEC-102/106…110/118; SEC-109/112/113/118…123/126 | TEST-098…TEST-102 | MVP |
-| Enterprise control | BR-032, BR-034, BR-038 | FR-019…FR-025, FR-142…FR-145, FR-175, FR-177 | UC-022 | WF-001…025 notifications | US-022 | AC-103…AC-107 | API-106…113; API-017…025/API-034…038/API-130…136 | DB-069…072; DB-009…021/065…068; DB-105 | SEC-102/106…110/118; SEC-105…111/118 | TEST-103…TEST-107 | MVP; DB-105 reserved, not implemented |
+| Enterprise control | BR-032, BR-034, BR-038 | FR-019…FR-025, FR-142…FR-145, FR-175, FR-177 | UC-022 | WF-001…025 notifications | US-022 | AC-103…AC-107 | API-106…113; API-017…025/API-034…038/API-130…136 | DB-069…072; DB-009…021/065…068; DB-105 | SEC-102/106…110/118; SEC-105…111/118 | TEST-103…TEST-107 | MVP; DB-105 schedule-alert subset Implemented, broader notification lifecycle planned |
 | Enterprise control | BR-001, BR-032, BR-036, BR-038 | FR-010…FR-015, FR-020…FR-025, FR-130…FR-137, FR-171…FR-177 | UC-023 | Report job | US-023 | AC-108…AC-112 | API-015…020/API-130…136; API-017…025/API-034…038/API-130…136; API-062…066; API-039…052 | DB-009…013/065…068; DB-009…021/065…068; DB-034…040; DB-022…027; DB-106/107 | SEC-105…111/118/119; SEC-105…111/118; SEC-108/109/114/118/119; SEC-109/112/113/118…123/126 | TEST-108…TEST-112 | MVP; DB-106/107 reserved, not implemented |
 | Safe extensibility | BR-040 | NFR-004…NFR-006, NFR-021…NFR-024 | UC-024 | Recovery runbook | US-024 | AC-113…AC-116 | API-001…014; API-122…126 | DB-001…008/098; DB-089…092/096…098 | SEC-101…110/118; SEC-115…118/122/125…128 | TEST-113…TEST-116 | MVP |
 | Opportunity/investment | BR-002…BR-008 | FR-001…FR-009, FR-053…FR-060, FR-125…FR-137 | UC-025 | WF-002 | US-025 | AC-117…AC-121 | API-026…033; API-072/073/API-121; API-074/075/API-121/125; API-062…066 | DB-014…016; DB-079…083/093…095; DB-079…083/089…092; DB-034…040 | SEC-105/107/111/118; SEC-111/127/128; SEC-108/109/114/118/119 | TEST-117…TEST-121 | Release 1 |
@@ -74,17 +74,23 @@ This is the primary chain. API/DB/SEC ranges are capability surfaces; exact oper
 
 | Relationship | Upstream/behavior | API/DB | Verification | Status boundary |
 |---|---|---|---|---|
-| Direct implementation contract | BR-018/032; FR-016…021; UC-003; WF-003; US-003; AC-010…013 | API-023/024/034…037/140…142; DB-012/017…021/101/105 | TEST-010…013 plus TEST-185/187/189/190/193…196 and SEC negative tests | Core Implemented/deployed; unit/static evidence pass; full runtime/story Pass chưa claim |
-| Operational dependency | AC-013 committed alert delivery, retry, duplicate suppression and DLQ | DB-102 Outbox; DB-103 ConsumerCheckpoint; DB-104 CommandReceipt | TEST-180/185/194/196 | M1 Approved/Planned; AC-013 end-to-end cannot Pass before execution evidence |
-| Change-control dependency | AC-012 positive rebaseline requires approved same-scope/current-baseline schedule change | API-150…156/159; DB-067; US-004 public ApprovedChangeReader | TEST-012 plus TEST-016 | Dependency, not US-003 direct ownership; implementation starts only after US-004 M2 evidence |
+| Direct implementation contract | BR-018/032; FR-016…021; UC-003; WF-003; US-003; AC-010…013 | API-023/024/034…037/140…142; DB-012/017…021/101/105 | TEST-010…013 plus TEST-185/187/189/190/193…196 and SEC negative tests | Core Implemented/deployed; current isolated integration và focused rebaseline Pass; full story E2E Pass chưa claim |
+| Operational dependency | AC-013 committed alert delivery, retry, duplicate suppression and DLQ | DB-102 Outbox; DB-103 ConsumerCheckpoint; DB-104 CommandReceipt | TEST-180/185/194/196 | Implemented local; full AC-013 end-to-end delivery evidence chưa được claim |
+| Change-control dependency | AC-012 positive rebaseline requires approved same-scope/current-baseline Change whose frozen schedule impact requires rebaseline | US-004 API-150…156/162 + public ApprovedChangeReader; Project Controls API-036/159; DB-067 | TEST-012 plus TEST-016 | Implemented local with focused positive/negative integration; same-journey Change→REBASELINE E2E remains Partial |
 | Downstream consumption | Command Center/report reads schedule state and alert projection | Existing downstream APIs/read models, no new direct schedule command | TEST-005…009/013 as applicable | Does not broaden US-003 implementation scope or imply US-002 Implemented |
 
 ### 2.2 US-004 exact trace and readiness boundary
 
 | Relationship | Upstream/behavior | API/DB | Verification | Status boundary |
 |---|---|---|---|---|
-| Direct implementation contract | BR-022/031/032; FR-098…102 plus subset FR-104; UC-004; WF-015/021; US-004; AC-014…017 | API-038/143…158 plus API-159 reverse trace; DB-065…067/112/098/102…105 | TEST-014…017 plus NFR/security ranges | Approved/Build-ready; no execution claim |
-| Schedule dependency/consumer | Change assessment references DB-020; approved DB-067 is read through public contract; reverse trace remains Project Controls-owned | API-034…037/140/159; DB-020 | TEST-012/016 | Positive path owned jointly by US-004 M2 and US-003 M4 |
+| Direct implementation contract | BR-022/031/032; FR-098…102 plus subset FR-104; UC-004; WF-015/021; US-004; AC-014…017 | API-038/143…158/160…164; DB-065…067/112/113/098/102…105 | TEST-014…017 plus NFR/security ranges | Implemented local; focused evidence recorded, TEST-014…017 Partial |
+| Assignee dependency | Owner/action assignment must list only active actors with required capability and effective full-project/matching-package assignment | API-008; DB-005…007 | TEST-014/015 plus tenant/package negative tests | Identity-owned dependency implemented local; focused exact-scope test Pass, full negative matrix Partial |
+| Action completion/closure guard | DONE records evidence; VERIFIED or authorized CANCELLED requires independent full-project actor and satisfies closure; every other Action state blocks | API-148/149/163/164; DB-112; API-154/155; DB-065/066/113 | TEST-015/017 | DONE/VERIFY/self/stale evidence exists; ROUTINE/CANCEL/full closure-block matrix Pending |
+| Residual authority | DB-065 is residual SoR; direct API-144 reassessment is full-project/versioned/evidenced; DB-112 proposal changes no summary until independent VERIFY atomically checks `residualRiskVersion` and promotes it | API-144/149/157; DB-065/112/098/102/104 | TEST-015 plus version/package/zero-write negatives | Eliminates dual SoR; DONE and stale verification cannot change Risk/heatmap |
+| Closure-cycle evidence | Every request appends DB-113; one decision completes the current undecided cycle once; reopen/re-close appends instead of overwriting prior evidence; DB-065/066 closure scalars are only latest projections | API-144/147/154/155/160/161; DB-065/066/113/098 | TEST-014/017 plus reopen/re-close/history/immutability/cursor traversal negatives | Post-fix focused HTTP 6/6 evidences Risk missing-evidence zero-write, reopen and second APPROVE cycle with immutable `[2,1]` history; Issue/RETURN/REJECT/cursor/ACL matrix Partial |
+| Heatmap authority | API-157 aggregates the complete authorized Risk filter independently from API-143 cursor pages and returns 25 inherent plus 25 residual cells for every scoring/threshold-version pair, including residual-missing count | API-143/157; DB-065 | TEST-014/015 plus page/filter/version/package isolation | No silent page or version-group truncation and no cross-package inference |
+| Notification generalization | Existing ScheduleActivity projection is preserved while DB-105 adds exact source/package semantics and deterministic source-derived NORMAL/HIGH priority for Risk/Issue/Action/Change; schedule readers filter source type | DB-105/102/103; API-034/157 | TEST-013/015 priority/source/date/version matrix plus migration up/down/up | Implemented local; Worker 3 suites/11 and migration 7/7 Pass, actual deploy Pending |
+| Schedule dependency/consumer | Change requires source baseline only when frozen schedule impact requires rebaseline; approved DB-067 is read through public contract; REBASELINE and reverse trace remain Project Controls-owned | US-004 API-150…156/162; Project Controls API-034…037/140/159; DB-020/067 | TEST-012/016 | Positive/negative API integration implemented; same-journey E2E and EC2 deploy Pending |
 | Claim dependency | FR-103 Claim/Variation needs Contract/Legal physical aggregate/authority/privilege | DB-068/028…033 and future concrete API | Future Claim/Contract tests | Documented dependency; not US-004 AC implementation claim |
 | External early-warning dependency | FR-105 source adapters need delivery/obligation/NCR/punch modules | Future committed source events; DB-102/103 | Source-story integration tests | US-004 emits/consumes stable events additively; source modules not claimed |
 
@@ -96,9 +102,9 @@ This is the primary chain. API/DB/SEC ranges are capability surfaces; exact oper
 | NFR-012; SEC-122 | Generic command idempotency | DB-104; operation-level `Idempotency-Key`, request hash và stable result | TEST-180/185 | Approved/Planned | Retention/capacity TBD |
 | SEC-103/118; US-020 | Shared login quota/session dependency | Redis rate-limit state; không tạo API mới | TEST-200/231 | Approved/Planned, fail closed | Redis HA/persistence TBD |
 | ADR-002/004; SEC-105…111 | Database tenant reference invariant | Composite `(tenant_id, referenced_id)` FK; không đổi public API | TEST-202…208 | Approved/Planned | Topology/RLS TBD |
-| NFR-021/023; ADR-001 | API/worker runtime + main CI/CD contract | PostgreSQL + Redis + BullMQ; worker process/container riêng; self-hosted workflow + SHA image rollout | TEST-194/196 và operational smoke | Runtime deployed; CI/CD repository implementation, first GitHub run Pending | Registry/HA/SLO Proposed |
+| NFR-021/023; ADR-001 | API/worker runtime + main CI/CD contract | PostgreSQL + Redis + BullMQ; worker process/container riêng; self-hosted workflow + SHA image rollout; isolated CI ports 15433/16380 | TEST-194/196 và operational smoke | Historical first run + current isolated preflight Pass; actual US-004 GitHub run/EC2 deploy/public smoke Pending | Registry/HA/SLO Proposed |
 | BR-040; NFR-007/023; SEC-124; US-024 | Controlled EC2 test delivery | `.github/workflows/main-cicd.yml`; `scripts/deploy-ec2.sh`; không đổi DB/API | TEST-196; TEST-221 subset | Implemented; runner online, first GitHub CI/CD run Pass; branch protection follow-up | Full supply-chain/production Proposed |
-| US-003 | Schedule contract | DB-101 + schedule-alert subset DB-105; API-023/024/034…037/140…142 | TEST-010…013 written; final runtime execution pending | Core Implemented/deployed, story not fully Pass | Proposed |
+| US-003 | Schedule contract | DB-101 + schedule-alert subset DB-105; API-023/024/034…037/140…142 | Current isolated integration và focused rebaseline Pass; TEST-010…013 full story/E2E vẫn Partial | Core Implemented/deployed, story not fully Pass | Proposed |
 | US-022/023/031…037 | ID stability only | DB-106…111 reserved; phần Notification ngoài schedule của DB-105 thuộc US-022 | ID/link audit; feature TEST giữ Draft | Documented/Not implemented | Proposed |
 
 ## 3. Business Requirement coverage
@@ -153,8 +159,8 @@ This is the primary chain. API/DB/SEC ranges are capability surfaces; exact oper
 | NFR-001…024 | BR/ARC/SEC Source mappings in PRD | TEST-174…197 one-to-one | 24/24 |
 | SEC-101…132 | BR/FR/NFR/API and Source SEC-001…008 | TEST-198…229 one-to-one | 32/32 |
 | ADR-001…010 | ARC-001…010 | NFR/SEC/architecture evidence; TEST ranges where applicable | 10/10 Proposed; acceptance TBD |
-| API-001…159 | Each x-related-requirements/data/security | OpenAPI x-api-id + API/contract/security tests | 159/159 have requirement; API-023/024/034…037/140…142 Implemented; API-038/143…159 concrete planned |
-| DB-001…112 | Domain/BR/FR/NFR trace in dictionary/operational plan | API/OpenAPI, aggregate/internal relationship or explicit reservation | 112/112 referenced outside owner; DB-101 và schedule-alert subset DB-105 Implemented; DB-106…111 reserved; DB-112 planned |
+| API-001…164 | Each x-related-requirements/data/security | OpenAPI x-api-id + API/contract/security tests | 164/164 have requirement; 33 implemented operation markers include API-008/036/038/143…164; acceptance status remains test-specific |
+| DB-001…113 | Domain/BR/FR/NFR trace in dictionary/operational plan | API/OpenAPI, aggregate/internal relationship or explicit reservation | 113/113 referenced outside owner; DB-101…105 and DB-112/113 materialized local; DB-106…111 reserved; forward reconcile tested local, actual deploy Pending |
 | AC-001…177 | US-001…037/source GWT + approved auth delta | TEST-001…173 + TEST-230…233 | 177/177 mapped |
 
 ## 5. Automated gap audit result
@@ -163,20 +169,20 @@ This is the primary chain. API/DB/SEC ranges are capability surfaces; exact oper
 |---|---:|---|
 | Business Requirement without feature/story chain | 0 | Expanded UC/US BR mapping covers BR-001…040 |
 | FR without User Story | 0 | Expanded US/UC mapping covers FR-001…198; US-030 covers lifecycle 001…177, AI stories cover 178…198 |
-| User Story without AC | 0 | 37/37 stories have 173 total AC |
-| AC without TEST | 0 | TEST-001…173 one-to-one |
+| User Story without AC | 0 | 37/37 stories have 177 total AC, gồm AC-174…177 auth delta đã phê duyệt |
+| AC without TEST | 0 | TEST-001…173 + TEST-230…233 map đủ AC-001…177 |
 | NFR without TEST | 0 | TEST-174…197 |
 | SEC without TEST | 0 | TEST-198…229 |
-| API without requirement | 0 | 140/140 x-related-requirements |
+| API without requirement | 0 | 164/164 `x-api-id` có `x-related-requirements`; ID và operationId đều unique |
 | DB entity/store unused outside Data Model | 0 | API reconciliation added Invoice, Warranty, MaintenancePlan, WarrantyClaim and BillingStatement associations |
 | Duplicate canonical IDs | 0 | Exact range checks; Source SEC/WF/US IDs are explicitly distinct |
 | Broken scope invariant | 0 known | PM/O&M/OT boundary and no-control consistent across SRS/API/Security/UX/Test |
-| Deferred design gaps | 1 | RFI physical representation remains explicit TBD; DB-101/105 US-003 contract is build-ready but not implemented; DB-106…111 remain reserved |
+| Deferred design gaps | 1 | RFI physical representation remains explicit TBD; DB-101/generalized DB-105, DB-112/113 and forward migrations materialized/tested local; actual deploy Pending; DB-106…111 remain reserved |
 
 Deferred does not mean silently complete:
 
 - AI API currently references authorized source records + DB-098 audit; DB-108…111 reserve policy/run/proposal/review ownership, nhưng không tạo table hoặc tuyên bố feature implemented.
-- DB-105 schedule-alert subset đã materialize cho US-003; notification types khác thuộc US-022. Saved view/report job DB-106/107 vẫn reserved cho slice sau.
+- DB-105 đã generalize locally cho schedule và Risk/Issue/Action/Change projection trong US-004; full Notification Center lifecycle vẫn thuộc US-022. Saved view/report job DB-106/107 vẫn reserved cho slice sau.
 - RFI is modeled as Document type + Workflow + optional Issue/Change link; Product/Engineering must confirm before schema/API detail.
 
 ## 6. Contradiction and reconciliation register
@@ -215,7 +221,7 @@ Deferred does not mean silently complete:
 | Broad lifecycle US-030 legitimately traces FR-001…177 | Product Owner | Feature-to-story coverage |
 | AI stories collectively trace FR-178…198 | AI/Product | AI coverage |
 | Aggregate APIs may use child DB entities without dedicated endpoint | Architecture/Domain | Entity usage |
-| DB-101 và schedule-alert subset DB-105 build-ready không đồng nghĩa table/feature đã triển khai; DB-106…111 chỉ là reservation | Data/Architecture/Product | Schema/readiness reporting |
+| DB-101 và schedule-alert subset DB-105 đã materialize cho core US-003 nhưng không đồng nghĩa full US-003/US-022 Pass; DB-106…111 chỉ là reservation | Data/Architecture/Product | Schema/readiness reporting |
 | All artefacts remain Draft v0.1 | Product Owner | Approval/readiness |
 
 ## 9. Open Questions
@@ -245,3 +251,8 @@ Deferred does not mean silently complete:
 | 0.8 | 2026-07-12 | Codex | Thêm API-142 audited look-ahead export và Dashboard schedule alert lane vào direct US-003 trace | Core M3 surface complete hơn; full runtime/story Pass vẫn pending |
 | 0.9 | 2026-07-12 | Codex | Khóa exact direct/dependency trace US-004, cấp DB-112/API-143…159 và nối public approved-change/reverse baseline trace | Approved/Build-ready; không claim US-004/Claim/test execution |
 | 1.0 | 2026-07-12 | Codex | Thêm trace self-hosted main CI/CD EC2 test tới BR-040/NFR-007/023/SEC-124/US-024/TEST-196/221 | Repository implementation; first GitHub run và production supply chain chưa claim Pass |
+| 1.1 | 2026-07-18 | Codex | Đính chính automated audit lên 177 AC/159 API và trạng thái materialized DB-101/schedule subset DB-105; xác nhận exact US-004 trace sau no-warning OpenAPI gate | Không đổi phạm vi; M0 validation chính xác, US-004 chưa claim Implemented |
+| 1.2 | 2026-07-18 | Codex | Đồng bộ registry/audit thành 164 API; tách direct US-004 API-038/143…158/160…164 khỏi API-008 assignee dependency và Project Controls API-036/159; thêm Action/closure và conditional REBASELINE trace | Không đổi requirement/AC; final contract build-ready, US-004 chưa claim Implemented/Pass |
+| 1.3 | 2026-07-18 | Codex | Thêm exact trace cho DB-065 residual SoR/versioned Action promotion và in-place DB-105 source/scope generalization | Không đổi requirement/AC; migration/runtime/test evidence vẫn pending |
+| 1.4 | 2026-07-18 | Codex | Cấp trace DB-113 closure-cycle history, API-149 command union và API-157 full-filter/version-grouped heatmap; đồng bộ registry DB-001…113 | Không đổi requirement/AC; đóng ambiguity semantic trước M1 |
+| 1.5 | 2026-07-18 | Codex | Ghi implementation trace API-008/036/038/143…164, DB-065…067/112/113/generalized DB-105, pre-push Pass và exact TEST-012/014…017 Partial evidence | Không đổi requirement/AC; unit 168/integration 60/migration 7/build Pass, actual GitHub Actions/EC2 deployment/full E2E Pending |

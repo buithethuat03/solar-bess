@@ -61,7 +61,19 @@ export enum BaselineStatus {
 
 export enum AlertType {
   OVERDUE = 'OVERDUE',
-  NEAR_CRITICAL = 'NEAR_CRITICAL'
+  NEAR_CRITICAL = 'NEAR_CRITICAL',
+  RISK_REVIEW_DUE = 'RISK_REVIEW_DUE',
+  ISSUE_TARGET_DUE = 'ISSUE_TARGET_DUE',
+  ACTION_OVERDUE = 'ACTION_OVERDUE',
+  CHANGE_DECISION_PENDING = 'CHANGE_DECISION_PENDING'
+}
+
+export enum NotificationSourceType {
+  SCHEDULE_ACTIVITY = 'ScheduleActivity',
+  RISK = 'Risk',
+  ISSUE = 'Issue',
+  RISK_ISSUE_ACTION = 'RiskIssueAction',
+  CHANGE_REQUEST = 'ChangeRequest'
 }
 
 export enum NotificationPriority {

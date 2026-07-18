@@ -146,7 +146,12 @@ export class PermissionService {
     return {
       roles: [...new Set(assignments.map((assignment) => assignment.roleCode))].sort(),
       permissions: [...new Set(assignments.flatMap((assignment) => assignment.permissions))].sort(),
-      scopes: assignments.map(({ roleCode, scopeType, scopeId }) => ({ roleCode, scopeType, scopeId }))
+      scopes: assignments.map(({ roleCode, permissions, scopeType, scopeId }) => ({
+        roleCode,
+        permissions: [...permissions].sort(),
+        scopeType,
+        scopeId
+      }))
     };
   }
 }

@@ -66,6 +66,10 @@ function harness(importMaxRows = 5_000) {
   const progressUpdates = repositoryStub();
   const notifications = repositoryStub();
   const audits = repositoryStub();
+  const approvedChanges = {
+    resolveForRebaseline: jest.fn(),
+    assertReferenceForBaselineHistory: jest.fn()
+  };
   const permissions = {
     has: jest.fn().mockResolvedValue(true),
     packageScopeIds: jest.fn().mockResolvedValue(null)
@@ -111,6 +115,7 @@ function harness(importMaxRows = 5_000) {
         thresholdVersion: 'SCHEDULE_THRESHOLDS_V1'
       }
     } as never,
+    approvedChanges as never,
     permissions as never,
     commands as never,
     outbox as never

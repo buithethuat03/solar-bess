@@ -14,6 +14,8 @@ import { TokenService } from './token.service';
 import { PermissionGuard } from './permission.guard';
 import { PermissionService } from './permission.service';
 import { OperationalFoundationModule } from '../operational-foundation/operational-foundation.module';
+import { UserDirectoryController } from './user-directory.controller';
+import { UserDirectoryService } from './user-directory.service';
 
 @Module({
   imports: [
@@ -24,10 +26,10 @@ import { OperationalFoundationModule } from '../operational-foundation/operation
       AuthenticationSessionEntity, AuditEventEntity, RoleAssignmentEntity, ProjectEntity, PackageEntity
     ])
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, UserDirectoryController],
   providers: [
     AuthService, TokenService, PasswordService, LoginRateLimitService,
-    AccessGuard, PermissionService, PermissionGuard
+    AccessGuard, PermissionService, PermissionGuard, UserDirectoryService
   ],
   exports: [AuthService, AccessGuard, PermissionService, PermissionGuard]
 })

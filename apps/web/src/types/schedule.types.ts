@@ -218,13 +218,33 @@ export interface ApplyScheduleDraftResult {
 
 export type ApplyScheduleDraftResponse = ApiEnvelope<ApplyScheduleDraftResult>;
 
-export interface SubmitScheduleBaselineRequest {
-  baselineType: BaselineType;
+export interface SubmitInitialScheduleBaselineRequest {
+  baselineType: 'INITIAL';
   dataDate: string;
   reason: string;
   impactSummary: string;
-  approvedChangeRequestId?: string;
   expectedScheduleVersion: number;
+}
+
+export interface SubmitRebaselineRequest {
+  baselineType: 'REBASELINE';
+  dataDate: string;
+  approvedChangeRequestId: string;
+  expectedScheduleVersion: number;
+}
+
+export type SubmitScheduleBaselineRequest = SubmitInitialScheduleBaselineRequest | SubmitRebaselineRequest;
+
+export interface ScheduleBaselineListResponse {
+  data: ScheduleBaseline[];
+  meta: { nextCursor: string | null; limit: number };
+  correlationId: string;
+}
+
+export interface SchedulePackageListResponse {
+  data: SchedulePackage[];
+  meta: { nextCursor?: string | null; total?: number; limit?: number };
+  correlationId: string;
 }
 
 export interface ProgressUpdateRequest {

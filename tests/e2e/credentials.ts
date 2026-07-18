@@ -7,3 +7,7 @@ export function e2eCredentials() {
   if (password.length < 16) throw new Error('E2E password file is invalid');
   return { tenantCode: 'demo', email: 'e2e-runner@example.test', password };
 }
+
+export function e2eApproverCredentials() {
+  return { ...e2eCredentials(), email: 'e2e-approver@example.test' };
+}

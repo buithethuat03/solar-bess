@@ -21,6 +21,12 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, permission: 'schedule.read' }
   },
   {
+    path: RoutePath.projectRiskChange,
+    name: RouteName.projectRiskChange,
+    component: () => import('@/views/risk-change/ProjectRiskChangeView.vue'),
+    meta: { requiresAuth: true, permission: 'riskChange.read' }
+  },
+  {
     path: RoutePath.projectDetail,
     name: RouteName.projectDetail,
     component: () => import('@/views/projects/ProjectDetailView.vue'),

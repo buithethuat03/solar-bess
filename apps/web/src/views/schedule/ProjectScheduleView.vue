@@ -46,6 +46,9 @@ const showDraft = ref(false);
 const showBaseline = ref(false);
 const draftSource = ref<string | null>(null);
 const dataDateOverridden = ref(false);
+const approvedChangeRequestId = computed(() => typeof route.query.approvedChangeRequestId === 'string'
+  ? route.query.approvedChangeRequestId
+  : undefined);
 const filters = reactive({
   dataDate: '',
   lookAheadDays: 21,
@@ -58,8 +61,8 @@ const filters = reactive({
 
 const canManage = computed(() => auth.can('schedule.manage'));
 const canImport = computed(() => auth.can('schedule.import'));
-const canSubmitBaseline = computed(() => auth.can('baseline.submit'));
-const hasApprovePermission = computed(() => auth.can('baseline.approve'));
+const canSubmitBaseline = computed(() => auth.hasFullProjectPermission('baseline.submit', projectId));
+const hasApprovePermission = computed(() => auth.hasFullProjectPermission('baseline.approve', projectId));
 const canRecordProgress = computed(() => auth.can('progress.record'));
 const canCorrectProgress = computed(() => auth.can('progress.correct'));
 const projectMutable = computed(() => ![
@@ -414,6 +417,8 @@ onMounted(() => void load());
         :schedule-version="schedule.versionNo"
         :data-date="schedule.dataDate"
         :can-submit="canSubmitBaseline"
+        :can-rebaseline="canSubmitBaseline"
+        :approved-change-request-id="approvedChangeRequestId"
         :can-decide="canDecideBaseline"
         :decision-unavailable-reason="decisionUnavailableReason"
         :busy="busy"

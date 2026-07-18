@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import AppDataSource from 'src/database/data-source';
-import { runTestMigrations } from 'test/setup/run-migrations';
+import { revertThroughMigration, runTestMigrations } from 'test/setup/run-migrations';
 
 jest.setTimeout(45_000);
 
@@ -24,8 +24,7 @@ describe('Operational foundation migration — DB-102/103/104 and tenant hardeni
   });
 
   it('runs down and up with operational tables, constraints and triggers restored', async () => {
-    await AppDataSource.undoLastMigration({ transaction: 'all' });
-    await AppDataSource.undoLastMigration({ transaction: 'all' });
+    await revertThroughMigration('CreateOperationalFoundation1783729000000');
     const [down] = await AppDataSource.query<Array<{
       outbox: string | null;
       consumption: string | null;

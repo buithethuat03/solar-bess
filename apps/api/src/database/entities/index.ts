@@ -20,8 +20,13 @@ import { ProgressUpdateEntity } from './progress-update.entity';
 import { ProjectScheduleEntity } from './project-schedule.entity';
 import { ScheduleActivityEntity } from './schedule-activity.entity';
 import { ScheduleBaselineEntity } from './schedule-baseline.entity';
-import { ScheduleNotificationEntity } from './schedule-notification.entity';
+import { NotificationEntity } from './notification.entity';
 import { WbsNodeEntity } from './wbs-node.entity';
+import { ChangeRequestEntity } from './change-request.entity';
+import { IssueEntity } from './issue.entity';
+import { RiskEntity } from './risk.entity';
+import { RiskIssueActionEntity } from './risk-issue-action.entity';
+import { RiskIssueClosureCycleEntity } from './risk-issue-closure-cycle.entity';
 
 export {
   AuditEventEntity, AuthenticationSessionEntity, LocalCredentialEntity,
@@ -31,11 +36,14 @@ export {
   TenantEntity, TransactionalOutboxEventEntity, UserAccountEntity,
   ActivityDependencyEntity, PackageEntity, ProgressUpdateEntity,
   ProjectScheduleEntity, ScheduleActivityEntity, ScheduleBaselineEntity,
-  ScheduleNotificationEntity, WbsNodeEntity
+  NotificationEntity, NotificationEntity as ScheduleNotificationEntity, WbsNodeEntity,
+  ChangeRequestEntity, IssueEntity, RiskEntity, RiskIssueActionEntity,
+  RiskIssueClosureCycleEntity
 };
 export * from './operational.enums';
 export * from './project-controls.enums';
 export * from './project.enums';
+export * from './risk-change.enums';
 
 export const databaseEntities = [
   TenantEntity, UserAccountEntity, LocalCredentialEntity,
@@ -45,5 +53,6 @@ export const databaseEntities = [
   EventConsumptionEntity, CommandReceiptEntity, PackageEntity,
   ProjectScheduleEntity, WbsNodeEntity, ScheduleActivityEntity,
   ActivityDependencyEntity, ScheduleBaselineEntity, ProgressUpdateEntity,
-  ScheduleNotificationEntity
+  NotificationEntity, RiskEntity, IssueEntity, ChangeRequestEntity,
+  RiskIssueActionEntity, RiskIssueClosureCycleEntity
 ];

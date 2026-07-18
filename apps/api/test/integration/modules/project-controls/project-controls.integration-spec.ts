@@ -7,9 +7,11 @@ import type { DataSource } from 'typeorm';
 import { createApplication } from 'src/bootstrap';
 import {
   AlertType, AssignmentScopeType, CompanyEntity, LegalEntityEntity, LocalCredentialEntity,
-  MasterRecordStatus, NotificationPriority, NotificationStatus, OrganizationType,
+  ChangeRequestEntity, ChangeRequestStatus, ChangeSourceType, MasterRecordStatus,
+  NotificationPriority, NotificationStatus, OrganizationType,
   PortfolioEntity, ProjectEntity, ProjectPhase, ProjectRecordStatus, ProjectType,
-  RoleAssignmentEntity, RoleEntity, ScheduleNotificationEntity, TenantEntity,
+  NotificationSourceType, RoleAssignmentEntity, RoleEntity, ScheduleNotificationEntity,
+  TenantEntity,
   UserAccountEntity
 } from 'src/database/entities';
 import { runTestMigrations } from 'test/setup/run-migrations';
@@ -136,6 +138,43 @@ describe('Project Controls API integration — TEST-010…013/185/193/195', () =
     expect(evidence).toEqual({ packages: '1', audits: '1', events: '1', receipts: '1' });
   });
 
+  it('TEST-014/API-008: returns only active exact-scope assignee identity fields', async () => {
+    const packageA = await createPackage('ASSIGNEE_A', 'controls-assignee-package-a');
+    const packageB = await createPackage('ASSIGNEE_B', 'controls-assignee-package-b');
+    await dataSource.getRepository(RoleAssignmentEntity).save({
+      id: randomUUID(), tenantId, userAccountId: packageUserId, roleId: packageRoleId,
+      scopeType: AssignmentScopeType.PACKAGE, scopeId: packageA,
+      effectiveFrom: new Date('2026-01-01T00:00:00Z'), effectiveTo: null,
+      status: MasterRecordStatus.ACTIVE
+    });
+    const packageToken = await login('package-owner@example.test');
+
+    const fullProject = await api(plannerToken).get('/v1/users').query({
+      projectId, packageId: packageA, requiredPermission: 'riskChange.manage', limit: 100
+    }).expect(200);
+    expect(new Set(fullProject.body.data.map((item: { id: string }) => item.id)))
+      .toEqual(new Set([plannerId, packageUserId]));
+    expect(fullProject.body.data.every((item: Record<string, unknown>) => (
+      Object.keys(item).sort().join(',') === 'displayName,id'
+    ))).toBe(true);
+
+    const missingPackage = await api(packageToken).get('/v1/users').query({
+      projectId, requiredPermission: 'riskChange.manage'
+    }).expect(400);
+    expect(missingPackage.body.code).toBe('PACKAGE_SCOPE_REQUIRED');
+    const ownPackage = await api(packageToken).get('/v1/users').query({
+      projectId, packageId: packageA, requiredPermission: 'riskChange.manage',
+      search: 'Package Owner'
+    }).expect(200);
+    expect(ownPackage.body.data).toEqual([{
+      id: packageUserId, displayName: 'Package Owner Test'
+    }]);
+    const crossPackage = await api(packageToken).get('/v1/users').query({
+      projectId, packageId: packageB, requiredPermission: 'riskChange.manage'
+    }).expect(403);
+    expect(crossPackage.body.code).toBe('PROJECT_SCOPE_DENIED');
+  });
+
   it('TEST-010: PREVIEW reports cycle/weight/date issues and writes nothing', async () => {
     const packageId = await createPackage('PREVIEW', 'controls-preview-package');
     const key = 'controls-preview-invalid-001';
@@ -194,8 +233,9 @@ describe('Project Controls API integration — TEST-010…013/185/193/195', () =
 
     const firstActivity = schedule.activities[0] as { id: string };
     await dataSource.getRepository(ScheduleNotificationEntity).save({
-      id: randomUUID(), tenantId, recipientUserId: plannerId, projectId,
-      activityId: firstActivity.id, sourceType: 'ScheduleActivity', sourceId: firstActivity.id,
+      id: randomUUID(), tenantId, recipientUserId: plannerId, projectId, packageId,
+      activityId: firstActivity.id, sourceType: NotificationSourceType.SCHEDULE_ACTIVITY,
+      sourceId: firstActivity.id,
       alertType: AlertType.OVERDUE, priority: NotificationPriority.HIGH,
       objectLink: `/projects/${projectId}/schedule`, reason: 'Synthetic overdue test alert',
       dueAt: '2026-07-17', dataDate: schedule.dataDate,
@@ -346,14 +386,92 @@ describe('Project Controls API integration — TEST-010…013/185/193/195', () =
       [submitted.body.data.id]
     )).rejects.toMatchObject({ code: '55000' });
 
+    const currentScheduleVersion = Number((await getSchedule(plannerToken)).versionNo);
     const rebaselineDenied = await api(plannerToken)
       .post(`/v1/projects/${projectId}/schedule-baselines`)
       .set('Idempotency-Key', 'controls-rebaseline-without-us004')
       .send({
-        ...baselinePayload(3), baselineType: 'REBASELINE',
-        approvedChangeRequestId: randomUUID()
+        baselineType: 'REBASELINE', dataDate: '2026-07-12',
+        approvedChangeRequestId: randomUUID(), expectedScheduleVersion: currentScheduleVersion
       }).expect(422);
     expect(rebaselineDenied.body.code).toBe('CHANGE_APPROVAL_REQUIRED');
+
+    const approvedChange = await dataSource.getRepository(ChangeRequestEntity).save({
+      id: randomUUID(), tenantId, projectId, packageId, code: 'CR-REBASELINE-001',
+      title: 'Approved schedule change', reason: 'Điều chỉnh kế hoạch đã được duyệt',
+      options: ['Rebaseline schedule'], recommendation: 'Phát hành baseline kế tiếp',
+      ownerId: plannerId, requesterId: plannerId, sourceBaselineId: submitted.body.data.id,
+      sourceType: ChangeSourceType.MANUAL, sourceRiskId: null, sourceIssueId: null,
+      evidenceRefs: [], sourceEvidenceSnapshot: [],
+      impactDraft: {
+        schedule: {
+          summary: 'Dời mốc kế hoạch theo Change đã duyệt',
+          durationDeltaDays: 5, requiresRebaseline: true, affectedMilestoneIds: []
+        }
+      },
+      impactSnapshot: {
+        scope: { summary: 'Không đổi phạm vi' },
+        schedule: {
+          summary: 'Dời mốc kế hoạch theo Change đã duyệt',
+          durationDeltaDays: 5, requiresRebaseline: true, affectedMilestoneIds: []
+        },
+        cost: { summary: 'Không đổi chi phí', amountDelta: '0.0000', currency: 'VND' },
+        quality: { summary: 'Không đổi chất lượng' },
+        hse: { summary: 'Không đổi HSE' },
+        contract: { summary: 'Không đổi hợp đồng' }
+      },
+      impactSnapshotHash: 'a'.repeat(64),
+      approvalSnapshot: { decision: 'APPROVE', scheduleImpactApproved: true },
+      approvalSnapshotHash: 'b'.repeat(64), status: ChangeRequestStatus.APPROVED,
+      submittedBy: plannerId, submittedAt: new Date('2026-07-18T01:00:00Z'),
+      decisionVersion: 1, decidedBy: approverId,
+      decidedAt: new Date('2026-07-18T02:00:00Z'), approvedBy: approverId,
+      approvedAt: new Date('2026-07-18T02:00:00Z'),
+      decisionComment: 'Phê duyệt Change và rebaseline', scheduleImpactApproved: true,
+      createdBy: plannerId, updatedBy: approverId
+    });
+    const rebaseline = await api(plannerToken)
+      .post(`/v1/projects/${projectId}/schedule-baselines`)
+      .set('Idempotency-Key', 'controls-positive-rebaseline')
+      .send({
+        baselineType: 'REBASELINE', dataDate: '2026-07-12',
+        approvedChangeRequestId: approvedChange.id,
+        expectedScheduleVersion: currentScheduleVersion
+      }).expect(201);
+    expect(rebaseline.body.data).toMatchObject({
+      baselineNumber: 2, baselineType: 'REBASELINE', status: 'SUBMITTED',
+      approvedChangeRequestId: approvedChange.id,
+      replacesBaselineId: submitted.body.data.id,
+      reason: 'Điều chỉnh kế hoạch đã được duyệt',
+      impactSummary: 'Dời mốc kế hoạch theo Change đã duyệt'
+    });
+    const reverseTrace = await api(plannerToken)
+      .get(`/v1/projects/${projectId}/schedule-baselines`)
+      .query({ approvedChangeRequestId: approvedChange.id }).expect(200);
+    expect(reverseTrace.body.data).toHaveLength(1);
+    expect(reverseTrace.body.data[0].id).toBe(rebaseline.body.data.id);
+    await dataSource.getRepository(RoleAssignmentEntity).save({
+      id: randomUUID(), tenantId, userAccountId: packageUserId, roleId: packageRoleId,
+      scopeType: AssignmentScopeType.PACKAGE, scopeId: packageId,
+      effectiveFrom: new Date('2026-01-01T00:00:00Z'), effectiveTo: null,
+      status: MasterRecordStatus.ACTIVE
+    });
+    const packageToken = await login('package-owner@example.test');
+    const reverseTraceDenied = await api(packageToken)
+      .get(`/v1/projects/${projectId}/schedule-baselines`)
+      .query({ approvedChangeRequestId: approvedChange.id }).expect(403);
+    expect(reverseTraceDenied.body.code).toBe('PROJECT_SCOPE_DENIED');
+    const approvedRebaseline = await api(approverToken)
+      .post(`/v1/schedule-baselines/${rebaseline.body.data.id}:decision`)
+      .set('Idempotency-Key', 'controls-approve-rebaseline')
+      .send({ decision: 'APPROVE', expectedVersion: 1 }).expect(200);
+    expect(approvedRebaseline.body.data).toMatchObject({
+      status: 'APPROVED', approvedBy: approverId, versionNo: 2
+    });
+    const [superseded] = await dataSource.query<Array<{ status: string }>>(
+      'SELECT status FROM schedule_baselines WHERE id = $1', [submitted.body.data.id]
+    );
+    expect(superseded.status).toBe('SUPERSEDED');
 
     const [evidence] = await dataSource.query<Array<{
       submittedAudits: string;
@@ -371,11 +489,14 @@ describe('Project Controls API integration — TEST-010…013/185/193/195', () =
       (SELECT count(*) FROM transactional_outbox_events WHERE tenant_id = $1
         AND event_type = 'BaselineApproved')::text AS "approvedEvents",
       (SELECT count(*) FROM command_receipts WHERE tenant_id = $1
-        AND idempotency_key IN ('controls-submit-baseline','controls-independent-approve')
+        AND idempotency_key IN (
+          'controls-submit-baseline','controls-independent-approve',
+          'controls-positive-rebaseline','controls-approve-rebaseline'
+        )
         AND state = 'COMPLETED')::text AS receipts`, [tenantId]);
     expect(evidence).toEqual({
-      submittedAudits: '1', approvedAudits: '1',
-      submittedEvents: '1', approvedEvents: '1', receipts: '2'
+      submittedAudits: '2', approvedAudits: '2',
+      submittedEvents: '2', approvedEvents: '2', receipts: '4'
     });
   });
 
@@ -527,7 +648,8 @@ describe('Project Controls API integration — TEST-010…013/185/193/195', () =
       policyVersion: 1, status: MasterRecordStatus.ACTIVE,
       permissions: [
         'package.read', 'package.create', 'schedule.read', 'schedule.manage', 'schedule.import',
-        'baseline.submit', 'baseline.approve', 'progress.record', 'progress.correct'
+        'baseline.submit', 'baseline.approve', 'progress.record', 'progress.correct',
+        'user.read', 'riskChange.read', 'riskChange.manage'
       ]
     });
     const approverRole = await dataSource.getRepository(RoleEntity).save({
@@ -538,7 +660,10 @@ describe('Project Controls API integration — TEST-010…013/185/193/195', () =
     const packageRole = await dataSource.getRepository(RoleEntity).save({
       id: randomUUID(), tenantId, code: 'PACKAGE_OWNER', name: 'Package Owner',
       policyVersion: 1, status: MasterRecordStatus.ACTIVE,
-      permissions: ['package.read', 'schedule.read', 'schedule.manage', 'progress.record']
+      permissions: [
+        'package.read', 'schedule.read', 'schedule.manage', 'progress.record',
+        'user.read', 'riskChange.read', 'riskChange.manage'
+      ]
     });
     packageRoleId = packageRole.id;
 

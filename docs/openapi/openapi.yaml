@@ -2,7 +2,7 @@ openapi: 3.1.0
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 info:
   title: Solar & BESS Project Management Platform API
-  version: 0.7.0
+  version: 0.9.0
   description: >-
     Draft vendor-neutral contract. Unknown domain fields remain TBD. PM/O&M operations
     cannot start, stop, reset, bypass, clear source alarms, or send BESS/OT setpoints.
@@ -139,7 +139,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Envelope'
+                $ref: '#/components/schemas/AuthIdentityResponse'
         '400':
           $ref: '#/components/responses/Error400'
         '401':
@@ -403,27 +403,44 @@ paths:
   "/v1/users":
     get:
       tags: ["Identity & Tenant"]
-      summary: "Liệt kê user/person đã lọc dữ liệu nhạy cảm"
+      summary: "Liệt kê assignee active theo project/package/capability"
       operationId: api_008_get_v1_users
       x-api-id: "API-008"
+      x-implementation-status: implemented
       x-permission: "user.read"
-      x-data-scope: "tenant/department"
-      x-idempotency: "safe"
-      x-related-requirements: ["FR-146"]
-      x-related-data: ["DB-004", "DB-005"]
-      x-related-security: ["SEC-107", "SEC-130"]
+      x-data-scope: "active users with effective full-project or matching-package assignment and allowlisted required permission"
+      x-idempotency: "safe; cursor/limit/search"
+      x-related-requirements: ["FR-099", "FR-100", "FR-146"]
+      x-related-data: ["DB-005", "DB-006", "DB-007"]
+      x-related-security: ["SEC-105", "SEC-107", "SEC-111", "SEC-130"]
       security:
         - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/TenantHeader'
         - $ref: '#/components/parameters/CorrelationHeader'
+        - name: projectId
+          in: query
+          required: true
+          schema: {type: string, format: uuid}
+        - name: packageId
+          in: query
+          schema: {type: string, format: uuid}
+        - name: requiredPermission
+          in: query
+          required: true
+          schema: {type: string, enum: [riskChange.read, riskChange.manage]}
+        - name: search
+          in: query
+          schema: {type: string, minLength: 1, maxLength: 100}
+        - $ref: '#/components/parameters/RiskChangeCursor'
+        - $ref: '#/components/parameters/RiskChangeLimit'
       responses:
         '200':
-          description: "Authorized result"
+          description: "Authorized active assignees; minimal identity fields only"
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Envelope'
+                $ref: '#/components/schemas/UserAssigneeListResponse'
         '400':
           $ref: '#/components/responses/Error400'
         '401':
@@ -1745,9 +1762,9 @@ paths:
       summary: "Liệt kê baseline provenance theo approved Change Request"
       operationId: api_159_get_v1_projects_projectid_schedule_baselines
       x-api-id: "API-159"
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-permission: "schedule.read"
-      x-data-scope: "project/package authorized baseline summaries; approved Change must match tenant/project"
+      x-data-scope: "full-project only; approved Change and baseline must match tenant/project"
       x-idempotency: "safe; opaque baseline UUID cursor"
       x-related-requirements: ["FR-018", "FR-101", "FR-102"]
       x-related-data: ["DB-020", "DB-067"]
@@ -1768,7 +1785,7 @@ paths:
           schema: {type: integer, minimum: 1, maximum: 100, default: 50}
       responses:
         '200':
-          description: "Authorized immutable baseline summaries linked to the Change"
+          description: "Full-project authorized immutable baseline summaries linked to the Change"
           content:
             application/json:
               schema: {$ref: '#/components/schemas/ScheduleBaselineListResponse'}
@@ -1784,12 +1801,14 @@ paths:
       operationId: api_036_post_v1_projects_projectid_schedule_baselines
       x-api-id: "API-036"
       x-implementation-status: implemented
+      x-implementation-note: "INITIAL and approved-Change-backed positive REBASELINE implemented locally; EC2 deployment pending"
       x-permission: "baseline.submit"
-      x-data-scope: "project"
+      x-data-scope: "INITIAL follows authorized project scope; REBASELINE is full-project only and approved Change must match tenant/project/current baseline"
       x-idempotency: "required"
-      x-related-requirements: ["FR-018"]
+      x-related-requirements: ["FR-018", "FR-101", "FR-102"]
       x-related-data: ["DB-020", "DB-067", "DB-098", "DB-102", "DB-104"]
       x-related-security: ["SEC-108", "SEC-109", "SEC-111", "SEC-118"]
+      x-error-codes: ["CHANGE_APPROVAL_REQUIRED", "CHANGE_SCOPE_MISMATCH", "BASELINE_MISMATCH", "SCHEDULE_IMPACT_NOT_APPROVED", "VERSION_CONFLICT", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT"]
       security:
         - bearerAuth: []
       parameters:
@@ -1934,12 +1953,12 @@ paths:
       summary: "Liệt kê Risk theo project/package scope"
       operationId: api_143_get_v1_projects_projectid_risks
       x-api-id: "API-143"
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-permission: "riskChange.read"
       x-data-scope: "project or matching package; package-only actors cannot read project-level rows"
       x-idempotency: "safe; opaque cursor with stable createdAt/id ordering"
       x-related-requirements: ["FR-098", "FR-099"]
-      x-related-data: ["DB-065", "DB-112"]
+      x-related-data: ["DB-065", "DB-112", "DB-113"]
       x-related-security: ["SEC-105", "SEC-107", "SEC-111", "SEC-114"]
       x-error-codes: ["PROJECT_SCOPE_DENIED"]
       parameters:
@@ -1959,7 +1978,7 @@ paths:
         - name: exposureLevel
           in: query
           schema: {$ref: '#/components/schemas/ExposureLevel'}
-        - name: dueBefore
+        - name: reviewBefore
           in: query
           schema: {type: string, format: date}
       responses:
@@ -1979,7 +1998,7 @@ paths:
       summary: "Tạo Risk cause-event-impact"
       operationId: api_038_post_v1_projects_projectid_risks
       x-api-id: "API-038"
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-permission: "riskChange.create"
       x-data-scope: "project or matching package; null packageId requires full-project scope"
       x-idempotency: "DB-104 required"
@@ -2032,17 +2051,51 @@ paths:
         in: path
         required: true
         schema: {type: string, format: uuid}
+    get:
+      tags: ["Risk & Change"]
+      summary: "Đọc Risk detail theo exact authorized scope"
+      operationId: api_160_get_v1_projects_projectid_risks_riskid
+      x-api-id: "API-160"
+      x-implementation-status: implemented
+      x-permission: "riskChange.read"
+      x-data-scope: "full project or matching package; known out-of-scope ID returns generic not found"
+      x-idempotency: "safe; closure-cycle page uses stable sequenceNo/id ordering"
+      x-related-requirements: ["FR-098", "FR-099", "FR-104"]
+      x-related-data: ["DB-065", "DB-112", "DB-113"]
+      x-related-security: ["SEC-105", "SEC-107", "SEC-111", "SEC-114"]
+      x-error-codes: ["RISK_NOT_FOUND", "PROJECT_SCOPE_DENIED"]
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+        - $ref: '#/components/parameters/CorrelationHeader'
+        - name: closureCycleCursor
+          in: query
+          description: Opaque cursor for immutable closure-cycle history
+          schema: {type: string, minLength: 1, maxLength: 500}
+        - name: closureCycleLimit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 100, default: 50}
+      responses:
+        '200':
+          description: "Authorized Risk detail"
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RiskDetailResponse'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
     patch:
       tags: ["Risk & Change"]
       summary: "Cập nhật Risk, residual assessment hoặc yêu cầu closure"
       operationId: api_144_patch_v1_projects_projectid_risks_riskid
       x-api-id: "API-144"
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-permission: "riskChange.manage; riskChange.requestClosure when status=CLOSURE_PENDING"
-      x-data-scope: "tenant/project/package of Risk; known out-of-scope UUID is not disclosed"
+      x-data-scope: "ordinary update follows exact Risk package scope; authoritative residual reassessment is full-project only; closure request only from MONITORING; known out-of-scope UUID is not disclosed"
       x-idempotency: "DB-104 required; expectedVersion required"
       x-related-requirements: ["FR-098", "FR-099", "FR-104"]
-      x-related-data: ["DB-065", "DB-066", "DB-098", "DB-102", "DB-104"]
+      x-related-data: ["DB-065", "DB-066", "DB-098", "DB-102", "DB-104", "DB-113"]
       x-related-security: ["SEC-105", "SEC-108", "SEC-109", "SEC-111", "SEC-118"]
       x-error-codes: ["RISK_NOT_FOUND", "ISSUE_NOT_FOUND", "INVALID_STATE_TRANSITION", "CLOSE_EVIDENCE_REQUIRED", "VERSION_CONFLICT", "PROJECT_SCOPE_DENIED", "IDEMPOTENCY_CONFLICT"]
       parameters:
@@ -2079,12 +2132,12 @@ paths:
       summary: "Liệt kê Issue theo project/package scope"
       operationId: api_146_get_v1_projects_projectid_issues
       x-api-id: "API-146"
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-permission: "riskChange.read"
       x-data-scope: "project or matching package; package-only actors cannot read project-level rows"
       x-idempotency: "safe; opaque cursor with stable createdAt/id ordering"
       x-related-requirements: ["FR-100"]
-      x-related-data: ["DB-066", "DB-112"]
+      x-related-data: ["DB-066", "DB-112", "DB-113"]
       x-related-security: ["SEC-105", "SEC-107", "SEC-111", "SEC-114"]
       x-error-codes: ["PROJECT_SCOPE_DENIED"]
       parameters:
@@ -2127,7 +2180,7 @@ paths:
       summary: "Tạo Issue actual-impact/root-cause"
       operationId: api_145_post_v1_projects_projectid_issues
       x-api-id: "API-145"
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-permission: "riskChange.create"
       x-data-scope: "project or matching package; optional source Risk must have same tenant/project/package scope"
       x-idempotency: "DB-104 required"
@@ -2168,19 +2221,53 @@ paths:
         in: path
         required: true
         schema: {type: string, format: uuid}
+    get:
+      tags: ["Risk & Change"]
+      summary: "Đọc Issue detail theo exact authorized scope"
+      operationId: api_161_get_v1_projects_projectid_issues_issueid
+      x-api-id: "API-161"
+      x-implementation-status: implemented
+      x-permission: "riskChange.read"
+      x-data-scope: "full project or matching package; known out-of-scope ID returns generic not found"
+      x-idempotency: "safe; closure-cycle page uses stable sequenceNo/id ordering"
+      x-related-requirements: ["FR-100", "FR-104"]
+      x-related-data: ["DB-066", "DB-112", "DB-113"]
+      x-related-security: ["SEC-105", "SEC-107", "SEC-111", "SEC-114"]
+      x-error-codes: ["ISSUE_NOT_FOUND", "PROJECT_SCOPE_DENIED"]
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+        - $ref: '#/components/parameters/CorrelationHeader'
+        - name: closureCycleCursor
+          in: query
+          description: Opaque cursor for immutable closure-cycle history
+          schema: {type: string, minLength: 1, maxLength: 500}
+        - name: closureCycleLimit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 100, default: 50}
+      responses:
+        '200':
+          description: "Authorized Issue detail"
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/IssueDetailResponse'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
     patch:
       tags: ["Risk & Change"]
       summary: "Cập nhật Issue hoặc yêu cầu closure"
       operationId: api_147_patch_v1_projects_projectid_issues_issueid
       x-api-id: "API-147"
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-permission: "riskChange.manage; riskChange.requestClosure when status=CLOSURE_PENDING"
       x-data-scope: "tenant/project/package of Issue; known out-of-scope UUID is not disclosed"
       x-idempotency: "DB-104 required; expectedVersion required"
       x-related-requirements: ["FR-100", "FR-104"]
-      x-related-data: ["DB-066", "DB-098", "DB-102", "DB-104"]
+      x-related-data: ["DB-066", "DB-098", "DB-102", "DB-104", "DB-113"]
       x-related-security: ["SEC-105", "SEC-108", "SEC-109", "SEC-111", "SEC-118"]
-      x-error-codes: ["ISSUE_NOT_FOUND", "INVALID_STATE_TRANSITION", "CLOSE_EVIDENCE_REQUIRED", "VERSION_CONFLICT", "PROJECT_SCOPE_DENIED", "IDEMPOTENCY_CONFLICT"]
+      x-error-codes: ["ISSUE_NOT_FOUND", "INVALID_STATE_TRANSITION", "REOPEN_EVIDENCE_REQUIRED", "CLOSE_EVIDENCE_REQUIRED", "VERSION_CONFLICT", "PROJECT_SCOPE_DENIED", "IDEMPOTENCY_CONFLICT"]
       parameters:
         - $ref: '#/components/parameters/TenantHeader'
         - $ref: '#/components/parameters/CorrelationHeader'
@@ -2210,12 +2297,57 @@ paths:
         in: path
         required: true
         schema: {type: string, format: uuid}
+    get:
+      tags: ["Risk & Change"]
+      summary: "Liệt kê Action theo Risk/Issue và exact authorized scope"
+      operationId: api_163_get_v1_projects_projectid_risk_issue_actions
+      x-api-id: "API-163"
+      x-implementation-status: implemented
+      x-permission: "riskChange.read"
+      x-data-scope: "full project or matching parent package; project-level rows hidden from package-only actor"
+      x-idempotency: "safe; opaque cursor"
+      x-related-requirements: ["FR-099", "FR-100", "FR-104"]
+      x-related-data: ["DB-065", "DB-066", "DB-112"]
+      x-related-security: ["SEC-105", "SEC-107", "SEC-111"]
+      x-error-codes: ["PROJECT_SCOPE_DENIED"]
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+        - $ref: '#/components/parameters/CorrelationHeader'
+        - $ref: '#/components/parameters/RiskChangeCursor'
+        - $ref: '#/components/parameters/RiskChangeLimit'
+        - name: riskId
+          in: query
+          schema: {type: string, format: uuid}
+        - name: issueId
+          in: query
+          schema: {type: string, format: uuid}
+        - name: status
+          in: query
+          schema: {$ref: '#/components/schemas/RiskIssueActionStatus'}
+        - name: ownerId
+          in: query
+          schema: {type: string, format: uuid}
+        - name: dueBefore
+          in: query
+          schema: {type: string, format: date}
+      responses:
+        '200':
+          description: "Authorized Action register page"
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RiskIssueActionListResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
     post:
       tags: ["Risk & Change"]
       summary: "Tạo action cho đúng một Risk hoặc Issue"
       operationId: api_148_post_v1_projects_projectid_risk_issue_actions
       x-api-id: "API-148"
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-permission: "riskChange.manage"
       x-data-scope: "inherits and validates source Risk/Issue package scope"
       x-idempotency: "DB-104 required"
@@ -2256,19 +2388,46 @@ paths:
         in: path
         required: true
         schema: {type: string, format: uuid}
+    get:
+      tags: ["Risk & Change"]
+      summary: "Đọc Action detail theo parent scope"
+      operationId: api_164_get_v1_projects_projectid_risk_issue_actions_actionid
+      x-api-id: "API-164"
+      x-implementation-status: implemented
+      x-permission: "riskChange.read"
+      x-data-scope: "full project or matching parent package; known out-of-scope ID returns generic not found"
+      x-idempotency: "safe"
+      x-related-requirements: ["FR-099", "FR-100", "FR-104"]
+      x-related-data: ["DB-065", "DB-066", "DB-112"]
+      x-related-security: ["SEC-105", "SEC-107", "SEC-111"]
+      x-error-codes: ["ACTION_NOT_FOUND", "PROJECT_SCOPE_DENIED"]
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+        - $ref: '#/components/parameters/CorrelationHeader'
+      responses:
+        '200':
+          description: "Authorized Action detail"
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RiskIssueActionCommandResponse'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
     patch:
       tags: ["Risk & Change"]
       summary: "Cập nhật action, evidence và optional Risk residual assessment"
       operationId: api_149_patch_v1_projects_projectid_risk_issue_actions_actionid
       x-api-id: "API-149"
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-permission: "riskChange.manage"
-      x-data-scope: "source Risk/Issue project/package scope and action owner policy"
+      x-data-scope: "source project/exact-package for ordinary updates; VERIFIED/CANCELLED require full-project and independent actor"
       x-idempotency: "DB-104 required; expectedVersion required"
       x-related-requirements: ["FR-099", "FR-100"]
       x-related-data: ["DB-065", "DB-066", "DB-098", "DB-102", "DB-104", "DB-112"]
-      x-related-security: ["SEC-105", "SEC-109", "SEC-111", "SEC-118"]
-      x-error-codes: ["ACTION_NOT_FOUND", "INVALID_STATE_TRANSITION", "VERSION_CONFLICT", "PROJECT_SCOPE_DENIED", "IDEMPOTENCY_CONFLICT"]
+      x-related-security: ["SEC-105", "SEC-108", "SEC-109", "SEC-111", "SEC-118"]
+      x-error-codes: ["ACTION_NOT_FOUND", "ACTION_VERIFICATION_SOD", "ACTION_CANCEL_REASON_REQUIRED", "INVALID_STATE_TRANSITION", "VERSION_CONFLICT", "PROJECT_SCOPE_DENIED", "IDEMPOTENCY_CONFLICT"]
       parameters:
         - $ref: '#/components/parameters/TenantHeader'
         - $ref: '#/components/parameters/CorrelationHeader'
@@ -2303,7 +2462,7 @@ paths:
       summary: "Liệt kê Change Request theo source và trạng thái"
       operationId: api_151_get_v1_projects_projectid_change_requests
       x-api-id: "API-151"
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-permission: "riskChange.read"
       x-data-scope: "project or inherited source package scope; restricted impact fields are masked"
       x-idempotency: "safe; opaque cursor with stable createdAt/id ordering"
@@ -2348,7 +2507,7 @@ paths:
       summary: "Tạo Change Request manual hoặc từ Risk/Issue"
       operationId: api_150_post_v1_projects_projectid_change_requests
       x-api-id: "API-150"
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-permission: "riskChange.create"
       x-data-scope: "inherits and validates source package scope; manual project-level Change requires full-project scope"
       x-idempotency: "DB-104 required"
@@ -2389,12 +2548,39 @@ paths:
         in: path
         required: true
         schema: {type: string, format: uuid}
+    get:
+      tags: ["Risk & Change"]
+      summary: "Đọc Change Request detail theo exact authorized scope"
+      operationId: api_162_get_v1_projects_projectid_change_requests_changerequestid
+      x-api-id: "API-162"
+      x-implementation-status: implemented
+      x-permission: "riskChange.read"
+      x-data-scope: "full project or matching package; full impact/evidence only after record-level authorization"
+      x-idempotency: "safe"
+      x-related-requirements: ["FR-101", "FR-102", "FR-104"]
+      x-related-data: ["DB-020", "DB-065", "DB-066", "DB-067"]
+      x-related-security: ["SEC-105", "SEC-107", "SEC-111", "SEC-114"]
+      x-error-codes: ["CHANGE_REQUEST_NOT_FOUND", "PROJECT_SCOPE_DENIED"]
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+        - $ref: '#/components/parameters/CorrelationHeader'
+      responses:
+        '200':
+          description: "Authorized Change Request detail"
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ChangeRequestCommandResponse'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
     patch:
       tags: ["Risk & Change"]
       summary: "Cập nhật Change Draft/Assessed/Returned và impact draft"
       operationId: api_152_patch_v1_projects_projectid_change_requests_changerequestid
       x-api-id: "API-152"
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-permission: "riskChange.manage"
       x-data-scope: "Change project/inherited package scope; approved impact and decision are immutable"
       x-idempotency: "DB-104 required; expectedVersion required"
@@ -2440,9 +2626,9 @@ paths:
       summary: "Submit complete six-dimension Change impact"
       operationId: api_153_post_v1_projects_projectid_change_requests_changerequestid_submit
       x-api-id: "API-153"
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-permission: "riskChange.submit"
-      x-data-scope: "Change project/inherited package scope and source baseline"
+      x-data-scope: "full-project only; source package remains provenance, not authorization elevation"
       x-idempotency: "DB-104 required; expectedVersion required"
       x-related-requirements: ["FR-101", "FR-102"]
       x-related-data: ["DB-020", "DB-067", "DB-098", "DB-102", "DB-104"]
@@ -2486,12 +2672,12 @@ paths:
       summary: "Quyết định closure Risk độc lập"
       operationId: api_154_post_v1_projects_projectid_risks_riskid_closure_decision
       x-api-id: "API-154"
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-permission: "riskChange.close; riskChange.closeCritical additionally required for HIGH/CRITICAL"
-      x-data-scope: "Risk project/package scope; closure requester/effective actor cannot decide"
+      x-data-scope: "full-project only; creator/current owner/closure requester/effective actor cannot decide"
       x-idempotency: "DB-104 required; expectedVersion required; SoD"
       x-related-requirements: ["FR-098", "FR-099", "FR-104"]
-      x-related-data: ["DB-065", "DB-098", "DB-102", "DB-104"]
+      x-related-data: ["DB-065", "DB-098", "DB-102", "DB-104", "DB-113"]
       x-related-security: ["SEC-105", "SEC-108", "SEC-109", "SEC-111", "SEC-118"]
       x-error-codes: ["RISK_NOT_FOUND", "CLOSE_EVIDENCE_REQUIRED", "CLOSE_APPROVAL_SOD", "INVALID_STATE_TRANSITION", "VERSION_CONFLICT", "PROJECT_SCOPE_DENIED", "IDEMPOTENCY_CONFLICT"]
       parameters:
@@ -2532,12 +2718,12 @@ paths:
       summary: "Quyết định closure Issue độc lập"
       operationId: api_155_post_v1_projects_projectid_issues_issueid_closure_decision
       x-api-id: "API-155"
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-permission: "riskChange.close; riskChange.closeCritical additionally required for CRITICAL"
-      x-data-scope: "Issue project/package scope; closure requester/effective actor cannot decide"
+      x-data-scope: "full-project only; creator/current owner/closure requester/effective actor cannot decide"
       x-idempotency: "DB-104 required; expectedVersion required; SoD"
       x-related-requirements: ["FR-100", "FR-104"]
-      x-related-data: ["DB-066", "DB-098", "DB-102", "DB-104"]
+      x-related-data: ["DB-066", "DB-098", "DB-102", "DB-104", "DB-113"]
       x-related-security: ["SEC-105", "SEC-108", "SEC-109", "SEC-111", "SEC-118"]
       x-error-codes: ["ISSUE_NOT_FOUND", "CLOSE_EVIDENCE_REQUIRED", "CLOSE_APPROVAL_SOD", "INVALID_STATE_TRANSITION", "VERSION_CONFLICT", "PROJECT_SCOPE_DENIED", "IDEMPOTENCY_CONFLICT"]
       parameters:
@@ -2578,9 +2764,9 @@ paths:
       summary: "APPROVE, RETURN hoặc REJECT submitted Change"
       operationId: api_156_post_v1_projects_projectid_change_requests_changerequestid_decision
       x-api-id: "API-156"
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-permission: "riskChange.approve"
-      x-data-scope: "Change project/inherited package scope; requester/submitter/effective actor SoD"
+      x-data-scope: "full-project only; requester/submitter/effective actor SoD"
       x-idempotency: "DB-104 required; expectedVersion required; SoD"
       x-related-requirements: ["FR-101", "FR-102"]
       x-related-data: ["DB-020", "DB-067", "DB-098", "DB-102", "DB-104"]
@@ -2620,9 +2806,9 @@ paths:
       summary: "Đọc Command Center Risk/Issue/Action/Change summary"
       operationId: api_157_get_v1_projects_projectid_risk_change_summary
       x-api-id: "API-157"
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-permission: "riskChange.read"
-      x-data-scope: "authorized project/package rows only; aggregates cannot infer hidden rows"
+      x-data-scope: "authorized project/package rows only; heatmap aggregates the complete authorized filtered Risk register, never the API-143 cursor page; aggregates cannot infer hidden rows"
       x-idempotency: "safe"
       x-related-requirements: ["FR-098", "FR-099", "FR-100", "FR-101", "FR-102", "FR-104"]
       x-related-data: ["DB-065", "DB-066", "DB-067", "DB-105", "DB-112"]
@@ -2637,6 +2823,25 @@ paths:
         - name: ownerId
           in: query
           schema: {type: string, format: uuid}
+        - name: riskStatus
+          in: query
+          description: Applies only to Risk counts, topRisks and heatmap
+          schema: {$ref: '#/components/schemas/RiskStatus'}
+        - name: riskCategory
+          in: query
+          description: Applies only to Risk counts, topRisks and heatmap
+          schema: {type: string, minLength: 1, maxLength: 100}
+        - name: riskReviewBefore
+          in: query
+          description: Inclusive review-date filter applied only to Risk counts, topRisks and heatmap
+          schema: {type: string, format: date}
+        - name: scoringVersion
+          in: query
+          description: Optional exact version filter; omitted returns one heatmap group per authorized scoring/threshold version pair
+          schema: {type: string, minLength: 1, maxLength: 100}
+        - name: thresholdVersion
+          in: query
+          schema: {type: string, minLength: 1, maxLength: 100}
       responses:
         '200':
           description: "Authorized bounded dashboard projection"
@@ -2660,7 +2865,7 @@ paths:
       summary: "Đọc immutable redacted Risk/Issue/Action/Change history"
       operationId: api_158_get_v1_projects_projectid_risk_change_history
       x-api-id: "API-158"
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-permission: "riskChange.read"
       x-data-scope: "source object project/package scope re-authorized before DB-098 history serialization"
       x-idempotency: "safe; opaque cursor with stable occurredAt/id ordering"
@@ -7499,6 +7704,50 @@ components:
           additionalProperties: false
         correlationId: {type: string}
       additionalProperties: false
+    AuthIdentityResponse:
+      type: object
+      required: [user, tenant, roles, permissions, scopes, correlationId]
+      properties:
+        user:
+          type: object
+          required: [id, email, displayName]
+          properties:
+            id: {type: string, format: uuid}
+            email: {type: string, format: email}
+            displayName: {type: string, minLength: 1, maxLength: 200}
+          additionalProperties: false
+        tenant:
+          type: object
+          required: [id, code, name]
+          properties:
+            id: {type: string, format: uuid}
+            code: {type: string, minLength: 1, maxLength: 64}
+            name: {type: string, minLength: 1, maxLength: 200}
+          additionalProperties: false
+        roles:
+          type: array
+          uniqueItems: true
+          items: {type: string, minLength: 1, maxLength: 80}
+        permissions:
+          type: array
+          uniqueItems: true
+          items: {type: string, minLength: 1, maxLength: 120}
+        scopes:
+          type: array
+          items:
+            type: object
+            required: [roleCode, permissions, scopeType, scopeId]
+            properties:
+              roleCode: {type: string, minLength: 1, maxLength: 80}
+              permissions:
+                type: array
+                uniqueItems: true
+                items: {type: string, minLength: 1, maxLength: 120}
+              scopeType: {type: string, enum: [TENANT, PORTFOLIO, PROJECT, PACKAGE]}
+              scopeId: {type: [string, 'null'], format: uuid}
+            additionalProperties: false
+        correlationId: {type: string, minLength: 1, maxLength: 100}
+      additionalProperties: false
     Envelope:
       type: object
       required: [correlationId]
@@ -7830,7 +8079,7 @@ components:
       additionalProperties: false
     ScheduleBaseline:
       type: object
-      required: [id, baselineNumber, baselineType, status, dataDate, snapshotHash, createdBy, submittedBy, versionNo]
+      required: [id, baselineNumber, baselineType, status, dataDate, snapshotHash, reason, impactSummary, approvedChangeRequestId, replacesBaselineId, createdBy, submittedBy, submittedAt, approvedBy, approvedAt, decisionComment, versionNo]
       properties:
         id: {type: string, format: uuid}
         baselineNumber: {type: integer, minimum: 1}
@@ -7838,11 +8087,16 @@ components:
         status: {$ref: '#/components/schemas/BaselineStatus'}
         dataDate: {type: string, format: date}
         snapshotHash: {type: string, pattern: '^[a-f0-9]{64}$'}
+        reason: {type: string, minLength: 3, maxLength: 4000}
+        impactSummary: {type: string, minLength: 3, maxLength: 4000}
         approvedChangeRequestId: {type: [string, 'null'], format: uuid}
+        replacesBaselineId: {type: [string, 'null'], format: uuid}
         createdBy: {type: string, format: uuid}
         submittedBy: {type: string, format: uuid}
+        submittedAt: {type: [string, 'null'], format: date-time, readOnly: true}
         approvedBy: {type: [string, 'null'], format: uuid}
         approvedAt: {type: [string, 'null'], format: date-time}
+        decisionComment: {type: [string, 'null'], maxLength: 2000, readOnly: true}
         versionNo: {type: integer, minimum: 1}
       additionalProperties: false
     ScheduleValidationIssue:
@@ -7987,7 +8241,7 @@ components:
       additionalProperties: false
     SubmitScheduleBaselineRequest:
       type: object
-      required: [baselineType, dataDate, reason, impactSummary, expectedScheduleVersion]
+      required: [baselineType, dataDate, expectedScheduleVersion]
       properties:
         baselineType: {type: string, enum: [INITIAL, REBASELINE]}
         dataDate: {type: string, format: date}
@@ -7995,13 +8249,19 @@ components:
         impactSummary: {type: string, minLength: 3, maxLength: 4000}
         approvedChangeRequestId: {type: string, format: uuid}
         expectedScheduleVersion: {type: integer, minimum: 1}
-      allOf:
-        - if:
-            properties: {baselineType: {const: REBASELINE}}
-          then:
-            required: [approvedChangeRequestId]
-            properties:
-              approvedChangeRequestId: {type: string, format: uuid}
+      oneOf:
+        - required: [baselineType, reason, impactSummary]
+          properties:
+            baselineType: {const: INITIAL}
+            reason: {type: string, minLength: 3, maxLength: 2000}
+            impactSummary: {type: string, minLength: 3, maxLength: 4000}
+            approvedChangeRequestId: false
+        - required: [baselineType, approvedChangeRequestId]
+          properties:
+            baselineType: {const: REBASELINE}
+            reason: false
+            impactSummary: false
+            approvedChangeRequestId: {type: string, format: uuid}
       additionalProperties: false
     ScheduleBaselineCommandResponse:
       type: object
@@ -8118,28 +8378,21 @@ components:
       additionalProperties: false
     BaselineDecisionRequest:
       type: object
-      required: [decision, expectedVersion]
+      required: [decision, comment, expectedVersion]
       properties:
         decision: {type: string, enum: [APPROVE, RETURN, REJECT]}
         comment: {type: string, minLength: 3, maxLength: 2000}
         expectedVersion: {type: integer, minimum: 1}
-      allOf:
-        - if:
-            properties: {decision: {enum: [RETURN, REJECT]}}
-          then:
-            required: [comment]
-            properties:
-              comment: {type: string, minLength: 3, maxLength: 2000}
       additionalProperties: false
     RiskStatus:
       type: string
       enum: [IDENTIFIED, ASSESSED, TREATING, MONITORING, CLOSURE_PENDING, CLOSED, OCCURRED]
     IssueStatus:
       type: string
-      enum: [REPORTED, TRIAGED, IN_PROGRESS, RESOLVED, CLOSURE_PENDING, VERIFIED, CLOSED, REOPENED]
+      enum: [REPORTED, TRIAGED, IN_PROGRESS, RESOLVED, CLOSURE_PENDING, CLOSED, REOPENED]
     RiskIssueActionStatus:
       type: string
-      enum: [OPEN, IN_PROGRESS, BLOCKED, COMPLETED, CANCELLED]
+      enum: [OPEN, IN_PROGRESS, BLOCKED, DONE, VERIFIED, CANCELLED]
     ChangeRequestStatus:
       type: string
       enum: [DRAFT, ASSESSED, SUBMITTED, APPROVED, RETURNED, REJECTED, IMPLEMENTED, CLOSED]
@@ -8158,6 +8411,12 @@ components:
     RiskChangeDecision:
       type: string
       enum: [APPROVE, RETURN, REJECT]
+    RiskResponseStrategy:
+      type: string
+      enum: [AVOID, MITIGATE, TRANSFER, ACCEPT]
+    RiskIssueActionType:
+      type: string
+      enum: [RESPONSE, CONTINGENCY, CORRECTIVE, DECISION]
     EvidenceReference:
       type: object
       required: [objectType, objectId]
@@ -8170,67 +8429,146 @@ components:
         label: {type: string, maxLength: 250}
       additionalProperties: false
       description: Opaque PM Web object reference; authorization is re-evaluated when opened
+    RiskIssueClosureCycle:
+      type: object
+      required: [id, projectId, packageId, riskId, issueId, sequenceNo, requestReason, requestEvidenceRefs, requestedBy, requestedAt, decision, decisionComment, decisionEvidenceRefs, decidedBy, decidedAt, resultingStatus, createdAt]
+      properties:
+        id: {type: string, format: uuid, readOnly: true}
+        projectId: {type: string, format: uuid, readOnly: true}
+        packageId: {type: [string, 'null'], format: uuid, readOnly: true}
+        riskId: {type: [string, 'null'], format: uuid, readOnly: true}
+        issueId: {type: [string, 'null'], format: uuid, readOnly: true}
+        sequenceNo: {type: integer, minimum: 1, readOnly: true}
+        requestReason: {type: string, minLength: 3, maxLength: 2000, readOnly: true}
+        requestEvidenceRefs: {type: array, minItems: 1, uniqueItems: true, maxItems: 100, readOnly: true, items: {$ref: '#/components/schemas/EvidenceReference'}}
+        requestedBy: {type: string, format: uuid, readOnly: true}
+        requestedAt: {type: string, format: date-time, readOnly: true}
+        decision:
+          oneOf:
+            - $ref: '#/components/schemas/RiskChangeDecision'
+            - type: 'null'
+        decisionComment: {type: [string, 'null'], maxLength: 2000, readOnly: true}
+        decisionEvidenceRefs: {type: array, uniqueItems: true, maxItems: 100, readOnly: true, items: {$ref: '#/components/schemas/EvidenceReference'}}
+        decidedBy: {type: [string, 'null'], format: uuid, readOnly: true}
+        decidedAt: {type: [string, 'null'], format: date-time, readOnly: true}
+        resultingStatus:
+          type: [string, 'null']
+          enum: [MONITORING, RESOLVED, CLOSED, null]
+          readOnly: true
+        createdAt: {type: string, format: date-time, readOnly: true}
+      oneOf:
+        - properties: {riskId: {type: string, format: uuid}, issueId: {type: 'null'}}
+        - properties: {riskId: {type: 'null'}, issueId: {type: string, format: uuid}}
+      allOf:
+        - oneOf:
+            - properties:
+                decision: {type: 'null'}
+                decisionComment: {type: 'null'}
+                decisionEvidenceRefs: {type: array, maxItems: 0}
+                decidedBy: {type: 'null'}
+                decidedAt: {type: 'null'}
+                resultingStatus: {type: 'null'}
+            - properties:
+                decision: {$ref: '#/components/schemas/RiskChangeDecision'}
+                decisionComment: {type: string, minLength: 3, maxLength: 2000}
+                decisionEvidenceRefs: {type: array, minItems: 1, uniqueItems: true, maxItems: 100, items: {$ref: '#/components/schemas/EvidenceReference'}}
+                decidedBy: {type: string, format: uuid}
+                decidedAt: {type: string, format: date-time}
+                resultingStatus: {type: string, enum: [MONITORING, RESOLVED, CLOSED]}
+      additionalProperties: false
+      description: DB-113 cycle; request creates one row, decision may complete it exactly once, completed cycle is immutable and a later re-close appends the next sequence
     RiskResidualAssessment:
       type: object
-      required: [probability, impactRating]
+      required: [probability, costImpactRating, scheduleImpactRating, hseImpactRating]
       properties:
         probability: {type: integer, minimum: 1, maximum: 5}
-        impactRating: {type: integer, minimum: 1, maximum: 5}
+        costImpactRating: {type: integer, minimum: 1, maximum: 5}
+        scheduleImpactRating: {type: integer, minimum: 1, maximum: 5}
+        hseImpactRating: {type: integer, minimum: 1, maximum: 5}
         rationale: {type: string, minLength: 3, maxLength: 2000}
       additionalProperties: false
     Risk:
       type: object
-      required: [id, projectId, packageId, code, cause, event, impact, probability, impactRating, inherentExposure, inherentLevel, residualProbability, residualImpactRating, residualExposure, residualLevel, ownerId, dueDate, responsePlan, trigger, contingency, evidenceRefs, status, occurredIssueId, closureRequestedBy, closureRequestedAt, closureEvidenceRefs, versionNo, createdAt, updatedAt]
+      required: [id, projectId, packageId, code, category, cause, event, impact, probability, costImpactRating, scheduleImpactRating, hseImpactRating, impactRating, inherentExposure, inherentLevel, residualProbability, residualCostImpactRating, residualScheduleImpactRating, residualHseImpactRating, residualImpactRating, residualExposure, residualLevel, scoringVersion, thresholdVersion, ownerId, reviewDate, responseStrategy, responsePlan, trigger, contingencyPlan, evidenceRefs, status, occurredIssueId, createdBy, closureRequestedBy, closureRequestedAt, closureReason, closureRequestEvidenceRefs, closureDecision, closureDecisionEvidenceRefs, closureDecidedBy, closureDecidedAt, closureDecisionComment, versionNo, createdAt, updatedAt]
       properties:
         id: {type: string, format: uuid}
         projectId: {type: string, format: uuid}
         packageId: {type: [string, 'null'], format: uuid}
         code: {type: string, pattern: '^[A-Z0-9][A-Z0-9_.-]{1,79}$'}
+        category: {type: string, minLength: 1, maxLength: 100}
         cause: {type: string, minLength: 3, maxLength: 2000}
         event: {type: string, minLength: 3, maxLength: 2000}
         impact: {type: string, minLength: 3, maxLength: 4000}
         probability: {type: integer, minimum: 1, maximum: 5}
-        impactRating: {type: integer, minimum: 1, maximum: 5}
+        costImpactRating: {type: integer, minimum: 1, maximum: 5}
+        scheduleImpactRating: {type: integer, minimum: 1, maximum: 5}
+        hseImpactRating: {type: integer, minimum: 1, maximum: 5}
+        impactRating: {type: integer, minimum: 1, maximum: 5, readOnly: true}
         inherentExposure: {type: integer, minimum: 1, maximum: 25, readOnly: true}
-        inherentLevel: {$ref: '#/components/schemas/ExposureLevel'}
+        inherentLevel:
+          allOf: [{$ref: '#/components/schemas/ExposureLevel'}]
+          readOnly: true
         residualProbability: {type: [integer, 'null'], minimum: 1, maximum: 5}
-        residualImpactRating: {type: [integer, 'null'], minimum: 1, maximum: 5}
+        residualCostImpactRating: {type: [integer, 'null'], minimum: 1, maximum: 5}
+        residualScheduleImpactRating: {type: [integer, 'null'], minimum: 1, maximum: 5}
+        residualHseImpactRating: {type: [integer, 'null'], minimum: 1, maximum: 5}
+        residualImpactRating: {type: [integer, 'null'], minimum: 1, maximum: 5, readOnly: true}
         residualExposure: {type: [integer, 'null'], minimum: 1, maximum: 25, readOnly: true}
         residualLevel:
           oneOf:
             - $ref: '#/components/schemas/ExposureLevel'
             - type: 'null'
+        scoringVersion: {type: string, minLength: 1, maxLength: 100, readOnly: true}
+        thresholdVersion: {type: string, minLength: 1, maxLength: 100, readOnly: true}
         ownerId: {type: string, format: uuid}
-        dueDate: {type: string, format: date}
+        reviewDate: {type: string, format: date}
+        responseStrategy:
+          oneOf:
+            - $ref: '#/components/schemas/RiskResponseStrategy'
+            - type: 'null'
         responsePlan: {type: [string, 'null'], maxLength: 4000}
         trigger: {type: [string, 'null'], maxLength: 2000}
-        contingency: {type: [string, 'null'], maxLength: 4000}
+        contingencyPlan: {type: [string, 'null'], maxLength: 4000}
         evidenceRefs: {type: array, uniqueItems: true, maxItems: 100, items: {$ref: '#/components/schemas/EvidenceReference'}}
         status: {$ref: '#/components/schemas/RiskStatus'}
         occurredIssueId: {type: [string, 'null'], format: uuid}
+        createdBy: {type: string, format: uuid, readOnly: true}
         closureRequestedBy: {type: [string, 'null'], format: uuid}
         closureRequestedAt: {type: [string, 'null'], format: date-time}
-        closureEvidenceRefs: {type: array, uniqueItems: true, maxItems: 100, items: {$ref: '#/components/schemas/EvidenceReference'}}
+        closureReason: {type: [string, 'null'], maxLength: 2000}
+        closureRequestEvidenceRefs: {type: array, uniqueItems: true, maxItems: 100, items: {$ref: '#/components/schemas/EvidenceReference'}}
+        closureDecision:
+          oneOf:
+            - $ref: '#/components/schemas/RiskChangeDecision'
+            - type: 'null'
+        closureDecisionEvidenceRefs: {type: array, uniqueItems: true, maxItems: 100, items: {$ref: '#/components/schemas/EvidenceReference'}}
+        closureDecidedBy: {type: [string, 'null'], format: uuid, readOnly: true}
+        closureDecidedAt: {type: [string, 'null'], format: date-time, readOnly: true}
+        closureDecisionComment: {type: [string, 'null'], maxLength: 2000, readOnly: true}
         versionNo: {type: integer, minimum: 1}
         createdAt: {type: string, format: date-time}
         updatedAt: {type: string, format: date-time}
       additionalProperties: false
     CreateRiskRequest:
       type: object
-      required: [code, cause, event, impact, probability, impactRating, ownerId, dueDate]
+      required: [code, category, cause, event, impact, probability, costImpactRating, scheduleImpactRating, hseImpactRating, ownerId, reviewDate]
       properties:
         packageId: {type: string, format: uuid}
         code: {type: string, pattern: '^[A-Z0-9][A-Z0-9_.-]{1,79}$'}
+        category: {type: string, minLength: 1, maxLength: 100}
         cause: {type: string, minLength: 3, maxLength: 2000}
         event: {type: string, minLength: 3, maxLength: 2000}
         impact: {type: string, minLength: 3, maxLength: 4000}
         probability: {type: integer, minimum: 1, maximum: 5}
-        impactRating: {type: integer, minimum: 1, maximum: 5}
+        costImpactRating: {type: integer, minimum: 1, maximum: 5}
+        scheduleImpactRating: {type: integer, minimum: 1, maximum: 5}
+        hseImpactRating: {type: integer, minimum: 1, maximum: 5}
         ownerId: {type: string, format: uuid}
-        dueDate: {type: string, format: date}
+        reviewDate: {type: string, format: date}
+        responseStrategy: {$ref: '#/components/schemas/RiskResponseStrategy'}
         responsePlan: {type: string, maxLength: 4000}
         trigger: {type: string, maxLength: 2000}
-        contingency: {type: string, maxLength: 4000}
+        contingencyPlan: {type: string, maxLength: 4000}
         evidenceRefs: {type: array, uniqueItems: true, maxItems: 100, items: {$ref: '#/components/schemas/EvidenceReference'}}
       additionalProperties: false
     UpdateRiskRequest:
@@ -8239,17 +8577,25 @@ components:
       minProperties: 2
       properties:
         expectedVersion: {type: integer, minimum: 1}
+        category: {type: string, minLength: 1, maxLength: 100}
         cause: {type: string, minLength: 3, maxLength: 2000}
         event: {type: string, minLength: 3, maxLength: 2000}
         impact: {type: string, minLength: 3, maxLength: 4000}
         probability: {type: integer, minimum: 1, maximum: 5}
-        impactRating: {type: integer, minimum: 1, maximum: 5}
+        costImpactRating: {type: integer, minimum: 1, maximum: 5}
+        scheduleImpactRating: {type: integer, minimum: 1, maximum: 5}
+        hseImpactRating: {type: integer, minimum: 1, maximum: 5}
         residualAssessment: {$ref: '#/components/schemas/RiskResidualAssessment'}
+        residualAssessmentReason: {type: string, minLength: 3, maxLength: 2000}
         ownerId: {type: string, format: uuid}
-        dueDate: {type: string, format: date}
+        reviewDate: {type: string, format: date}
+        responseStrategy:
+          oneOf:
+            - $ref: '#/components/schemas/RiskResponseStrategy'
+            - type: 'null'
         responsePlan: {type: [string, 'null'], maxLength: 4000}
         trigger: {type: [string, 'null'], maxLength: 2000}
-        contingency: {type: [string, 'null'], maxLength: 4000}
+        contingencyPlan: {type: [string, 'null'], maxLength: 4000}
         evidenceRefs: {type: array, uniqueItems: true, maxItems: 100, items: {$ref: '#/components/schemas/EvidenceReference'}}
         status: {$ref: '#/components/schemas/RiskStatus'}
         occurredIssueId: {type: string, format: uuid}
@@ -8257,47 +8603,81 @@ components:
         closureEvidenceRefs: {type: array, minItems: 1, uniqueItems: true, maxItems: 100, items: {$ref: '#/components/schemas/EvidenceReference'}}
       allOf:
         - if:
+            required: [residualAssessment]
+            properties:
+              residualAssessment: {$ref: '#/components/schemas/RiskResidualAssessment'}
+          then:
+            required: [residualAssessmentReason, evidenceRefs]
+            properties:
+              residualAssessmentReason: {type: string, minLength: 3, maxLength: 2000}
+              evidenceRefs: {type: array, minItems: 1, uniqueItems: true, maxItems: 100, items: {$ref: '#/components/schemas/EvidenceReference'}}
+        - if:
             required: [status]
             properties: {status: {const: OCCURRED}}
           then:
             required: [occurredIssueId]
+            properties:
+              occurredIssueId: {type: string, format: uuid}
         - if:
             required: [status]
             properties: {status: {const: CLOSURE_PENDING}}
           then:
             required: [closureReason, closureEvidenceRefs]
+            properties:
+              closureReason: {type: string, minLength: 3, maxLength: 2000}
+              closureEvidenceRefs: {type: array, minItems: 1, uniqueItems: true, maxItems: 100, items: {$ref: '#/components/schemas/EvidenceReference'}}
       additionalProperties: false
+      description: residualAssessment is an authoritative full-project Risk reassessment guarded by expectedVersion, reason and evidence; CLOSURE_PENDING is accepted only from current MONITORING state
     Issue:
       type: object
-      required: [id, projectId, packageId, code, title, rootCause, actualImpact, severity, ownerId, targetDate, sourceRiskId, evidenceRefs, status, closureRequestedBy, closureRequestedAt, closureEvidenceRefs, versionNo, createdAt, updatedAt]
+      required: [id, projectId, packageId, code, title, description, occurredAt, rootCause, actualImpact, severity, decisionSummary, ownerId, targetDate, sourceRiskId, evidenceRefs, status, resolutionSummary, resolutionEvidenceRefs, resolvedBy, resolvedAt, createdBy, closureRequestedBy, closureRequestedAt, closureReason, closureRequestEvidenceRefs, closureDecision, closureDecisionEvidenceRefs, closureDecidedBy, closureDecidedAt, closureDecisionComment, versionNo, createdAt, updatedAt]
       properties:
         id: {type: string, format: uuid}
         projectId: {type: string, format: uuid}
         packageId: {type: [string, 'null'], format: uuid}
         code: {type: string, pattern: '^[A-Z0-9][A-Z0-9_.-]{1,79}$'}
         title: {type: string, minLength: 3, maxLength: 250}
+        description: {type: string, minLength: 3, maxLength: 4000}
+        occurredAt: {type: string, format: date-time}
         rootCause: {type: string, minLength: 3, maxLength: 4000}
         actualImpact: {type: string, minLength: 3, maxLength: 4000}
         severity: {$ref: '#/components/schemas/IssueSeverity'}
+        decisionSummary: {type: [string, 'null'], maxLength: 4000}
         ownerId: {type: string, format: uuid}
         targetDate: {type: string, format: date}
         sourceRiskId: {type: [string, 'null'], format: uuid}
         evidenceRefs: {type: array, uniqueItems: true, maxItems: 100, items: {$ref: '#/components/schemas/EvidenceReference'}}
         status: {$ref: '#/components/schemas/IssueStatus'}
+        resolutionSummary: {type: [string, 'null'], maxLength: 4000}
+        resolutionEvidenceRefs: {type: array, uniqueItems: true, maxItems: 100, items: {$ref: '#/components/schemas/EvidenceReference'}}
+        resolvedBy: {type: [string, 'null'], format: uuid, readOnly: true}
+        resolvedAt: {type: [string, 'null'], format: date-time, readOnly: true}
+        createdBy: {type: string, format: uuid, readOnly: true}
         closureRequestedBy: {type: [string, 'null'], format: uuid}
         closureRequestedAt: {type: [string, 'null'], format: date-time}
-        closureEvidenceRefs: {type: array, uniqueItems: true, maxItems: 100, items: {$ref: '#/components/schemas/EvidenceReference'}}
+        closureReason: {type: [string, 'null'], maxLength: 2000}
+        closureRequestEvidenceRefs: {type: array, uniqueItems: true, maxItems: 100, items: {$ref: '#/components/schemas/EvidenceReference'}}
+        closureDecision:
+          oneOf:
+            - $ref: '#/components/schemas/RiskChangeDecision'
+            - type: 'null'
+        closureDecisionEvidenceRefs: {type: array, uniqueItems: true, maxItems: 100, items: {$ref: '#/components/schemas/EvidenceReference'}}
+        closureDecidedBy: {type: [string, 'null'], format: uuid, readOnly: true}
+        closureDecidedAt: {type: [string, 'null'], format: date-time, readOnly: true}
+        closureDecisionComment: {type: [string, 'null'], maxLength: 2000, readOnly: true}
         versionNo: {type: integer, minimum: 1}
         createdAt: {type: string, format: date-time}
         updatedAt: {type: string, format: date-time}
       additionalProperties: false
     CreateIssueRequest:
       type: object
-      required: [code, title, rootCause, actualImpact, severity, ownerId, targetDate]
+      required: [code, title, description, occurredAt, rootCause, actualImpact, severity, ownerId, targetDate]
       properties:
         packageId: {type: string, format: uuid}
         code: {type: string, pattern: '^[A-Z0-9][A-Z0-9_.-]{1,79}$'}
         title: {type: string, minLength: 3, maxLength: 250}
+        description: {type: string, minLength: 3, maxLength: 4000}
+        occurredAt: {type: string, format: date-time}
         rootCause: {type: string, minLength: 3, maxLength: 4000}
         actualImpact: {type: string, minLength: 3, maxLength: 4000}
         severity: {$ref: '#/components/schemas/IssueSeverity'}
@@ -8312,6 +8692,8 @@ components:
             properties: {markSourceRiskOccurred: {const: true}}
           then:
             required: [sourceRiskId]
+            properties:
+              sourceRiskId: {type: string, format: uuid}
       additionalProperties: false
     UpdateIssueRequest:
       type: object
@@ -8320,38 +8702,74 @@ components:
       properties:
         expectedVersion: {type: integer, minimum: 1}
         title: {type: string, minLength: 3, maxLength: 250}
+        description: {type: string, minLength: 3, maxLength: 4000}
+        occurredAt: {type: string, format: date-time}
         rootCause: {type: string, minLength: 3, maxLength: 4000}
         actualImpact: {type: string, minLength: 3, maxLength: 4000}
         severity: {$ref: '#/components/schemas/IssueSeverity'}
+        decisionSummary: {type: [string, 'null'], maxLength: 4000}
         ownerId: {type: string, format: uuid}
         targetDate: {type: string, format: date}
         evidenceRefs: {type: array, uniqueItems: true, maxItems: 100, items: {$ref: '#/components/schemas/EvidenceReference'}}
         status: {$ref: '#/components/schemas/IssueStatus'}
+        resolutionSummary: {type: string, minLength: 3, maxLength: 4000}
+        resolutionEvidenceRefs: {type: array, minItems: 1, uniqueItems: true, maxItems: 100, items: {$ref: '#/components/schemas/EvidenceReference'}}
         closureReason: {type: string, minLength: 3, maxLength: 2000}
         closureEvidenceRefs: {type: array, minItems: 1, uniqueItems: true, maxItems: 100, items: {$ref: '#/components/schemas/EvidenceReference'}}
       allOf:
         - if:
             required: [status]
+            properties: {status: {const: RESOLVED}}
+          then:
+            required: [resolutionSummary, resolutionEvidenceRefs]
+            properties:
+              resolutionSummary: {type: string, minLength: 3, maxLength: 4000}
+              resolutionEvidenceRefs: {type: array, minItems: 1, uniqueItems: true, maxItems: 100, items: {$ref: '#/components/schemas/EvidenceReference'}}
+        - if:
+            required: [status]
             properties: {status: {const: CLOSURE_PENDING}}
           then:
             required: [closureReason, closureEvidenceRefs]
+            properties:
+              closureReason: {type: string, minLength: 3, maxLength: 2000}
+              closureEvidenceRefs: {type: array, minItems: 1, uniqueItems: true, maxItems: 100, items: {$ref: '#/components/schemas/EvidenceReference'}}
+        - if:
+            required: [status]
+            properties: {status: {const: REOPENED}}
+          then:
+            required: [evidenceRefs]
+            properties:
+              evidenceRefs: {type: array, minItems: 1, uniqueItems: true, maxItems: 100, items: {$ref: '#/components/schemas/EvidenceReference'}}
       additionalProperties: false
     RiskIssueAction:
       type: object
-      required: [id, projectId, packageId, riskId, issueId, title, description, ownerId, dueDate, status, evidenceRefs, completedAt, versionNo, createdAt, updatedAt]
+      required: [id, projectId, packageId, riskId, issueId, code, actionType, title, description, ownerId, dueDate, status, statusReason, evidenceRefs, residualAssessment, residualRiskVersion, completedBy, completedAt, verifiedBy, verifiedAt, cancelledBy, cancelledAt, versionNo, createdAt, updatedAt]
       properties:
         id: {type: string, format: uuid}
         projectId: {type: string, format: uuid}
         packageId: {type: [string, 'null'], format: uuid, readOnly: true}
         riskId: {type: [string, 'null'], format: uuid}
         issueId: {type: [string, 'null'], format: uuid}
+        code: {type: string, pattern: '^[A-Z0-9][A-Z0-9_.-]{1,79}$'}
+        actionType: {$ref: '#/components/schemas/RiskIssueActionType'}
         title: {type: string, minLength: 3, maxLength: 250}
         description: {type: [string, 'null'], maxLength: 4000}
         ownerId: {type: string, format: uuid}
         dueDate: {type: string, format: date}
         status: {$ref: '#/components/schemas/RiskIssueActionStatus'}
+        statusReason: {type: [string, 'null'], maxLength: 2000}
         evidenceRefs: {type: array, uniqueItems: true, maxItems: 100, items: {$ref: '#/components/schemas/EvidenceReference'}}
+        residualAssessment:
+          oneOf:
+            - $ref: '#/components/schemas/RiskResidualAssessment'
+            - type: 'null'
+        residualRiskVersion: {type: [integer, 'null'], minimum: 1, readOnly: true, description: Risk version captured when the residual proposal is recorded}
+        completedBy: {type: [string, 'null'], format: uuid, readOnly: true}
         completedAt: {type: [string, 'null'], format: date-time}
+        verifiedBy: {type: [string, 'null'], format: uuid, readOnly: true}
+        verifiedAt: {type: [string, 'null'], format: date-time, readOnly: true}
+        cancelledBy: {type: [string, 'null'], format: uuid, readOnly: true}
+        cancelledAt: {type: [string, 'null'], format: date-time, readOnly: true}
         versionNo: {type: integer, minimum: 1}
         createdAt: {type: string, format: date-time}
         updatedAt: {type: string, format: date-time}
@@ -8361,12 +8779,15 @@ components:
         - required: [issueId]
           properties: {riskId: {type: 'null'}, issueId: {type: string, format: uuid}}
       additionalProperties: false
+      description: VERIFIED and authorized CANCELLED are terminal immutable facts; a verified Risk residual proposal is atomically copied to the authoritative Risk only when residualRiskVersion still matches
     CreateRiskIssueActionRequest:
       type: object
-      required: [title, ownerId, dueDate]
+      required: [code, actionType, title, ownerId, dueDate]
       properties:
         riskId: {type: string, format: uuid}
         issueId: {type: string, format: uuid}
+        code: {type: string, pattern: '^[A-Z0-9][A-Z0-9_.-]{1,79}$'}
+        actionType: {$ref: '#/components/schemas/RiskIssueActionType'}
         title: {type: string, minLength: 3, maxLength: 250}
         description: {type: string, maxLength: 4000}
         ownerId: {type: string, format: uuid}
@@ -8374,11 +8795,22 @@ components:
         evidenceRefs: {type: array, uniqueItems: true, maxItems: 100, items: {$ref: '#/components/schemas/EvidenceReference'}}
       oneOf:
         - required: [riskId]
-          not: {required: [issueId]}
+          properties:
+            riskId: {type: string, format: uuid}
+            issueId: false
         - required: [issueId]
-          not: {required: [riskId]}
+          properties:
+            riskId: false
+            issueId: {type: string, format: uuid}
       additionalProperties: false
     UpdateRiskIssueActionRequest:
+      oneOf:
+        - $ref: '#/components/schemas/UpdateRiskIssueActionFieldsRequest'
+        - $ref: '#/components/schemas/CompleteRiskIssueActionRequest'
+        - $ref: '#/components/schemas/VerifyRiskIssueActionRequest'
+        - $ref: '#/components/schemas/CancelRiskIssueActionRequest'
+      description: Discriminated command union; terminal commands cannot be mixed with field/owner/due/residual changes and compare actor against pre-command owner/completedBy
+    UpdateRiskIssueActionFieldsRequest:
       type: object
       required: [expectedVersion]
       minProperties: 2
@@ -8388,18 +8820,52 @@ components:
         description: {type: [string, 'null'], maxLength: 4000}
         ownerId: {type: string, format: uuid}
         dueDate: {type: string, format: date}
-        status: {$ref: '#/components/schemas/RiskIssueActionStatus'}
+        status: {type: string, enum: [OPEN, IN_PROGRESS, BLOCKED]}
+        statusReason: {type: string, minLength: 3, maxLength: 2000}
         evidenceRefs: {type: array, uniqueItems: true, maxItems: 100, items: {$ref: '#/components/schemas/EvidenceReference'}}
+      additionalProperties: false
+    CompleteRiskIssueActionRequest:
+      type: object
+      required: [expectedVersion, status, evidenceRefs]
+      properties:
+        expectedVersion: {type: integer, minimum: 1}
+        status: {const: DONE}
+        evidenceRefs: {type: array, minItems: 1, uniqueItems: true, maxItems: 100, items: {$ref: '#/components/schemas/EvidenceReference'}}
         residualAssessment: {$ref: '#/components/schemas/RiskResidualAssessment'}
+        residualRiskVersion: {type: integer, minimum: 1, description: Current parent Risk version captured with the proposal}
       allOf:
         - if:
-            required: [status]
-            properties: {status: {const: COMPLETED}}
-          then:
-            required: [evidenceRefs]
+            required: [residualAssessment]
             properties:
-              evidenceRefs: {type: array, minItems: 1, uniqueItems: true, maxItems: 100, items: {$ref: '#/components/schemas/EvidenceReference'}}
+              residualAssessment: {$ref: '#/components/schemas/RiskResidualAssessment'}
+          then:
+            required: [residualRiskVersion]
+            properties:
+              residualRiskVersion: {type: integer, minimum: 1}
+      dependentRequired:
+        residualAssessment: [residualRiskVersion]
+        residualRiskVersion: [residualAssessment]
       additionalProperties: false
+      description: DONE records completion and optional residual proposal; it never changes authoritative Risk score
+    VerifyRiskIssueActionRequest:
+      type: object
+      required: [expectedVersion, status, evidenceRefs]
+      properties:
+        expectedVersion: {type: integer, minimum: 1}
+        status: {const: VERIFIED}
+        evidenceRefs: {type: array, minItems: 1, uniqueItems: true, maxItems: 100, items: {$ref: '#/components/schemas/EvidenceReference'}}
+      additionalProperties: false
+      description: Full-project independent terminal decision; promotes only a previously stored proposal after residualRiskVersion check and compares actor/effective actor with pre-command owner/completedBy
+    CancelRiskIssueActionRequest:
+      type: object
+      required: [expectedVersion, status, statusReason, evidenceRefs]
+      properties:
+        expectedVersion: {type: integer, minimum: 1}
+        status: {const: CANCELLED}
+        statusReason: {type: string, minLength: 3, maxLength: 2000}
+        evidenceRefs: {type: array, minItems: 1, uniqueItems: true, maxItems: 100, items: {$ref: '#/components/schemas/EvidenceReference'}}
+      additionalProperties: false
+      description: Full-project independent terminal decision; compares actor/effective actor with pre-command owner/completedBy and never promotes residual
     ChangeSource:
       type: object
       required: [type]
@@ -8407,27 +8873,22 @@ components:
         type: {$ref: '#/components/schemas/ChangeSourceType'}
         riskId: {type: string, format: uuid}
         issueId: {type: string, format: uuid}
-      allOf:
-        - if:
-            required: [type]
-            properties: {type: {const: RISK}}
-          then:
-            required: [riskId]
-            not: {required: [issueId]}
-        - if:
-            required: [type]
-            properties: {type: {const: ISSUE}}
-          then:
-            required: [issueId]
-            not: {required: [riskId]}
-        - if:
-            required: [type]
-            properties: {type: {const: MANUAL}}
-          then:
-            not:
-              anyOf:
-                - required: [riskId]
-                - required: [issueId]
+      oneOf:
+        - required: [type]
+          properties:
+            type: {const: MANUAL}
+            riskId: false
+            issueId: false
+        - required: [type, riskId]
+          properties:
+            type: {const: RISK}
+            riskId: {type: string, format: uuid}
+            issueId: false
+        - required: [type, issueId]
+          properties:
+            type: {const: ISSUE}
+            riskId: false
+            issueId: {type: string, format: uuid}
       additionalProperties: false
     TextImpactDimension:
       type: object
@@ -8457,7 +8918,6 @@ components:
       additionalProperties: false
     ChangeImpactDraft:
       type: object
-      required: [schedule]
       properties:
         scope: {$ref: '#/components/schemas/TextImpactDimension'}
         schedule: {$ref: '#/components/schemas/ScheduleImpactDimension'}
@@ -8479,7 +8939,7 @@ components:
       additionalProperties: false
     ChangeRequest:
       type: object
-      required: [id, projectId, packageId, code, title, reason, ownerId, sourceBaselineId, source, sourceEvidenceSnapshot, impactDraft, impactSnapshot, impactSnapshotHash, status, submittedBy, submittedAt, decisionVersion, approvedBy, approvedAt, decisionComment, scheduleImpactApproved, versionNo, createdAt, updatedAt]
+      required: [id, projectId, packageId, code, title, reason, options, recommendation, ownerId, requesterId, sourceBaselineId, source, evidenceRefs, sourceEvidenceSnapshot, impactDraft, impactSnapshot, impactSnapshotHash, approvalSnapshotHash, status, submittedBy, submittedAt, decisionVersion, decidedBy, decidedAt, approvedBy, approvedAt, decisionComment, scheduleImpactApproved, versionNo, createdAt, updatedAt]
       properties:
         id: {type: string, format: uuid}
         projectId: {type: string, format: uuid}
@@ -8487,9 +8947,13 @@ components:
         code: {type: string, pattern: '^[A-Z0-9][A-Z0-9_.-]{1,79}$'}
         title: {type: string, minLength: 3, maxLength: 250}
         reason: {type: string, minLength: 3, maxLength: 4000}
+        options: {type: array, uniqueItems: true, maxItems: 20, items: {type: string, minLength: 3, maxLength: 2000}}
+        recommendation: {type: [string, 'null'], maxLength: 4000}
         ownerId: {type: string, format: uuid}
-        sourceBaselineId: {type: string, format: uuid}
+        requesterId: {type: string, format: uuid, readOnly: true}
+        sourceBaselineId: {type: [string, 'null'], format: uuid}
         source: {$ref: '#/components/schemas/ChangeSource'}
+        evidenceRefs: {type: array, uniqueItems: true, maxItems: 100, items: {$ref: '#/components/schemas/EvidenceReference'}}
         sourceEvidenceSnapshot: {type: array, uniqueItems: true, maxItems: 100, readOnly: true, items: {$ref: '#/components/schemas/EvidenceReference'}}
         impactDraft: {$ref: '#/components/schemas/ChangeImpactDraft'}
         impactSnapshot:
@@ -8497,26 +8961,34 @@ components:
             - $ref: '#/components/schemas/ChangeImpactSnapshot'
             - type: 'null'
         impactSnapshotHash: {type: [string, 'null'], pattern: '^[a-f0-9]{64}$', readOnly: true}
+        approvalSnapshotHash: {type: [string, 'null'], pattern: '^[a-f0-9]{64}$', readOnly: true}
         status: {$ref: '#/components/schemas/ChangeRequestStatus'}
         submittedBy: {type: [string, 'null'], format: uuid, readOnly: true}
         submittedAt: {type: [string, 'null'], format: date-time, readOnly: true}
         decisionVersion: {type: [integer, 'null'], minimum: 1, readOnly: true}
+        decidedBy: {type: [string, 'null'], format: uuid, readOnly: true}
+        decidedAt: {type: [string, 'null'], format: date-time, readOnly: true}
         approvedBy: {type: [string, 'null'], format: uuid, readOnly: true}
         approvedAt: {type: [string, 'null'], format: date-time, readOnly: true}
         decisionComment: {type: [string, 'null'], readOnly: true}
-        scheduleImpactApproved: {type: boolean, readOnly: true}
+        scheduleImpactApproved:
+          type: boolean
+          readOnly: true
+          description: True only when APPROVE freezes a complete snapshot whose schedule.requiresRebaseline is true
         versionNo: {type: integer, minimum: 1}
         createdAt: {type: string, format: date-time}
         updatedAt: {type: string, format: date-time}
       additionalProperties: false
     CreateChangeRequestRequest:
       type: object
-      required: [code, title, reason, ownerId, sourceBaselineId, source, impact]
+      required: [code, title, reason, ownerId, source]
       properties:
         packageId: {type: string, format: uuid}
         code: {type: string, pattern: '^[A-Z0-9][A-Z0-9_.-]{1,79}$'}
         title: {type: string, minLength: 3, maxLength: 250}
         reason: {type: string, minLength: 3, maxLength: 4000}
+        options: {type: array, uniqueItems: true, maxItems: 20, items: {type: string, minLength: 3, maxLength: 2000}}
+        recommendation: {type: string, minLength: 3, maxLength: 4000}
         ownerId: {type: string, format: uuid}
         sourceBaselineId: {type: string, format: uuid}
         source: {$ref: '#/components/schemas/ChangeSource'}
@@ -8525,11 +8997,14 @@ components:
       additionalProperties: false
     UpdateChangeRequestRequest:
       type: object
-      required: [expectedVersion, sourceBaselineId, impact]
+      required: [expectedVersion]
+      minProperties: 2
       properties:
         expectedVersion: {type: integer, minimum: 1}
         title: {type: string, minLength: 3, maxLength: 250}
         reason: {type: string, minLength: 3, maxLength: 4000}
+        options: {type: array, uniqueItems: true, maxItems: 20, items: {type: string, minLength: 3, maxLength: 2000}}
+        recommendation: {type: [string, 'null'], maxLength: 4000}
         ownerId: {type: string, format: uuid}
         sourceBaselineId: {type: string, format: uuid}
         impact: {$ref: '#/components/schemas/ChangeImpactDraft'}
@@ -8543,20 +9018,14 @@ components:
         expectedVersion: {type: integer, minimum: 1}
         comment: {type: string, maxLength: 2000}
       additionalProperties: false
-      description: Server requires all six current impact dimensions and freezes their canonical SHA-256 snapshot
+      description: Server requires all six current impact dimensions and recommendation; sourceBaselineId is required when schedule.requiresRebaseline is true; then freezes canonical impact and approval-input hashes
     ChangeDecisionRequest:
       type: object
-      required: [decision, expectedVersion]
+      required: [decision, expectedVersion, comment]
       properties:
         decision: {$ref: '#/components/schemas/RiskChangeDecision'}
         expectedVersion: {type: integer, minimum: 1}
         comment: {type: string, minLength: 3, maxLength: 2000}
-      allOf:
-        - if:
-            required: [decision]
-            properties: {decision: {enum: [RETURN, REJECT]}}
-          then:
-            required: [comment]
       additionalProperties: false
     ClosureDecisionRequest:
       type: object
@@ -8574,6 +9043,86 @@ components:
         nextCursor: {type: [string, 'null']}
         limit: {type: integer, minimum: 1, maximum: 100}
       additionalProperties: false
+    RiskSummary:
+      type: object
+      required: [id, projectId, packageId, code, category, ownerId, reviewDate, status, inherentProbability, inherentImpactRating, inherentExposure, inherentLevel, residualProbability, residualImpactRating, residualExposure, residualLevel, effectiveExposure, effectiveLevel, scoringVersion, thresholdVersion, versionNo]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        packageId: {type: [string, 'null'], format: uuid}
+        code: {type: string}
+        category: {type: string}
+        ownerId: {type: string, format: uuid}
+        reviewDate: {type: string, format: date}
+        status: {$ref: '#/components/schemas/RiskStatus'}
+        inherentProbability: {type: integer, minimum: 1, maximum: 5, readOnly: true}
+        inherentImpactRating: {type: integer, minimum: 1, maximum: 5, readOnly: true}
+        inherentExposure: {type: integer, minimum: 1, maximum: 25, readOnly: true}
+        inherentLevel: {$ref: '#/components/schemas/ExposureLevel'}
+        residualProbability: {type: [integer, 'null'], minimum: 1, maximum: 5, readOnly: true}
+        residualImpactRating: {type: [integer, 'null'], minimum: 1, maximum: 5, readOnly: true}
+        residualExposure: {type: [integer, 'null'], minimum: 1, maximum: 25, readOnly: true}
+        residualLevel:
+          oneOf:
+            - $ref: '#/components/schemas/ExposureLevel'
+            - type: 'null'
+        effectiveExposure: {type: integer, minimum: 1, maximum: 25, readOnly: true}
+        effectiveLevel: {$ref: '#/components/schemas/ExposureLevel'}
+        scoringVersion: {type: string}
+        thresholdVersion: {type: string}
+        versionNo: {type: integer, minimum: 1}
+      additionalProperties: false
+    IssueSummary:
+      type: object
+      required: [id, projectId, packageId, code, title, severity, ownerId, targetDate, status, sourceRiskId, versionNo]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        packageId: {type: [string, 'null'], format: uuid}
+        code: {type: string}
+        title: {type: string}
+        severity: {$ref: '#/components/schemas/IssueSeverity'}
+        ownerId: {type: string, format: uuid}
+        targetDate: {type: string, format: date}
+        status: {$ref: '#/components/schemas/IssueStatus'}
+        sourceRiskId: {type: [string, 'null'], format: uuid}
+        versionNo: {type: integer, minimum: 1}
+      additionalProperties: false
+    RiskIssueActionSummary:
+      type: object
+      required: [id, projectId, packageId, riskId, issueId, code, actionType, title, ownerId, dueDate, status, versionNo]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        packageId: {type: [string, 'null'], format: uuid}
+        riskId: {type: [string, 'null'], format: uuid}
+        issueId: {type: [string, 'null'], format: uuid}
+        code: {type: string}
+        actionType: {$ref: '#/components/schemas/RiskIssueActionType'}
+        title: {type: string}
+        ownerId: {type: string, format: uuid}
+        dueDate: {type: string, format: date}
+        status: {$ref: '#/components/schemas/RiskIssueActionStatus'}
+        versionNo: {type: integer, minimum: 1}
+      additionalProperties: false
+    ChangeRequestSummary:
+      type: object
+      required: [id, projectId, packageId, code, title, ownerId, requesterId, source, status, submittedAt, scheduleImpactApproved, versionNo, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        packageId: {type: [string, 'null'], format: uuid}
+        code: {type: string}
+        title: {type: string}
+        ownerId: {type: string, format: uuid}
+        requesterId: {type: string, format: uuid}
+        source: {$ref: '#/components/schemas/ChangeSource'}
+        status: {$ref: '#/components/schemas/ChangeRequestStatus'}
+        submittedAt: {type: [string, 'null'], format: date-time}
+        scheduleImpactApproved: {type: boolean}
+        versionNo: {type: integer, minimum: 1}
+        updatedAt: {type: string, format: date-time}
+      additionalProperties: false
     RiskCommandResponse:
       type: object
       required: [data, correlationId]
@@ -8586,6 +9135,32 @@ components:
       required: [data, correlationId]
       properties:
         data: {$ref: '#/components/schemas/Issue'}
+        correlationId: {type: string}
+      additionalProperties: false
+    RiskDetailResponse:
+      type: object
+      required: [data, closureCycles, closureCycleMeta, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/Risk'}
+        closureCycles:
+          type: array
+          maxItems: 100
+          items: {$ref: '#/components/schemas/RiskIssueClosureCycle'}
+          description: Authorized immutable page ordered by sequenceNo/id; follow closureCycleMeta.nextCursor until null to retrieve complete history
+        closureCycleMeta: {$ref: '#/components/schemas/RiskChangePageMeta'}
+        correlationId: {type: string}
+      additionalProperties: false
+    IssueDetailResponse:
+      type: object
+      required: [data, closureCycles, closureCycleMeta, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/Issue'}
+        closureCycles:
+          type: array
+          maxItems: 100
+          items: {$ref: '#/components/schemas/RiskIssueClosureCycle'}
+          description: Authorized immutable page ordered by sequenceNo/id; follow closureCycleMeta.nextCursor until null to retrieve complete history
+        closureCycleMeta: {$ref: '#/components/schemas/RiskChangePageMeta'}
         correlationId: {type: string}
       additionalProperties: false
     RiskIssueActionCommandResponse:
@@ -8606,7 +9181,7 @@ components:
       type: object
       required: [data, meta, correlationId]
       properties:
-        data: {type: array, items: {$ref: '#/components/schemas/Risk'}}
+        data: {type: array, items: {$ref: '#/components/schemas/RiskSummary'}}
         meta: {$ref: '#/components/schemas/RiskChangePageMeta'}
         correlationId: {type: string}
       additionalProperties: false
@@ -8614,7 +9189,7 @@ components:
       type: object
       required: [data, meta, correlationId]
       properties:
-        data: {type: array, items: {$ref: '#/components/schemas/Issue'}}
+        data: {type: array, items: {$ref: '#/components/schemas/IssueSummary'}}
         meta: {$ref: '#/components/schemas/RiskChangePageMeta'}
         correlationId: {type: string}
       additionalProperties: false
@@ -8622,25 +9197,51 @@ components:
       type: object
       required: [data, meta, correlationId]
       properties:
-        data: {type: array, items: {$ref: '#/components/schemas/ChangeRequest'}}
+        data: {type: array, items: {$ref: '#/components/schemas/ChangeRequestSummary'}}
         meta: {$ref: '#/components/schemas/RiskChangePageMeta'}
         correlationId: {type: string}
       additionalProperties: false
+    RiskHeatmapCell:
+      type: object
+      required: [probability, impactRating, count]
+      properties:
+        probability: {type: integer, minimum: 1, maximum: 5}
+        impactRating: {type: integer, minimum: 1, maximum: 5}
+        count: {type: integer, minimum: 0}
+      additionalProperties: false
+    RiskHeatmapVersionGroup:
+      type: object
+      required: [scoringVersion, thresholdVersion, inherentCells, residualCells, residualMissingCount]
+      properties:
+        scoringVersion: {type: string, minLength: 1, maxLength: 100}
+        thresholdVersion: {type: string, minLength: 1, maxLength: 100}
+        inherentCells: {type: array, minItems: 25, maxItems: 25, items: {$ref: '#/components/schemas/RiskHeatmapCell'}, description: "Exactly one cell for every probability/impact pair, including zero counts"}
+        residualCells: {type: array, minItems: 25, maxItems: 25, items: {$ref: '#/components/schemas/RiskHeatmapCell'}, description: Complete residual assessments only; exactly 25 cells including zero counts}
+        residualMissingCount: {type: integer, minimum: 0}
+      additionalProperties: false
+    RiskHeatmap:
+      type: object
+      required: [filteredRiskCount, versionGroups]
+      properties:
+        filteredRiskCount: {type: integer, minimum: 0, description: "Count across the complete authorized Risk filter, not the API-143 page"}
+        versionGroups: {type: array, items: {$ref: '#/components/schemas/RiskHeatmapVersionGroup'}, description: One group per scoringVersion/thresholdVersion pair; never silently truncated}
+      additionalProperties: false
     RiskChangeSummary:
       type: object
-      required: [riskTotal, highRiskCount, criticalRiskCount, issueTotal, criticalIssueCount, overdueActionCount, pendingChangeDecisionCount, topRisks, criticalIssues, overdueActions, pendingChangeRequests, calculatedAt]
+      required: [riskTotal, highRiskCount, criticalRiskCount, riskHeatmap, issueTotal, criticalIssueCount, overdueActionCount, pendingChangeDecisionCount, topRisks, criticalIssues, overdueActions, pendingChangeRequests, calculatedAt]
       properties:
         riskTotal: {type: integer, minimum: 0}
         highRiskCount: {type: integer, minimum: 0}
         criticalRiskCount: {type: integer, minimum: 0}
+        riskHeatmap: {$ref: '#/components/schemas/RiskHeatmap'}
         issueTotal: {type: integer, minimum: 0}
         criticalIssueCount: {type: integer, minimum: 0}
         overdueActionCount: {type: integer, minimum: 0}
         pendingChangeDecisionCount: {type: integer, minimum: 0}
-        topRisks: {type: array, maxItems: 10, items: {$ref: '#/components/schemas/Risk'}}
-        criticalIssues: {type: array, maxItems: 10, items: {$ref: '#/components/schemas/Issue'}}
-        overdueActions: {type: array, maxItems: 10, items: {$ref: '#/components/schemas/RiskIssueAction'}}
-        pendingChangeRequests: {type: array, maxItems: 10, items: {$ref: '#/components/schemas/ChangeRequest'}}
+        topRisks: {type: array, maxItems: 10, items: {$ref: '#/components/schemas/RiskSummary'}}
+        criticalIssues: {type: array, maxItems: 10, items: {$ref: '#/components/schemas/IssueSummary'}}
+        overdueActions: {type: array, maxItems: 10, items: {$ref: '#/components/schemas/RiskIssueActionSummary'}}
+        pendingChangeRequests: {type: array, maxItems: 10, items: {$ref: '#/components/schemas/ChangeRequestSummary'}}
         calculatedAt: {type: string, format: date-time}
       additionalProperties: false
     RiskChangeSummaryResponse:
@@ -8658,7 +9259,7 @@ components:
         sourceType: {$ref: '#/components/schemas/RiskChangeSourceType'}
         sourceId: {type: string, format: uuid}
         eventType: {type: string, minLength: 1, maxLength: 100}
-        actorId: {type: string, format: uuid}
+        actorId: {type: [string, 'null'], format: uuid, description: Null only for allowlisted system/worker events}
         effectiveActorId: {type: [string, 'null'], format: uuid}
         versionNo: {type: integer, minimum: 1}
         summary: {type: string, maxLength: 2000, description: 'Safe redacted event summary, not raw audit payload'}
@@ -8678,6 +9279,29 @@ components:
       required: [data, meta, correlationId]
       properties:
         data: {type: array, items: {$ref: '#/components/schemas/ScheduleBaseline'}}
+        meta: {$ref: '#/components/schemas/RiskChangePageMeta'}
+        correlationId: {type: string}
+      additionalProperties: false
+    RiskIssueActionListResponse:
+      type: object
+      required: [data, meta, correlationId]
+      properties:
+        data: {type: array, items: {$ref: '#/components/schemas/RiskIssueActionSummary'}}
+        meta: {$ref: '#/components/schemas/RiskChangePageMeta'}
+        correlationId: {type: string}
+      additionalProperties: false
+    UserAssignee:
+      type: object
+      required: [id, displayName]
+      properties:
+        id: {type: string, format: uuid}
+        displayName: {type: string, minLength: 1, maxLength: 200}
+      additionalProperties: false
+    UserAssigneeListResponse:
+      type: object
+      required: [data, meta, correlationId]
+      properties:
+        data: {type: array, items: {$ref: '#/components/schemas/UserAssignee'}}
         meta: {$ref: '#/components/schemas/RiskChangePageMeta'}
         correlationId: {type: string}
       additionalProperties: false

@@ -51,6 +51,13 @@ export interface AppConfig {
     calculationVersion: string;
     thresholdVersion: string;
   };
+  riskChange: {
+    highExposureThreshold: number;
+    criticalExposureThreshold: number;
+    alertScanIntervalMs: number;
+    scoringVersion: string;
+    thresholdVersion: string;
+  };
 }
 
 function required(name: string): string {
@@ -98,6 +105,14 @@ function keyPrefix(): string {
   return value;
 }
 
+function versionName(name: string, fallback: string): string {
+  const value = process.env[name]?.trim() || fallback;
+  if (!/^[A-Z][A-Z0-9_]{2,99}$/.test(value)) {
+    throw new Error(`${name} must contain 3 to 100 uppercase letters, digits or underscores`);
+  }
+  return value;
+}
+
 function environmentCipher(): CipherService {
   return new CipherService(parseCipherKey(process.env.CIPHER_KEY));
 }
@@ -126,6 +141,11 @@ export function loadDatabaseConfig(): AppConfig['database'] {
 export function loadAppConfig(): AppConfig {
   const accessTtlSeconds = integer('JWT_ACCESS_TTL_SECONDS', 900, 60, 86_400);
   const refreshTtlSeconds = integer('JWT_REFRESH_TTL_SECONDS', 604_800, 300, 31_536_000);
+  const highExposureThreshold = integer('RISK_HIGH_EXPOSURE_THRESHOLD', 15, 1, 24);
+  const criticalExposureThreshold = integer('RISK_CRITICAL_EXPOSURE_THRESHOLD', 20, 2, 25);
+  if (highExposureThreshold >= criticalExposureThreshold) {
+    throw new Error('RISK_HIGH_EXPOSURE_THRESHOLD must be lower than RISK_CRITICAL_EXPOSURE_THRESHOLD');
+  }
   return {
     app: {
       port: integer('APP_PORT', 3000, 1, 65_535),
@@ -174,6 +194,17 @@ export function loadAppConfig(): AppConfig {
       maxAbsoluteLagDays: integer('SCHEDULE_MAX_ABS_LAG_DAYS', 3_650, 0, 3_650),
       calculationVersion: 'SPI_WEIGHTED_LINEAR_V1',
       thresholdVersion: 'SCHEDULE_THRESHOLDS_V1'
+    },
+    riskChange: {
+      highExposureThreshold,
+      criticalExposureThreshold,
+      alertScanIntervalMs: integer(
+        'RISK_CHANGE_ALERT_SCAN_INTERVAL_MS', 60_000, 1_000, 86_400_000
+      ),
+      scoringVersion: 'RISK_SCORING_5X5_MAX_V1',
+      thresholdVersion: versionName(
+        'RISK_CHANGE_THRESHOLD_VERSION', 'RISK_CHANGE_THRESHOLDS_V1'
+      )
     }
   };
 }

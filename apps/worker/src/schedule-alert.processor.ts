@@ -1,17 +1,18 @@
-import { createHash, randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import type { WorkerConfig } from './config';
 import type { DomainEventJob } from './domain-event';
+import type { DomainEventProcessor } from './domain-event.processor';
+import {
+  authorizedRecipients,
+  notificationDedupKey,
+  removeStaleNotifications,
+  upsertNotification
+} from './notification-projection';
 import {
   evaluateScheduleAlerts, type ScheduleAlertActivity, type ScheduleAlertDependency
 } from './schedule-alert.policy';
 import { safeErrorCode } from './safe-error';
 import type { WorkerLogger } from './worker-logger';
-
-export interface DomainEventProcessor {
-  supports(event: DomainEventJob): boolean;
-  process(client: PoolClient, event: DomainEventJob): Promise<void>;
-}
 
 interface ScheduleRow {
   tenantId: string;
@@ -64,21 +65,19 @@ export class ScheduleAlertProcessor implements DomainEventProcessor {
     `, [tenantId, projectId]);
     const schedule = scheduleResult.rows[0];
     if (!schedule) return 0;
-    const [activitiesResult, dependenciesResult] = await Promise.all([
-      client.query<ActivityRow>(`
-        SELECT id, package_id AS "packageId", planned_start::text AS "plannedStart",
-          planned_finish::text AS "plannedFinish", duration_work_days AS "durationWorkDays",
-          percent_complete::text AS "percentComplete", status
-        FROM schedule_activities
-        WHERE tenant_id = $1 AND project_id = $2
-      `, [tenantId, projectId]),
-      client.query<ScheduleAlertDependency>(`
-        SELECT predecessor_id AS "predecessorId", successor_id AS "successorId",
-          dependency_type AS "dependencyType", lag_work_days AS "lagWorkDays"
-        FROM activity_dependencies
-        WHERE tenant_id = $1 AND project_id = $2
-      `, [tenantId, projectId])
-    ]);
+    const activitiesResult = await client.query<ActivityRow>(`
+      SELECT id, package_id AS "packageId", planned_start::text AS "plannedStart",
+        planned_finish::text AS "plannedFinish", duration_work_days AS "durationWorkDays",
+        percent_complete::text AS "percentComplete", status
+      FROM schedule_activities
+      WHERE tenant_id = $1 AND project_id = $2
+    `, [tenantId, projectId]);
+    const dependenciesResult = await client.query<ScheduleAlertDependency>(`
+      SELECT predecessor_id AS "predecessorId", successor_id AS "successorId",
+        dependency_type AS "dependencyType", lag_work_days AS "lagWorkDays"
+      FROM activity_dependencies
+      WHERE tenant_id = $1 AND project_id = $2
+    `, [tenantId, projectId]);
     const candidates = evaluateScheduleAlerts(
       activitiesResult.rows,
       dependenciesResult.rows,
@@ -88,70 +87,54 @@ export class ScheduleAlertProcessor implements DomainEventProcessor {
     );
     const activityById = new Map(activitiesResult.rows.map((row) => [row.id, row]));
     let inserted = 0;
+    const currentDedupKeys: string[] = [];
     for (const candidate of candidates) {
       const activity = activityById.get(candidate.activityId)!;
-      const recipients = await this.recipients(
-        client, tenantId, projectId, activity.packageId
-      );
+      const recipients = await authorizedRecipients(client, {
+        tenantId,
+        projectId,
+        packageId: activity.packageId,
+        requiredPermissions: ['schedule.read']
+      });
       for (const recipientId of recipients) {
-        const dedupKey = this.dedupKey(
-          tenantId, projectId, candidate.activityId, recipientId,
-          candidate.alertType, schedule.dataDate
-        );
-        const result = await client.query(`
-          INSERT INTO schedule_notifications (
-            id, tenant_id, recipient_user_id, project_id, activity_id,
-            source_type, source_id, alert_type, priority, object_link,
-            reason, due_at, data_date, threshold_version, dedup_key, status
-          ) VALUES (
-            $1, $2, $3, $4, $5,
-            'ScheduleActivity', $5, $6, $7, $8,
-            $9, $10, $11, $12, $13, 'UNREAD'
-          ) ON CONFLICT ON CONSTRAINT uq_schedule_notification_dedup DO NOTHING
-        `, [
-          randomUUID(), tenantId, recipientId, projectId, candidate.activityId,
-          candidate.alertType, candidate.priority,
-          `/projects/${projectId}/schedule?activityId=${candidate.activityId}`,
-          candidate.alertType === 'OVERDUE'
+        const dedupKey = notificationDedupKey({
+          tenantId,
+          projectId,
+          packageId: activity.packageId,
+          sourceType: 'ScheduleActivity',
+          sourceId: candidate.activityId,
+          recipientId,
+          alertType: candidate.alertType,
+          dueAt: candidate.dueAt,
+          thresholdVersion: this.config.schedule.thresholdVersion
+        });
+        currentDedupKeys.push(dedupKey);
+        const result = await upsertNotification(client, {
+          tenantId,
+          recipientId,
+          projectId,
+          packageId: activity.packageId,
+          activityId: candidate.activityId,
+          sourceType: 'ScheduleActivity',
+          sourceId: candidate.activityId,
+          alertType: candidate.alertType,
+          priority: candidate.priority,
+          objectLink: `/projects/${projectId}/schedule?activityId=${candidate.activityId}`,
+          reason: candidate.alertType === 'OVERDUE'
             ? 'Activity đã quá ngày kế hoạch và chưa hoàn thành'
             : `Activity có total float ${candidate.totalFloatWorkDays} ngày`,
-          candidate.dueAt, schedule.dataDate,
-          this.config.schedule.thresholdVersion, dedupKey
-        ]);
-        inserted += result.rowCount ?? 0;
+          dueAt: candidate.dueAt,
+          dataDate: schedule.dataDate,
+          thresholdVersion: this.config.schedule.thresholdVersion,
+          dedupKey
+        });
+        if (result.inserted) inserted += 1;
       }
     }
+    await removeStaleNotifications(
+      client, tenantId, projectId, ['ScheduleActivity'], currentDedupKeys
+    );
     return inserted;
-  }
-
-  private async recipients(
-    client: PoolClient, tenantId: string, projectId: string, packageId: string | null
-  ): Promise<string[]> {
-    const result = await client.query<{ userId: string }>(`
-      SELECT DISTINCT assignment.user_account_id AS "userId"
-      FROM role_assignments assignment
-      JOIN roles role
-        ON role.id = assignment.role_id AND role.tenant_id = assignment.tenant_id
-      JOIN user_accounts account
-        ON account.id = assignment.user_account_id AND account.tenant_id = assignment.tenant_id
-      JOIN projects project
-        ON project.id = $2 AND project.tenant_id = assignment.tenant_id
-      WHERE assignment.tenant_id = $1
-        AND assignment.status = 'ACTIVE'
-        AND role.status = 'ACTIVE'
-        AND account.status = 'ACTIVE'
-        AND assignment.effective_from <= CURRENT_TIMESTAMP
-        AND (assignment.effective_to IS NULL OR assignment.effective_to > CURRENT_TIMESTAMP)
-        AND role.permissions ? 'schedule.read'
-        AND (
-          assignment.scope_type = 'TENANT'
-          OR (assignment.scope_type = 'PORTFOLIO' AND assignment.scope_id = project.portfolio_id)
-          OR (assignment.scope_type = 'PROJECT' AND assignment.scope_id = project.id)
-          OR (assignment.scope_type = 'PACKAGE' AND assignment.scope_id = $3)
-        )
-      ORDER BY assignment.user_account_id
-    `, [tenantId, projectId, packageId]);
-    return result.rows.map((row) => row.userId);
   }
 
   private projectId(payload: Record<string, unknown>): string | null {
@@ -159,16 +142,6 @@ export class ScheduleAlertProcessor implements DomainEventProcessor {
     return typeof value === 'string'
       && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
       ? value : null;
-  }
-
-  private dedupKey(
-    tenantId: string, projectId: string, activityId: string, recipientId: string,
-    alertType: string, dataDate: string
-  ): string {
-    return createHash('sha256').update([
-      tenantId, projectId, activityId, recipientId, alertType, dataDate,
-      this.config.schedule.thresholdVersion
-    ].join(':')).digest('hex');
   }
 }
 

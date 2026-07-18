@@ -11,6 +11,8 @@ const props = defineProps<{
   scheduleVersion: number;
   dataDate: string;
   canSubmit: boolean;
+  canRebaseline: boolean;
+  approvedChangeRequestId?: string;
   canDecide: boolean;
   decisionUnavailableReason?: string;
   busy: boolean;
@@ -43,6 +45,20 @@ function submitBaseline(): void {
     dataDate: submitForm.dataDate,
     reason: submitForm.reason.trim(),
     impactSummary: submitForm.impactSummary.trim(),
+    expectedScheduleVersion: props.scheduleVersion
+  });
+}
+
+function submitRebaseline(): void {
+  error.value = '';
+  if (!props.approvedChangeRequestId) {
+    error.value = 'Rebaseline cần immutable approved Change reference.';
+    return;
+  }
+  emit('submit', {
+    baselineType: 'REBASELINE',
+    dataDate: submitForm.dataDate,
+    approvedChangeRequestId: props.approvedChangeRequestId,
     expectedScheduleVersion: props.scheduleVersion
   });
 }
@@ -86,7 +102,14 @@ function decide(): void {
       <label class="schedule-form-grid__wide">Tóm tắt tác động<textarea v-model.trim="submitForm.impactSummary" rows="3" minlength="3" maxlength="4000" required /></label>
       <div class="schedule-command-form__actions schedule-form-grid__wide"><el-button native-type="submit" type="primary" :loading="busy">Submit baseline</el-button></div>
     </form>
-    <p v-if="canSubmit && baseline?.status === 'APPROVED'" class="schedule-readonly-note">Rebaseline chưa khả dụng cho đến khi US-004 cung cấp approved change request cùng project.</p>
+    <form v-if="canSubmit && canRebaseline && baseline?.status === 'APPROVED' && approvedChangeRequestId" class="schedule-form-grid desktop-decision" @submit.prevent="submitRebaseline">
+      <label>Loại baseline<input value="REBASELINE" disabled /></label>
+      <label>Data date<input v-model="submitForm.dataDate" type="date" required /></label>
+      <label class="schedule-form-grid__wide">Approved Change reference<input :value="approvedChangeRequestId" disabled /></label>
+      <p class="schedule-readonly-note schedule-form-grid__wide">Reason và impact được server lấy từ immutable approved Change snapshot; browser không được gửi free-text thay thế.</p>
+      <div class="schedule-command-form__actions schedule-form-grid__wide"><el-button native-type="submit" type="primary" :loading="busy">Submit rebaseline</el-button></div>
+    </form>
+    <p v-else-if="canSubmit && baseline?.status === 'APPROVED'" class="schedule-readonly-note">Mở Schedule từ một approved Change có schedule impact để tạo rebaseline.</p>
     <form v-if="canDecide && submittedBaseline" class="schedule-form-grid schedule-decision-form" @submit.prevent="decide">
       <label>Quyết định<select v-model="decisionForm.decision"><option value="APPROVE">Approve</option><option value="RETURN">Return</option><option value="REJECT">Reject</option></select></label>
       <label class="schedule-form-grid__wide">Nhận xét<textarea v-model.trim="decisionForm.comment" rows="3" maxlength="2000" :required="decisionForm.decision !== 'APPROVE'" /></label>

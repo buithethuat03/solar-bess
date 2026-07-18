@@ -17,6 +17,9 @@ jobs:
     name: CI
     runs-on: [self-hosted, linux, x64, solar-bess-deploy]
     timeout-minutes: 35
+    env:
+      TEST_POSTGRES_HOST_PORT: "15433"
+      TEST_REDIS_HOST_PORT: "16380"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,8 +35,9 @@ jobs:
 
       - name: Start disposable integration dependencies
         run: |
-          sudo -n docker compose --project-name solar-bess-ci -f docker-compose.test.yml down --volumes --remove-orphans
-          sudo -n docker compose --project-name solar-bess-ci -f docker-compose.test.yml up -d --wait postgres-test redis-test
+          npm run worker:test:secrets
+          sudo -n env TEST_POSTGRES_HOST_PORT="$TEST_POSTGRES_HOST_PORT" TEST_REDIS_HOST_PORT="$TEST_REDIS_HOST_PORT" docker compose --project-name solar-bess-ci -f docker-compose.test.yml down --volumes --remove-orphans
+          sudo -n env TEST_POSTGRES_HOST_PORT="$TEST_POSTGRES_HOST_PORT" TEST_REDIS_HOST_PORT="$TEST_REDIS_HOST_PORT" docker compose --project-name solar-bess-ci -f docker-compose.test.yml up -d --wait postgres-test redis-test
 
       - name: Lint
         run: npm run lint
@@ -45,6 +49,11 @@ jobs:
         run: npm run test:unit
 
       - name: Integration tests
+        env:
+          DATABASE_URL: postgresql://solar_bess_test:solar_bess_test@127.0.0.1:15433/solar_bess_test
+          REDIS_PORT: "16380"
+          WORKER_TEST_DATABASE_PORT: "15433"
+          WORKER_TEST_REDIS_PORT: "16380"
         run: npm run test:integration
 
       - name: Validate OpenAPI
@@ -55,7 +64,7 @@ jobs:
 
       - name: Stop disposable integration dependencies
         if: always()
-        run: sudo -n docker compose --project-name solar-bess-ci -f docker-compose.test.yml down --volumes --remove-orphans
+        run: sudo -n env TEST_POSTGRES_HOST_PORT="$TEST_POSTGRES_HOST_PORT" TEST_REDIS_HOST_PORT="$TEST_REDIS_HOST_PORT" docker compose --project-name solar-bess-ci -f docker-compose.test.yml down --volumes --remove-orphans
 
   deploy:
     name: Deploy EC2 test

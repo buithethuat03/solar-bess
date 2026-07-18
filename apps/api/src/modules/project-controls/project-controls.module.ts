@@ -7,6 +7,7 @@ import {
 } from '../../database/entities';
 import { IdentityAccessModule } from '../identity-access/identity-access.module';
 import { OperationalFoundationModule } from '../operational-foundation/operational-foundation.module';
+import { RiskChangeModule } from '../risk-change/risk-change.module';
 import { ProjectControlsController } from './project-controls.controller';
 import { ProjectControlsService } from './project-controls.service';
 
@@ -14,6 +15,7 @@ import { ProjectControlsService } from './project-controls.service';
   imports: [
     IdentityAccessModule,
     OperationalFoundationModule,
+    RiskChangeModule,
     TypeOrmModule.forFeature([
       ActivityDependencyEntity, AuditEventEntity, CompanyEntity, PackageEntity,
       ProgressUpdateEntity, ProjectEntity, ProjectScheduleEntity, ScheduleActivityEntity,

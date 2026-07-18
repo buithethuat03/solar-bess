@@ -6,7 +6,7 @@ import { EventConsumptionStore } from './event-consumption.store';
 import { bullConnectionOptions, bullProducerConnectionOptions } from './outbox.publisher';
 import { safeErrorCode } from './safe-error';
 import type { WorkerLogger } from './worker-logger';
-import type { DomainEventProcessor } from './schedule-alert.processor';
+import type { DomainEventProcessor } from './domain-event.processor';
 
 interface DeadLetterEvent extends DomainEventJob {
   failedAt: string;

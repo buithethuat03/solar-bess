@@ -11,7 +11,8 @@ import { PermissionGuard } from '../identity-access/permission.guard';
 import {
   ApplyScheduleDraftDto, BaselineDecisionDto, CreatePackageDto, LookAheadExportQueryDto,
   PackageListQueryDto,
-  ProgressHistoryQueryDto, ProgressUpdateDto, ScheduleQueryDto, SubmitScheduleBaselineDto
+  ProgressHistoryQueryDto, ProgressUpdateDto, ScheduleBaselineListQueryDto, ScheduleQueryDto,
+  SubmitScheduleBaselineDto
 } from './dto/project-controls.dto';
 import { ProjectControlsService } from './project-controls.service';
 
@@ -84,6 +85,23 @@ export class ProjectControlsController {
     return this.resource(await this.service.applyDraft(
       this.context(request), projectId, input, this.idempotencyKey(idempotencyKey)
     ), request);
+  }
+
+  @Get('projects/:projectId/schedule-baselines')
+  @RequirePermission('schedule.read', 'PROJECT')
+  async listBaselinesByApprovedChange(
+    @Req() request: ContextRequest,
+    @Param('projectId', new ParseUUIDPipe()) projectId: string,
+    @Query() query: ScheduleBaselineListQueryDto
+  ) {
+    const result = await this.service.listBaselinesByApprovedChange(
+      this.context(request), projectId, query
+    );
+    return {
+      data: result.items,
+      meta: { nextCursor: result.nextCursor, limit: query.limit },
+      correlationId: request.correlationId
+    };
   }
 
   @Post('projects/:projectId/schedule-baselines')

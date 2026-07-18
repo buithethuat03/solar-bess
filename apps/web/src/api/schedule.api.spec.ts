@@ -98,4 +98,13 @@ describe('Schedule API — API-034…037/140/141', () => {
       '/v1/projects/project-id/schedule-look-ahead.csv?dataDate=2026-07-12&lookAheadDays=21'
     );
   });
+
+  it('serializes approved Change reverse trace through API-159', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      data: [], meta: { nextCursor: null, limit: 50 }, correlationId: 'c'
+    }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+    await scheduleApi.listBaselinesByApprovedChange(auth, 'project-id', 'change-id', 'cursor-id', 100);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/v1/projects/project-id/schedule-baselines?approvedChangeRequestId=change-id&cursor=cursor-id&limit=100');
+  });
 });

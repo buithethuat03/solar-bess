@@ -7,7 +7,9 @@ const names = [
   'REDIS_PASSWORD', 'RATE_LIMIT_HASH_SECRET', 'REDIS_HOST', 'REDIS_PORT',
   'AUTH_RATE_LIMIT_MAX_ATTEMPTS', 'AUTH_RATE_LIMIT_WINDOW_SECONDS', 'DATABASE_HOST_OVERRIDE',
   'SCHEDULE_NEAR_CRITICAL_FLOAT_DAYS', 'SCHEDULE_DEFAULT_LOOKAHEAD_DAYS',
-  'SCHEDULE_IMPORT_MAX_ROWS', 'SCHEDULE_MAX_ABS_LAG_DAYS'
+  'SCHEDULE_IMPORT_MAX_ROWS', 'SCHEDULE_MAX_ABS_LAG_DAYS',
+  'RISK_HIGH_EXPOSURE_THRESHOLD', 'RISK_CRITICAL_EXPOSURE_THRESHOLD',
+  'RISK_CHANGE_ALERT_SCAN_INTERVAL_MS', 'RISK_CHANGE_THRESHOLD_VERSION'
 ] as const;
 const original = new Map(names.map((name) => [name, process.env[name]]));
 
@@ -29,6 +31,11 @@ function configure(): void {
   process.env.RATE_LIMIT_HASH_SECRET = cipher.encrypt('r'.repeat(32));
   process.env.AUTH_RATE_LIMIT_MAX_ATTEMPTS = '7';
   process.env.AUTH_RATE_LIMIT_WINDOW_SECONDS = '42';
+  process.env.SCHEDULE_IMPORT_MAX_ROWS = '5000';
+  process.env.RISK_HIGH_EXPOSURE_THRESHOLD = '15';
+  process.env.RISK_CRITICAL_EXPOSURE_THRESHOLD = '20';
+  process.env.RISK_CHANGE_ALERT_SCAN_INTERVAL_MS = '60000';
+  process.env.RISK_CHANGE_THRESHOLD_VERSION = 'RISK_CHANGE_THRESHOLDS_V1';
 }
 
 describe('typed encrypted environment — SEC-117/SEC-118', () => {
@@ -48,6 +55,13 @@ describe('typed encrypted environment — SEC-117/SEC-118', () => {
       maxAbsoluteLagDays: 3_650,
       calculationVersion: 'SPI_WEIGHTED_LINEAR_V1'
     });
+    expect(config.riskChange).toEqual({
+      highExposureThreshold: 15,
+      criticalExposureThreshold: 20,
+      alertScanIntervalMs: 60_000,
+      scoringVersion: 'RISK_SCORING_5X5_MAX_V1',
+      thresholdVersion: 'RISK_CHANGE_THRESHOLDS_V1'
+    });
   });
 
   it('fails closed for plaintext credentials and out-of-range settings', () => {
@@ -60,6 +74,13 @@ describe('typed encrypted environment — SEC-117/SEC-118', () => {
     configure();
     process.env.SCHEDULE_IMPORT_MAX_ROWS = '20001';
     expect(() => loadAppConfig()).toThrow('SCHEDULE_IMPORT_MAX_ROWS must be an integer');
+    configure();
+    process.env.RISK_HIGH_EXPOSURE_THRESHOLD = '20';
+    process.env.RISK_CRITICAL_EXPOSURE_THRESHOLD = '20';
+    expect(() => loadAppConfig()).toThrow('RISK_HIGH_EXPOSURE_THRESHOLD must be lower');
+    configure();
+    process.env.RISK_CHANGE_THRESHOLD_VERSION = 'unsafe-version';
+    expect(() => loadAppConfig()).toThrow('RISK_CHANGE_THRESHOLD_VERSION must contain');
   });
 
   it('allows a validated non-secret host override for container topology', () => {

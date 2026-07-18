@@ -1,5 +1,5 @@
 import AppDataSource from 'src/database/data-source';
-import { runTestMigrations } from 'test/setup/run-migrations';
+import { revertThroughMigration, runTestMigrations } from 'test/setup/run-migrations';
 
 jest.setTimeout(30_000);
 
@@ -14,9 +14,7 @@ describe('Project Master migration — DB-002/003/006/007/009…011/013', () => 
   });
 
   it('runs down and up without leaving a partial schema', async () => {
-    await AppDataSource.undoLastMigration({ transaction: 'all' });
-    await AppDataSource.undoLastMigration({ transaction: 'all' });
-    await AppDataSource.undoLastMigration({ transaction: 'all' });
+    await revertThroughMigration('CreateProjectMaster1783728000000');
     const [down] = await AppDataSource.query<Array<{ roles: string | null; audit_column: string | null }>>(
       `SELECT to_regclass('public.roles')::text AS roles,
        (SELECT column_name FROM information_schema.columns

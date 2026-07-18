@@ -1,13 +1,13 @@
 # DevOps and Deployment — Nền tảng Solar & BESS
 
 > **Purpose:** Định nghĩa environment, source/build governance, CI/CD gates, artifact/migration/deployment/rollback, feature flags, secrets/IaC, observability, backup/DR và release checklist.
-> **Scope:** Operating model toàn platform; implementation profile cho base/auth, US-001, operational foundation/core US-003 và self-hosted CI/CD EC2 test. Production thật, registry và IaC vẫn Proposed/ngoài approval hiện tại.
-> **Source:** [SRS](./04-SRS.md), [Architecture](./06-solution-architecture.md), [Security](./09-security-and-permissions.md), [Test Strategy](./13-test-strategy.md), [Operational Foundation ExecPlan](../.agent/execplans/2026-07-11-operational-foundation.md), ADR-001…ADR-010, NFR-006…010/021/023 và SEC-115…132.
-> **Version:** 0.8
-> **Status:** Draft toàn platform; GitHub Actions self-hosted EC2 test Implemented và first end-to-end run Pass; production Proposed
+> **Scope:** Operating model toàn platform; implementation profile cho base/auth, US-001, operational foundation/core US-003, US-004 local implementation và self-hosted CI/CD EC2 test. Production thật, registry và IaC vẫn Proposed/ngoài approval hiện tại.
+> **Source:** [SRS](./04-SRS.md), [Architecture](./06-solution-architecture.md), [Security](./09-security-and-permissions.md), [Test Strategy](./13-test-strategy.md), [Operational Foundation ExecPlan](../.agent/execplans/2026-07-11-operational-foundation.md), [US-004 ExecPlan](../.agent/execplans/2026-07-12-risk-issue-change-us004.md), ADR-001…ADR-010, NFR-006…010/021/023 và SEC-115…132.
+> **Version:** 0.9
+> **Status:** Draft toàn platform; self-hosted pipeline/historical first run và US-004 isolated CI-like pre-push gate Implemented/Pass; current GitHub Actions actual deploy/public smoke Pending; production Proposed
 > **Owner:** Platform Engineering / SRE / Release Management (cá nhân: TBD)
-> **Updated:** 2026-07-12
-> **Approval:** Operational foundation/core US-003 EC2 test Approved — Product Owner delegated; production TBD — Architecture, Engineering, SRE, Security, QA và Data Owner
+> **Updated:** 2026-07-18
+> **Approval:** Operational foundation/core US-003 EC2 test và US-004 local implementation Approved — Product Owner delegated; US-004 current deployment và production TBD/Pending — Architecture, Engineering, SRE, Security, QA và Data Owner
 
 ## 1. Delivery principles
 
@@ -20,7 +20,7 @@
 - Rollback is tested; where data migration cannot roll back, use forward-fix/compatibility and explicit recovery.
 - OT remains autonomous. Deployment cannot create reverse OT route or control credential.
 - Base/auth slice có npm workspaces, Docker Compose và command kiểm chứng thực tế; không suy rộng kết quả này thành approval cho toàn platform.
-- PostgreSQL 17 + Redis + BullMQ + process/container worker riêng là implementation profile đã duyệt cho EC2 test; trạng thái chỉ **Planned** cho tới khi migration/test/deploy evidence hoàn tất, và không chấp nhận topology production.
+- PostgreSQL 17 + Redis + BullMQ + process/container worker riêng đã materialize cho EC2 test. Mỗi feature release, gồm US-004, vẫn chỉ được ghi deployed sau khi migration/test/health/public-smoke evidence riêng của release hoàn tất; topology production chưa được chấp nhận.
 
 ## 2. Environment strategy
 
@@ -53,7 +53,7 @@ Proposed model: protected main/trunk; short-lived feature/fix branches; pull req
 | Dependency | Lock/resolution file, SBOM, license/security review |
 | Release tag | Annotated/signed mechanism TBD; references artifact digest and changelog |
 
-GitHub Actions self-hosted workflow và deploy script cho EC2 test đã materialize trong repository. Runner registration, first GitHub execution và branch protection còn **Pending**; registry/signing/provenance và production CI/CD vẫn **Proposed**, không được suy rộng từ EC2 test.
+GitHub Actions self-hosted workflow, deploy script, runner registration và historical first execution `29178873783` đã materialize/Pass cho EC2 test. Branch protection còn **Pending**; US-004 chưa có current workflow/deploy run evidence nên vẫn **Pending deployment**. Registry/signing/provenance và production CI/CD vẫn **Proposed**, không được suy rộng từ EC2 test.
 
 ## 4. CI pipeline
 
@@ -83,9 +83,9 @@ flowchart LR
 |---|---|---|
 | Install | `npm ci` | Pass 2026-07-11; lockfile reproducible |
 | Format/lint | `npm run lint` | Pass, zero warning |
-| Type-check/compile | `npm run typecheck`; `npm run build` | Pass cho API và web |
-| Unit/property | `npm run test:unit` | 34/34 pass: API 15 và Web 19 |
-| Integration/API | `npm run test:integration` | 13/13 pass, 3 suite với PostgreSQL 17 disposable |
+| Type-check/compile | `npm run typecheck`; `npm run build` | Type-check API/Web/Worker Pass; build API/Web/Worker Pass, Web 1,697 modules |
+| Unit/property | `npm run test:unit` | Post-fix API 14 suites/52, Web 20 files/55, Worker 12 suites/61 = 168 Pass; Web focused closure exact-payload 4/4 |
+| Integration/API | `npm run test:integration` | Exact isolated ports: API 8 suites/49 + Worker 3 suites/11 = 60 Pass trước final branch hardening; backend changed closure paths post-fix 6/6 focused Pass; actual GitHub Actions rerun Pending |
 | UI/E2E/accessibility | `npm run test:e2e` | 3/3 pass: auth 2 + Project Master create/activate/Site/party/archive 1 |
 | Security scans | TBD SAST/SCA/secret/DAST/container/IaC | Not run |
 | Dependency audit | `npm audit --omit=dev`; `npm audit` | 0 vulnerability reported |
@@ -93,7 +93,8 @@ flowchart LR
 | Migration dry run | `npm run migration:show`; `npm run migration:revert`; `npm run migration:run`; `npm run migration:show` | TypeORM CLI show/up/down/up pass trên PostgreSQL test |
 | Artifact build/deploy | `sudo docker compose build/up` với timeout/poll | `postgres`/`api` healthy; `web` running; public health/database OK và HTTP 200; signing/SBOM TBD |
 | Operational foundation | Sau implementation: lint/type/unit/integration/build, PostgreSQL+Redis disposable, worker failure injection và Compose smoke | Approved/Planned; chưa chạy `TEST-180`, `TEST-200`, `TEST-202…208`, `TEST-231` cho foundation mới |
-| Core Project Controls deploy 2026-07-12 | Workspace build; migration/seed; `docker compose up -d --wait`; public root/login/health | PostgreSQL/Redis/API/worker/web healthy; HTTP 200 tại `54.255.223.131`; final US-003 integration/E2E vẫn pending |
+| Core Project Controls deploy 2026-07-12 | Workspace build; migration/seed; `docker compose up -d --wait`; public root/login/health | PostgreSQL/Redis/API/worker/web healthy; HTTP 200 tại `54.255.223.131`; current isolated integration Pass, full US-003 story E2E vẫn Pending |
+| US-004 pre-push close-out 2026-07-18 | lint/type/unit/integration/OpenAPI/build; migrations; isolated CI-like stack | Post-fix lint/type/unit 168/build Pass; exact-port full integration 60 Pass trước final branch hardening; backend HTTP 6/6 và Web focused 4/4/full 55 post-fix Pass; RiskChange migration 7/7; OpenAPI Pass; isolated stack 15433/16380 Pass. Actual GitHub Actions rerun/deploy/EC2/public/full E2E Pending |
 
 When code begins, PR cannot merge until lint, type-check, unit and required integration gates run and results are reported. A skipped gate needs reason, owner, expiry and risk decision.
 
@@ -101,6 +102,7 @@ When code begins, PR cannot merge until lint, type-check, unit and required inte
 
 - `.github/workflows/main-cicd.yml` chỉ nhận push `main` hoặc manual dispatch, chạy trên label dedicated `solar-bess-deploy`; không chạy pull request/fork code có Docker/deploy privilege.
 - Job `CI` dùng lockfile, disposable PostgreSQL/Redis và chạy đủ command mục 4.1. Job `Deploy EC2 test` phụ thuộc CI thành công.
+- `docker-compose.test.yml` parameterizes host ports. Main CI reserves isolated PostgreSQL/Redis host ports `15433/16380`, injects matching integration environment and passes `TEST_*` through privilege boundary via `sudo -n env ...`, avoiding collision with local `5433/6380` on the same self-hosted runner. Exact CI-like preflight after forward migrations Pass; actual GitHub Actions push/deploy remains Pending.
 - `scripts/deploy-ec2.sh` đọc env/secret ngoài Git, khóa deploy đồng thời, giữ Compose project hiện hữu `solar_bess_web`, tag image bằng commit SHA, chờ health và smoke `/web-health` + `/health`.
 - Trước rollout, image đang chạy được tag làm recovery point. Failure tự khôi phục application image; database migration không tự down và bắt buộc backward-compatible/forward-fix.
 - Runner `solar-bess-ec2-test` v2.335.1 chạy systemd dưới `ec2-user`; first run `29178873783` có CI/CD Succeeded. Preflight, branch protection và recovery theo [runbook self-hosted CI/CD](./17-self-hosted-cicd-runbook.md).
@@ -222,6 +224,13 @@ flowchart LR
 - Event schema supports old/new consumers during compatibility window; replay/DLQ plan.
 - Time-series/tag migration preserves source timestamp/unit/quality and never creates control message.
 - Data migration tool/engine/zero-downtime method is TBD after ADR-004/007.
+
+### 9.4 US-004 migration/rollout profile
+
+- Local migration chain includes `1783731000000-CreateRiskIssueControl`, `1783732000000-CreateChangeControl`, `1783733000000-GeneralizeNotifications`, `1783734000000-AddActionResidualRationale`, `1783735000000` live-schema constraint/function reconciliation and `1783736000000` existing seed role-grant/policy-v3 upgrade. Data handoff is complete; focused RiskChange migration 7/7 and exact-port full integration 60/60 Pass.
+- Migration inventory/pre-push rehearsal is Complete. Actual EC2 migration application and post-deploy verification remain part of the Pending deployment evidence; committed source/provenance still forbids automatic destructive down.
+- Required order: disposable migration up/down/up and full integration → CI-like isolated-port preflight → materialize secrets → migrate EC2 PostgreSQL → idempotent seed/role reconciliation → API/worker/web rollout → authenticated tenant/package/Change→REBASELINE smoke → public `/web-health` and `/health` → record release/SHA/container health.
+- Application rollback order is web → worker → API. Database migrations are not automatically reverted after committed Risk/Issue/Change/baseline provenance exists; containment disables routes/worker and uses compatible image/forward-fix unless preflight proves zero source rows and safe `down`.
 
 ## 10. Deployment and rollout
 
@@ -345,7 +354,7 @@ Security incident response owns containment/evidence; SRE owns service recovery;
 | Cost ceiling/team skills/managed vs self-hosted choices? | Finance/Engineering | Technology |
 | Disaster/incident exercise cadence and notification policy? | Security/BCM/Legal | Compliance |
 | Production Redis HA/persistence/eviction, BullMQ retention/concurrency/capacity và worker scaling? | SRE/Architecture/Security | Production acceptance; không chặn EC2 test |
-| First GitHub self-hosted run và branch protection? Registry, SBOM/signing/provenance và IaC production rollout? | Platform/Security | EC2 runner/first run Pending; production supply chain Planned |
+| Current US-004 GitHub self-hosted run/deploy and branch protection? Registry, SBOM/signing/provenance and IaC production rollout? | Platform/Security | Historical runner/first run and current isolated CI-like preflight Pass; actual US-004 GitHub Actions/EC2 deploy/public smoke and branch protection Pending; production supply chain Planned |
 
 ## 19. Changelog
 
@@ -359,3 +368,4 @@ Security incident response owns containment/evidence; SRE owns service recovery;
 | 0.6 | 2026-07-11 | Codex | Chốt operational foundation PostgreSQL/Redis/BullMQ/worker, DB-102…104, composite tenant FK và runtime rollout cho EC2 test | Approved/Planned; DB-101/105…111 chỉ reserve; production/hosted CI vẫn Proposed/Planned |
 | 0.7 | 2026-07-12 | Codex | Ghi Redis/worker/outbox + core US-003 Compose deployment, health/public smoke và Nest 11 literal-colon route fix | EC2 test Implemented/deployed; production/hosted CI/HTTPS vẫn Proposed |
 | 0.8 | 2026-07-12 | Codex | Thêm main self-hosted CI/CD, SHA image, serialized rollout, health/smoke/rollback và runner runbook | Repository implementation cho EC2 test; runner registration/first GitHub run Pending; production vẫn Proposed |
+| 0.9 | 2026-07-18 | Codex | Ghi US-004 completed local gate/migration/rollout boundary; parameterize ports, isolate CI PostgreSQL/Redis 15433/16380 và preserve `TEST_*` qua `sudo -n env` | Không đổi deployment scope; pre-push gate Pass, actual GitHub Actions/EC2 deploy/public smoke/full E2E Pending, production Proposed |
