@@ -18,6 +18,19 @@ File này ghi lịch sử thay đổi phạm vi, tài liệu và governance củ
 - **Trạng thái:** Proposed | Approved | Rejected | Implemented
 ```
 
+## 2026-07-18 — Publish canonical OpenAPI 3.1 qua Swagger UI
+
+- **Loại:** API tooling; DevOps; Test; Documentation; không thay đổi phạm vi nghiệp vụ baseline.
+- **Người yêu cầu/phê duyệt:** Người dùng/Product Owner yêu cầu tích hợp Swagger và commit để CI/CD deploy EC2 test ngày 2026-07-18.
+- **Mã bị ảnh hưởng:** `NFR-024`, `TEST-197`; không cấp `API-*` mới vì `/api/docs/` và `/api/docs/openapi.yaml` là technical publication surface, không phải domain operation.
+- **Trước thay đổi:** Canonical OpenAPI 3.1 chỉ tồn tại trong repository và được Redocly lint; runtime/Nginx không phục vụ Swagger UI hoặc machine-readable YAML.
+- **Sau thay đổi:** Nest fail-fast load trực tiếp `docs/openapi/openapi.yaml`, phục vụ Swagger UI/YAML khi `SWAGGER_ENABLED=true`; API image copy canonical asset, Nginx proxy same-origin và deploy script smoke/rollback kiểm cả UI lẫn OpenAPI version. Không dùng decorator để generate contract song song.
+- **Lý do:** Cho phép reviewer/consumer truy cập một contract canonical từ EC2 test mà không làm sai lệch 164 API ID hoặc trạng thái implementation từng operation.
+- **Artefact bị ảnh hưởng:** `apps/api` bootstrap/OpenAPI loader/dependency/test/image, `apps/web/nginx.conf`, Compose/env/deploy script, `docs/08-api-specification.md`, `docs/13-test-strategy.md`, `docs/14-devops-and-deployment.md`, `docs/INDEX.md`, `docs/CHANGELOG.md`.
+- **Migration/tương thích:** Không đổi database/schema/business API; feature flag độc lập mặc định false ngoài Compose. EC2 test Compose mặc định bật; production expose vẫn cần explicit decision, HTTPS và access policy.
+- **Validation hiện có:** Root lint/type/build và canonical OpenAPI lint Pass; unit API 15 suites/55 + Web 20/55 + Worker 12/61 = 171; isolated full integration API 8/50 + Worker 3/11 = 61. Loader unit 3/3, Identity/Swagger integration 9/9, production Docker image/Nginx UI+CSS+init-JS+YAML và public EC2 worktree smoke đều Pass.
+- **Trạng thái:** Local implementation/test/container smoke Implemented; commit/push GitHub Actions release Pending tại thời điểm ghi.
+
 ## 2026-07-18 — Ghi local implementation và close-out bảo thủ US-004
 
 - **Loại:** Architecture; Data; API; Security; Frontend; Worker; Test; DevOps; Documentation; không thay đổi phạm vi nghiệp vụ baseline.

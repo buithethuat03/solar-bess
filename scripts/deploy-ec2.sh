@@ -71,6 +71,12 @@ sudo -n env RELEASE_SHA="$RELEASE_SHA" docker compose --project-directory "$REPO
 log 'running HTTP smoke checks'
 curl --fail --silent --show-error --retry 10 --retry-delay 2 http://127.0.0.1/web-health >/dev/null
 curl --fail --silent --show-error --retry 10 --retry-delay 2 http://127.0.0.1/health >/dev/null
+if [[ "$({ set -a; source "$ENV_FILE"; set +a; printf '%s' "${SWAGGER_ENABLED:-true}"; })" == true ]]; then
+  curl --fail --silent --show-error --retry 10 --retry-delay 2 http://127.0.0.1/api/docs/ \
+    | grep -F 'Solar & BESS API Documentation' >/dev/null
+  curl --fail --silent --show-error --retry 10 --retry-delay 2 http://127.0.0.1/api/docs/openapi.yaml \
+    | grep '^openapi: 3.1.0$' >/dev/null
+fi
 
 printf '%s\n' "$RELEASE_SHA" > "$STATE_DIR/current-release"
 trap - ERR

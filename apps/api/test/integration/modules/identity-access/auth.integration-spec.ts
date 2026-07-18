@@ -9,6 +9,7 @@ import { createApplication } from 'src/bootstrap';
 import { loadAppConfig } from 'src/config/environment';
 import { LocalCredentialEntity, TenantEntity, UserAccountEntity } from 'src/database/entities';
 import { runTestMigrations } from 'test/setup/run-migrations';
+import { load } from 'js-yaml';
 
 const tenantId = randomUUID();
 const userId = randomUUID();
@@ -86,6 +87,20 @@ describe('Auth API integration — TEST-230…233', () => {
     expect(ipEvidence.session_ip).toMatch(/^[0-9a-f]{64}$/);
     expect(ipEvidence.audit_ip).toBe(ipEvidence.session_ip);
     expect(ipEvidence.session_ip).not.toContain('127.0.0.1');
+  });
+
+  it('TEST-197/NFR-024: publishes Swagger UI and the canonical OpenAPI 3.1 YAML', async () => {
+    const page = await request(app.getHttpServer()).get('/api/docs/').expect(200)
+      .expect('Content-Type', /text\/html/);
+    expect(page.text).toContain('Solar & BESS API Documentation');
+
+    await request(app.getHttpServer()).get('/api/docs/swagger-ui.css').expect(200)
+      .expect('Content-Type', /text\/css/);
+    const specification = await request(app.getHttpServer()).get('/api/docs/openapi.yaml').expect(200)
+      .expect('Content-Type', /yaml/);
+    const parsed = load(specification.text) as { openapi?: string; paths?: Record<string, unknown> };
+    expect(parsed.openapi).toBe('3.1.0');
+    expect(parsed.paths?.['/v1/auth/login']).toBeDefined();
   });
 
   it('TEST-231: returns generic denial and creates no session', async () => {

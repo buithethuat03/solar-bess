@@ -1,9 +1,9 @@
 # Documentation Index — Solar & BESS Project Management Platform
 
 > **Purpose:** Mục lục, thứ tự đọc, dependency, trạng thái, phiên bản và reviewer của toàn bộ bộ tài liệu phát triển phần mềm.
-> **Scope:** Governance, baseline, docs/00…17, OpenAPI và changelog; gồm US-004 local implementation/Partial acceptance/Pending deployment và EC2 self-hosted CI/CD profile; full story/production validation còn tiếp tục.
+> **Scope:** Governance, baseline, docs/00…17, OpenAPI và changelog; gồm US-004 local implementation/Partial acceptance/Pending deployment, canonical Swagger runtime publication và EC2 self-hosted CI/CD profile; full story/production validation còn tiếp tục.
 > **Source:** [AGENTS.md](../AGENTS.md), [Documentation Plan](./00-documentation-plan.md), [Program ExecPlan](../.agent/execplans/2026-07-11-platform-delivery-program.md), [CI/CD ExecPlan](../.agent/execplans/2026-07-12-main-self-hosted-cicd.md).
-> **Version:** 1.6
+> **Version:** 1.7
 > **Status:** Draft
 > **Owner:** Product Operations / Documentation Owner (cá nhân: TBD)
 > **Updated:** 2026-07-18
@@ -33,14 +33,14 @@
 | 7 | [05 — Domain Model](./05-domain-model.md) | Bounded contexts, aggregates, invariants/events/SoR | Draft; auth and US-004 domain Implemented local | 0.6 / 2026-07-18 | 02–04 | Domain/Architecture/Data owners |
 | 8 | [06 — Solution Architecture](./06-solution-architecture.md) | Context/container/component/deployment, flows and 10 ADR | Draft; operational/core US-003 deployed; US-004 boundary Implemented local | 0.8 / 2026-07-18 | 04/05 | Architecture Board, SRE, Security, OT |
 | 9 | [07 — Data Model](./07-data-model.md) | ERD/data dictionary DB-001…113 | Draft; DB-065…067/112/113/generalized DB-105 + forward reconcile tested local | 1.2 / 2026-07-18 | 04–06 | Data, Domain, Security, Finance |
-| 10 | [08 — API Specification](./08-api-specification.md) | API conventions and 164-operation catalog | Draft; API-008/036/038/143…164 Implemented local | 1.3 / 2026-07-18 | 04–07 | API/Domain/Security/Integration/QA |
+| 10 | [08 — API Specification](./08-api-specification.md) | API conventions and 164-operation catalog | Draft; implemented slice plus canonical Swagger publication local | 1.4 / 2026-07-18 | 04–07 | API/Domain/Security/Integration/QA |
 | 11 | [OpenAPI 3.1](./openapi/openapi.yaml) | Machine-readable API contract with 164 x-api-id | Machine-readable Draft; 33 implemented markers; Redocly validation required at close-out | 0.9.0 / 2026-07-18 | 08 | API tooling/QA/consumers |
 | 12 | [09 — Security and Permissions](./09-security-and-permissions.md) | Threat model, 32 SEC and permission matrix | Draft; US-004 guards Implemented local, security acceptance Partial | 1.0 / 2026-07-18 | 04/06–08 | Security, Legal, IAM, OT |
 | 13 | [10 — UX Information Architecture](./10-ux-information-architecture.md) | Sitemap/wireframes, flows/states/responsive/a11y | Draft; US-004 UX Implemented local, accessibility/E2E Pending | 0.6 / 2026-07-18 | 03/04/09 | UX, Product, functional users |
 | 14 | [11 — Workflows and State Machines](./11-workflows-and-state-machines.md) | 26 formal workflows/Mermaid and approval rules | Draft; WF-015/021 and positive WF-003 path Implemented local | 0.9 / 2026-07-18 | 02–05/09 | Process owners, Internal Control |
 | 15 | [12 — Product Backlog](./12-product-backlog.md) | 37 US, 177 AC, DoR/DoD and phase split | Draft; US-004 local implementation complete, story In Progress | 1.1 / 2026-07-18 | 02–11 | PO, Delivery, Engineering, QA |
-| 16 | [13 — Test Strategy](./13-test-strategy.md) | Test levels and 233 TEST scenarios | Draft; US-004 pre-push gate Pass, TEST-014…017 Partial | 1.5 / 2026-07-18 | 04/08–12 | QA, Security, SRE, OT, business |
-| 17 | [14 — DevOps and Deployment](./14-devops-and-deployment.md) | Environments, CI/CD, rollout/recovery/release | Draft; historical pipeline/current isolated preflight Pass, actual US-004 deploy Pending | 0.9 / 2026-07-18 | 06/09/13 | Platform, SRE, Security, QA |
+| 16 | [13 — Test Strategy](./13-test-strategy.md) | Test levels and 233 TEST scenarios | Draft; US-004 pre-push gate and Swagger TEST-197 local Pass; TEST-014…017 Partial | 1.6 / 2026-07-18 | 04/08–12 | QA, Security, SRE, OT, business |
+| 17 | [14 — DevOps and Deployment](./14-devops-and-deployment.md) | Environments, CI/CD, rollout/recovery/release | Draft; Swagger env/image/Nginx public worktree smoke Pass, commit CI/CD release Pending | 1.0 / 2026-07-18 | 06/09/13 | Platform, SRE, Security, QA |
 | 18 | [15 — Traceability Matrix](./15-traceability-matrix.md) | End-to-end chain, gap and contradiction audit | Draft; US-004 implementation traced, acceptance Partial | 1.5 / 2026-07-18 | 01–14 | PO, BA, QA, Architecture |
 | 19 | [16 — Open Questions and Decisions](./16-open-questions-and-decisions.md) | Consolidated assumptions/questions/decisions/risks/data needs | Draft/Living; local implementation/dependency/deploy boundary explicit | 1.0 / 2026-07-18 | 00–15 | All decision owners |
 | 20 | [17 — Self-hosted CI/CD Runbook](./17-self-hosted-cicd-runbook.md) | Runner registration, pipeline, deploy/recovery operations | Implemented; runner online, first GitHub run Pass | 0.1 / 2026-07-12 | 14 | Platform, repository admin, Security |
@@ -101,11 +101,12 @@ Canonical owner rules are defined in [00-documentation-plan.md](./00-documentati
 | Requirement catalogs | Exact planned counts created |
 | Baseline preservation | SHA-256 unchanged: 51DBAD85FFC548AB9D95743551DE6BE745EA2723B3F237054B9C793B3A8CF55C |
 | Relative links/anchors | 0 broken relative file links and 0 broken anchors in final audit |
-| OpenAPI | 3.1.0 document version 0.9.0; 164/164 unique x-api-id và 164/164 unique operationId; 33 implemented markers gồm API-008/036/038/143…164; close-out Redocly validation được chạy lại |
+| OpenAPI | 3.1.0 document version 0.9.0; 164/164 unique x-api-id và 164/164 unique operationId; 33 implemented markers gồm API-008/036/038/143…164; close-out Redocly validation được chạy lại; canonical runtime Swagger `/api/docs/` và YAML `/api/docs/openapi.yaml` local TEST-197 Pass |
 | Business/technical approval | Base/auth, US-001, operational foundation và core US-003 đã triển khai EC2 test; US-004 local implementation Approved/complete, TEST-014…017 Partial và deployment Pending; full story/production/các domain khác vẫn theo gate từng slice |
 | Technology/vendor decisions | ADR-001/002/004/006 Accepted cho EC2 test profile, vẫn Proposed production; ADR còn lại Proposed |
 | Production code/toolchain | Base/auth + US-001 + operational foundation + core US-003 Implemented cho EC2 test; US-004 API/data/worker/Vue, positive rebaseline and forward migrations Implemented/tested local; current deployment Pending; production profile chưa được chấp thuận |
 | Build/lint/type/test execution | 2026-07-18 pre-push: post-fix lint/type/build Pass; unit API 14/52 + Web 20/55 + Worker 12/61 = 168; Web focused closure exact-payload 4/4 và backend HTTP closure 6/6 post-fix. Exact CI-port full integration API 8/49 + Worker 3/11 = 60 Pass trước final branch hardening; migration 7/7; OpenAPI Pass, Web 1,697 modules. TEST-014…017 Partial; actual GitHub Actions rerun Pending. |
+| Swagger publication validation | 2026-07-18 pre-push root lint/type/build/OpenAPI Pass; unit API 15/55 + Web 20/55 + Worker 12/61 = 171; exact isolated full integration API 8/50 + Worker 3/11 = 61; production-image/Nginx public worktree UI/assets/YAML smoke Pass. Commit CI/CD Pending. |
 | Implementation readiness | US-004 M1–M3 and local M4 pre-push gate Complete. Isolated `15433/16380` preflight Pass with `sudo -n env`; remaining acceptance branches/full E2E và actual GitHub Actions/EC2 deployment/public smoke Pending; toàn platform/production Not yet. |
 
 ## 7. Assumptions
@@ -149,3 +150,4 @@ Canonical owner rules are defined in [00-documentation-plan.md](./00-documentati
 | 1.4 | 2026-07-18 | Codex | Đóng final US-004 contract ở 164 API: scoped assignee, stable detail/action reads, DB-065 residual SoR/versioned promotion, terminal Action, generalized DB-105 và immutable Change→REBASELINE provenance; đồng bộ SRS/Data/API/Security/UX/WF/Backlog/Test/Trace | Không đổi baseline/AC; mở M1 implementation sau no-warning/link/checksum/semantic audit |
 | 1.5 | 2026-07-18 | Codex | Ghi M0 final GO sau API-149 union, DB-105 deterministic mapping, DB-113 paginated immutable history và API-157 full-filter heatmap; exact machine/link/checksum evidence | Không đổi baseline/AC; M1 implementation được phép bắt đầu |
 | 1.6 | 2026-07-18 | Codex | Đồng bộ US-004 completed local pre-push gate, OpenAPI 0.9.0/API 1.3, forward migrations/isolated-CI evidence và TEST-014…017 Partial | Không đổi baseline/AC; unit 168/integration 60/migration 7/build Pass; actual GitHub Actions/EC2 deployment/full E2E Pending |
+| 1.7 | 2026-07-18 | Codex | Ghi canonical Swagger/OpenAPI runtime publication, env/image/Nginx/deploy-smoke profile và TEST-197 local evidence | Không đổi API count/business scope; UI/YAML local Pass, public commit deploy Pending tại thời điểm ghi |

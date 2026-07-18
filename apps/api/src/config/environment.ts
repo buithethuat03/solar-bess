@@ -8,7 +8,7 @@ loadDotEnvironment({
 });
 
 export interface AppConfig {
-  app: { port: number; trustProxyHops: number };
+  app: { port: number; trustProxyHops: number; swaggerEnabled: boolean };
   database: { url: string };
   redis: {
     host: string;
@@ -149,7 +149,8 @@ export function loadAppConfig(): AppConfig {
   return {
     app: {
       port: integer('APP_PORT', 3000, 1, 65_535),
-      trustProxyHops: integer('TRUST_PROXY_HOPS', 1, 0, 10)
+      trustProxyHops: integer('TRUST_PROXY_HOPS', 1, 0, 10),
+      swaggerEnabled: boolean('SWAGGER_ENABLED', false)
     },
     database: loadDatabaseConfig(),
     redis: {

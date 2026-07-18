@@ -9,7 +9,7 @@ const names = [
   'SCHEDULE_NEAR_CRITICAL_FLOAT_DAYS', 'SCHEDULE_DEFAULT_LOOKAHEAD_DAYS',
   'SCHEDULE_IMPORT_MAX_ROWS', 'SCHEDULE_MAX_ABS_LAG_DAYS',
   'RISK_HIGH_EXPOSURE_THRESHOLD', 'RISK_CRITICAL_EXPOSURE_THRESHOLD',
-  'RISK_CHANGE_ALERT_SCAN_INTERVAL_MS', 'RISK_CHANGE_THRESHOLD_VERSION'
+  'RISK_CHANGE_ALERT_SCAN_INTERVAL_MS', 'RISK_CHANGE_THRESHOLD_VERSION', 'SWAGGER_ENABLED'
 ] as const;
 const original = new Map(names.map((name) => [name, process.env[name]]));
 
@@ -48,6 +48,7 @@ describe('typed encrypted environment — SEC-117/SEC-118', () => {
     expect(config.auth.rateLimitHashSecret).toBe('r'.repeat(32));
     expect(config.auth.rateLimitMaxAttempts).toBe(7);
     expect(config.auth.rateLimitWindowMs).toBe(42_000);
+    expect(config.app.swaggerEnabled).toBe(false);
     expect(config.schedule).toMatchObject({
       nearCriticalFloatDays: 5,
       defaultLookAheadDays: 21,
@@ -81,6 +82,9 @@ describe('typed encrypted environment — SEC-117/SEC-118', () => {
     configure();
     process.env.RISK_CHANGE_THRESHOLD_VERSION = 'unsafe-version';
     expect(() => loadAppConfig()).toThrow('RISK_CHANGE_THRESHOLD_VERSION must contain');
+    configure();
+    process.env.SWAGGER_ENABLED = 'yes';
+    expect(() => loadAppConfig()).toThrow('SWAGGER_ENABLED must be true or false');
   });
 
   it('allows a validated non-secret host override for container topology', () => {

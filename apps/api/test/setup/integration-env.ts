@@ -22,3 +22,4 @@ process.env.JWT_AUDIENCE ??= 'solar-bess-web-test';
 process.env.COOKIE_SECURE = 'false';
 process.env.AUTH_RATE_LIMIT_MAX_ATTEMPTS = '5';
 process.env.AUTH_RATE_LIMIT_WINDOW_SECONDS = '60';
+process.env.SWAGGER_ENABLED = 'true';
