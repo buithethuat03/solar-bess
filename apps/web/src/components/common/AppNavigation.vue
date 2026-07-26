@@ -9,5 +9,6 @@ const auth = useAuthStore();
   <nav class="app-navigation" aria-label="Điều hướng chính">
     <router-link :to="{ name: RouteName.dashboard }">Tổng quan</router-link>
     <router-link v-if="auth.can('project.read')" :to="{ name: RouteName.projects }">Dự án</router-link>
+    <router-link v-if="auth.can('notification.read')" :to="{ name: RouteName.notifications }">Thông báo</router-link>
   </nav>
 </template>

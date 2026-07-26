@@ -12,6 +12,7 @@ import { GeneralizeNotifications1783733000000 } from './migrations/1783733000000
 import { AddActionResidualRationale1783734000000 } from './migrations/1783734000000-AddActionResidualRationale';
 import { ReconcileRiskChangeRuntimeDrift1783735000000 } from './migrations/1783735000000-ReconcileRiskChangeRuntimeDrift';
 import { ReconcileRiskChangeRoleGrants1783736000000 } from './migrations/1783736000000-ReconcileRiskChangeRoleGrants';
+import { GrantNotificationPermissions1783737000000 } from './migrations/1783737000000-GrantNotificationPermissions';
 
 export function typeOrmOptions(databaseUrl = loadDatabaseConfig().url): DataSourceOptions {
   return {
@@ -26,7 +27,8 @@ export function typeOrmOptions(databaseUrl = loadDatabaseConfig().url): DataSour
       GeneralizeNotifications1783733000000,
       AddActionResidualRationale1783734000000,
       ReconcileRiskChangeRuntimeDrift1783735000000,
-      ReconcileRiskChangeRoleGrants1783736000000
+      ReconcileRiskChangeRoleGrants1783736000000,
+      GrantNotificationPermissions1783737000000
     ],
     synchronize: false, logging: false
   };

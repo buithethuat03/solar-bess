@@ -201,11 +201,14 @@ describe('Risk/Issue/Change migrations — DB-065/066/067/105/112/113', () => {
     try {
       await AppDataSource.runMigrations({ transaction: 'all' });
       const upgraded = await readRoleCatalog();
-      expect(upgraded.get(`${tenantA}:PMO`)).toMatchObject({ policyVersion: 3 });
+      // The chain now ends at the US-022 notification grant, so every catalog role reaches
+      // policy_version 4 and carries the two notification codes on top of the RiskChange ones.
+      expect(upgraded.get(`${tenantA}:PMO`)).toMatchObject({ policyVersion: 4 });
       expect(upgraded.get(`${tenantA}:PMO`)?.permissions).toEqual(expect.arrayContaining([
         'custom.audit', 'riskChange.read', 'riskChange.create', 'riskChange.manage',
         'riskChange.submit', 'riskChange.approve', 'riskChange.requestClosure',
-        'riskChange.close', 'riskChange.closeCritical', 'user.read'
+        'riskChange.close', 'riskChange.closeCritical', 'user.read',
+        'notification.read', 'notification.acknowledge'
       ]));
       expect(upgraded.get(`${tenantA}:PROJECT_CONTROLS`)?.permissions)
         .toEqual(expect.arrayContaining([
@@ -218,23 +221,28 @@ describe('Risk/Issue/Change migrations — DB-065/066/067/105/112/113', () => {
           'riskChange.requestClosure', 'user.read'
         ]));
       expect(upgraded.get(`${tenantA}:EXECUTIVE`)?.permissions)
-        .toEqual(['custom.executive', 'riskChange.read']);
+        .toEqual(['custom.executive', 'riskChange.read', 'notification.read', 'notification.acknowledge']);
+      // TENANT_ADMIN is outside the RiskChange grant but inside the notification grant.
       expect(upgraded.get(`${tenantA}:TENANT_ADMIN`)).toEqual({
-        permissions: ['custom.admin'], policyVersion: 2
+        permissions: ['custom.admin', 'notification.read', 'notification.acknowledge'],
+        policyVersion: 4
       });
       expect(upgraded.get(`${tenantA}:CUSTOM_ROLE`)).toEqual({
         permissions: ['custom.only'], policyVersion: 7
       });
       expect(upgraded.size).toBe(roleFixtures.length);
 
+      // Simulate an operator editing the role after the migrations ran. The version is chosen to
+      // match no migration's target so the assertion stays valid as more grant migrations land.
       await AppDataSource.query(`UPDATE roles SET
         permissions = permissions || '["postMigration.custom"]'::jsonb,
-        policy_version = 4 WHERE id = $1`, [roleFixtures[0].id]);
+        policy_version = 9 WHERE id = $1`, [roleFixtures[0].id]);
       await revertThroughMigration('ReconcileRiskChangeRoleGrants1783736000000');
       const restored = await readRoleCatalog();
+      // Each down() removes only the codes it added and leaves the manual version untouched.
       expect(restored.get(`${tenantA}:PMO`)).toEqual({
         permissions: ['custom.audit', 'riskChange.read', 'postMigration.custom'],
-        policyVersion: 4
+        policyVersion: 9
       });
       expect(restored.get(`${tenantA}:PROJECT_MANAGER`)).toEqual({
         permissions: ['custom.manager'], policyVersion: 2

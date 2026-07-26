@@ -15,6 +15,17 @@ export interface EffectiveAssignment {
   scopeId: string | null;
 }
 
+/**
+ * Flattened ABAC reach of one action, usable as a single SQL predicate. `tenantWide` short-circuits
+ * the other two sets; otherwise a row is authorized when its project is in `projectIds` (full-project
+ * reach, any package) or its package is in `packageIds` (package-scoped reach only).
+ */
+export interface AccessScopeSets {
+  tenantWide: boolean;
+  projectIds: string[];
+  packageIds: string[];
+}
+
 @Injectable()
 export class PermissionService {
   constructor(
@@ -139,6 +150,43 @@ export class PermissionService {
       }
     });
     return [...new Set(rows.map((row) => row.id))];
+  }
+
+  /**
+   * Resolve one action into tenant/project/package reach in a single pass so a cross-project reader
+   * can filter in SQL instead of authorizing row by row after pagination, which would let a page
+   * return fewer rows than its limit while more authorized rows remain.
+   */
+  async accessScopeSets(context: AuthContext, action: string): Promise<AccessScopeSets> {
+    const assignments = (await this.effectiveAssignments(context))
+      .filter((assignment) => assignment.permissions.includes(action));
+    if (assignments.some((assignment) => assignment.scopeType === AssignmentScopeType.TENANT)) {
+      return { tenantWide: true, projectIds: [], packageIds: [] };
+    }
+    const scopeIds = (scopeType: AssignmentScopeType) => assignments
+      .filter((assignment) => assignment.scopeType === scopeType && assignment.scopeId)
+      .map((assignment) => assignment.scopeId!);
+    const projectIds = scopeIds(AssignmentScopeType.PROJECT);
+    const portfolioIds = scopeIds(AssignmentScopeType.PORTFOLIO);
+    if (portfolioIds.length > 0) {
+      const portfolioProjects = await this.projects.find({
+        select: { id: true },
+        where: { tenantId: context.tenantId, portfolioId: In(portfolioIds) }
+      });
+      projectIds.push(...portfolioProjects.map((project) => project.id));
+    }
+    const packageIds = scopeIds(AssignmentScopeType.PACKAGE);
+    const activePackageIds = packageIds.length === 0 ? [] : (await this.packages.find({
+      select: { id: true },
+      where: {
+        tenantId: context.tenantId, id: In(packageIds), status: PackageStatus.ACTIVE
+      }
+    })).map((row) => row.id);
+    return {
+      tenantWide: false,
+      projectIds: [...new Set(projectIds)],
+      packageIds: [...new Set(activePackageIds)]
+    };
   }
 
   async identityPermissions(context: AuthContext) {

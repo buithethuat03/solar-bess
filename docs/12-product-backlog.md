@@ -712,6 +712,7 @@ All AC and mapped TEST pass; negative permission/tenant/concurrency/idempotency/
 <a id="us-022"></a>
 ### US-022 — Notification, nhắc việc và escalation
 
+- **Delivery status:** **Inbox slice Implemented (AC-105/AC-107), phần còn lại In Progress** ngày 2026-07-26. `API-135` liệt kê DB-105 projection của chính người gọi và `API-136` acknowledge idempotent đã materialize kèm Vue `/notifications`; không có migration schema vì DB-105 đã tổng quát hóa từ 2026-07-18, chỉ thêm role grant `notification.read`/`notification.acknowledge` (migration `1783737000000`, policy_version 4). AC-105 được đóng bằng re-authorization mỗi request theo tenant/recipient/project/package hiện hành; AC-107 được đóng bằng acknowledge chỉ đổi presentation state và không ghi vào object nguồn. AC-103/AC-104/AC-106 (channel/preference, scheduler escalation, P1 call tree) vẫn Planned vì phụ thuộc external channel provider chưa có credential. Evidence: API integration 16/16, migration 3/3, Web unit 12 (API 3 + component 7 + structure delta), lint/typecheck/OpenAPI Pass.
 - **Source:** US-E22; source heading/priority: Notification, nhắc việc và escalation (`WFL-*`, `PRJ-*`) — Must/MVP, Dùng chung.
 - **Epic → Capability → Feature:** Workflow → WFL, PRJ → Notification, nhắc việc và escalation.
 - **Persona:** Project Member.

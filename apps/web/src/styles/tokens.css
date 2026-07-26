@@ -1,12 +1,126 @@
+/*
+ * Design tokens. Everything visual should resolve to a token here rather than a literal, so a
+ * palette or density change stays a one-file edit. Values are tuned for a data-dense delivery tool:
+ * the type scale tops out well below marketing sizes and the neutral ramp keeps long tables legible.
+ */
 :root {
-  font-family: Calibri, "Segoe UI", Arial, sans-serif;
-  color: #10231f;
-  background: #f3f5ef;
+  /* Brand ramp — deep evergreen through the lime accent used on the logo. */
+  --brand-900: #05201b;
+  --brand-800: #0a2f27;
+  --brand-700: #0d382f;
+  --brand-600: #14513f;
+  --brand-500: #1d6b52;
+  --brand-400: #3d8f6f;
+  --brand-300: #7fb89e;
+  --brand-200: #bcdccc;
+  --brand-100: #e3f0e7;
+  --brand-50:  #f1f7f2;
+
+  --accent-600: #7d9a17;
+  --accent-500: #a3c62c;
+  --accent-400: #cbe85d;
+  --accent-200: #e6f5a8;
+  --accent-100: #f2fada;
+
+  /* Neutral ramp — very slightly warm so it sits with the greens. */
+  --neutral-900: #10231f;
+  --neutral-800: #1e332d;
+  --neutral-700: #33463f;
+  --neutral-600: #4d5f58;
+  --neutral-500: #6b7d75;
+  --neutral-400: #8f9e97;
+  --neutral-300: #bcc7c1;
+  --neutral-200: #dbe2dc;
+  --neutral-100: #eef2ed;
+  --neutral-50:  #f6f8f4;
+  --white: #ffffff;
+
+  /* Semantic status — used by pills, alert priority and validation. */
+  --success-600: #1f6b32;
+  --success-100: #dcf4df;
+  --warning-600: #8a5b00;
+  --warning-500: #d7a72f;
+  --warning-100: #fff0c7;
+  --danger-600: #a8322c;
+  --danger-500: #c54b45;
+  --danger-100: #fbe2e0;
+  --info-600: #1c5b78;
+  --info-100: #dcecf4;
+
+  /* Roles */
+  --color-text: var(--neutral-900);
+  --color-text-muted: var(--neutral-500);
+  --color-text-subtle: var(--neutral-400);
+  --color-bg: var(--neutral-50);
+  --color-surface: var(--white);
+  --color-surface-sunken: var(--neutral-100);
+  --color-border: var(--neutral-200);
+  --color-border-strong: var(--neutral-300);
+  --color-primary: var(--brand-700);
+  --color-primary-hover: var(--brand-600);
+  --color-focus-ring: rgba(29, 107, 82, .22);
+
+  /* Spacing — 4px base. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-pill: 999px;
+
+  /* Type scale — deliberately modest; this is a work tool, not a landing page. */
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-md: 16px;
+  --text-lg: 19px;
+  --text-xl: 23px;
+  --text-2xl: 28px;
+  --text-3xl: 34px;
+
+  /* Elevation */
+  --shadow-xs: 0 1px 2px rgba(16, 35, 31, .06);
+  --shadow-sm: 0 1px 3px rgba(16, 35, 31, .07), 0 1px 2px rgba(16, 35, 31, .04);
+  --shadow-md: 0 4px 12px rgba(16, 35, 31, .07), 0 2px 4px rgba(16, 35, 31, .04);
+  --shadow-lg: 0 12px 32px rgba(16, 35, 31, .10), 0 4px 8px rgba(16, 35, 31, .04);
+
+  /* Legacy aliases kept so the Project Controls and Risk/Change stylesheets, which predate this
+     token layer, resolve to the new scale instead of being restyled wholesale. */
+  --color-brand-dark: var(--brand-700);
+  --color-brand-deep: var(--brand-900);
+  --color-accent: var(--accent-400);
+  --shadow-card: var(--shadow-sm);
+
+  /* Element Plus theme overrides so its components inherit the brand instead of default blue. */
+  --el-color-primary: var(--brand-700);
+  --el-color-primary-light-3: var(--brand-500);
+  --el-color-primary-light-5: var(--brand-400);
+  --el-color-primary-light-7: var(--brand-300);
+  --el-color-primary-light-8: var(--brand-200);
+  --el-color-primary-light-9: var(--brand-100);
+  --el-color-primary-dark-2: var(--brand-800);
+  --el-color-success: var(--success-600);
+  --el-color-warning: var(--warning-600);
+  --el-color-danger: var(--danger-600);
+  --el-color-error: var(--danger-600);
+  --el-border-radius-base: var(--radius-md);
+  --el-font-size-base: var(--text-base);
+
+  font-family: 'Inter', 'Segoe UI', Roboto, Calibri, Arial, sans-serif;
+  font-size: var(--text-base);
+  color: var(--color-text);
+  background: var(--color-bg);
   font-synthesis: none;
-  --color-brand-dark: #0d382f;
-  --color-brand-deep: #071f1c;
-  --color-accent: #cbe85d;
-  --color-surface: rgba(255, 255, 255, .84);
-  --color-border: #d8ded3;
-  --shadow-card: 0 14px 40px rgba(20, 46, 38, .05);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }

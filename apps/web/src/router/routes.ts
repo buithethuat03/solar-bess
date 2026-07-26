@@ -39,6 +39,12 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, permission: 'project.read' }
   },
   {
+    path: RoutePath.notifications,
+    name: RouteName.notifications,
+    component: () => import('@/views/notification/NotificationInboxView.vue'),
+    meta: { requiresAuth: true, permission: 'notification.read' }
+  },
+  {
     path: RoutePath.login,
     name: RouteName.login,
     component: () => import('@/views/auth/LoginView.vue'),

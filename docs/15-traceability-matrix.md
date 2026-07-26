@@ -3,10 +3,10 @@
 > **Purpose:** Cung cấp chuỗi truy vết Business Goal → BR → FR/NFR → UC → WF → US → AC → API → DB → SEC → TEST → Release và công khai mọi gap/mâu thuẫn.
 > **Scope:** Toàn bộ artefact Draft và implementation profiles; matrix dùng range inclusive. US-001 và operational foundation/core US-003 đã deploy EC2 test; US-004 Implemented local với acceptance Partial và deployment Pending; production vẫn Proposed.
 > **Source:** [Vision](./01-product-vision-and-scope.md), [BRD](./02-BRD.md), [PRD](./03-PRD.md), [SRS](./04-SRS.md), [Domain](./05-domain-model.md), [Architecture](./06-solution-architecture.md), [Data](./07-data-model.md), [API](./08-api-specification.md), [Security](./09-security-and-permissions.md), [UX](./10-ux-information-architecture.md), [Workflow](./11-workflows-and-state-machines.md), [Backlog](./12-product-backlog.md), [Test](./13-test-strategy.md), [Operational Foundation ExecPlan](../.agent/execplans/2026-07-11-operational-foundation.md), [US-003 ExecPlan](../.agent/execplans/2026-07-11-project-controls-us003.md), [US-004 ExecPlan](../.agent/execplans/2026-07-12-risk-issue-change-us004.md).
-> **Version:** 1.6
+> **Version:** 1.7
 > **Status:** Draft toàn platform; US-001/operational foundation/US-003 core Implemented; US-004 Implemented local, TEST-014…017 Partial và GitHub Actions/EC2 deployment Pending; production Proposed
 > **Owner:** Product Operations / Business Analysis / QA (cá nhân: TBD)
-> **Updated:** 2026-07-18
+> **Updated:** 2026-07-26
 > **Approval:** Operational foundation EC2 test và US-003/US-004 local implementation profile Approved — Product Owner delegated; full story/deployment/production acceptance TBD/Pending — Architecture, QA, Security và Process Owners
 
 ## 1. ID registry and canonical owner
@@ -19,7 +19,7 @@
 | UC-001…037 | 37 | 03-PRD | One-to-one source US-E |
 | ADR-001…010 | 10 | 06 Architecture | One-to-one ARC-001…010 |
 | DB-001…113 | 113 | 07 Data Model | DB-101…105 và DB-112/113 materialized local; DB-106…111 reserved; US-004 forward reconcile đã test local, actual deploy Pending |
-| API-001…164 | 164 | 08 API/OpenAPI | x-api-id exact/unique; API-008/036/038/143…164 implemented local; direct/dependency ownership vẫn tách rõ |
+| API-001…164 | 164 | 08 API/OpenAPI | x-api-id exact/unique; 53 implemented markers gồm API-008/036/038/135/136/143…164; direct/dependency ownership vẫn tách rõ |
 | SEC-101…132 | 32 | 09 Security | TEST-198…229 |
 | WF-001…026 | 26 | 11 Workflow | 26 Mermaid state machines |
 | US-001…037 | 37 | 12 Backlog | One-to-one US-E01…37 |
@@ -53,7 +53,7 @@ This is the primary chain. API/DB/SEC ranges are capability surfaces; exact oper
 | Enterprise control | BR-011, BR-035, BR-040 | FR-029…FR-035, FR-145, FR-151…FR-155, FR-164 | UC-019 | WF-007 | US-019 | AC-088…AC-092 | API-039…052; API-001…014; API-106…113 | DB-022…027; DB-001…008/098; DB-069…072 | SEC-109/112/113/118…123/126; SEC-101…110/118; SEC-102/106…110/118 | TEST-088…TEST-092 | MVP |
 | Enterprise control | BR-033, BR-040 | FR-146…FR-155, NFR-008…NFR-013 | UC-020 | WF-026 | US-020 | AC-093…AC-097, AC-174…177 | API-001…014, API-137…139 | DB-001…008/098…100 | SEC-101…110/117/118 | TEST-093…TEST-097, TEST-230…233 | MVP; base auth slice Approved |
 | Enterprise control | BR-011, BR-033…BR-035, BR-040 | FR-143, FR-154, FR-161, NFR-022 | UC-021 | Audit flow | US-021 | AC-098…AC-102 | API-001…014; API-106…113; API-039…052 | DB-001…008/098; DB-069…072; DB-022…027 | SEC-101…110/118; SEC-102/106…110/118; SEC-109/112/113/118…123/126 | TEST-098…TEST-102 | MVP |
-| Enterprise control | BR-032, BR-034, BR-038 | FR-019…FR-025, FR-142…FR-145, FR-175, FR-177 | UC-022 | WF-001…025 notifications | US-022 | AC-103…AC-107 | API-106…113; API-017…025/API-034…038/API-130…136 | DB-069…072; DB-009…021/065…068; DB-105 | SEC-102/106…110/118; SEC-105…111/118 | TEST-103…TEST-107 | MVP; DB-105 schedule-alert subset Implemented, broader notification lifecycle planned |
+| Enterprise control | BR-032, BR-034, BR-038 | FR-019…FR-025, FR-142…FR-145, FR-175, FR-177 | UC-022 | WF-001…025 notifications | US-022 | AC-103…AC-107 | **Direct:** API-135/136<br>**Dependency:** API-106…113; API-017…025/API-034…038/API-130…134 | DB-098; DB-105; DB-069…072; DB-009…021/065…068 | SEC-107/118; SEC-102/106…110/118 | TEST-103…TEST-107 | MVP; API-135/136 inbox Implemented local, AC-105/107 đóng; AC-103/104/106 channel/scheduler/P1 Planned pending external provider |
 | Enterprise control | BR-001, BR-032, BR-036, BR-038 | FR-010…FR-015, FR-020…FR-025, FR-130…FR-137, FR-171…FR-177 | UC-023 | Report job | US-023 | AC-108…AC-112 | API-015…020/API-130…136; API-017…025/API-034…038/API-130…136; API-062…066; API-039…052 | DB-009…013/065…068; DB-009…021/065…068; DB-034…040; DB-022…027; DB-106/107 | SEC-105…111/118/119; SEC-105…111/118; SEC-108/109/114/118/119; SEC-109/112/113/118…123/126 | TEST-108…TEST-112 | MVP; DB-106/107 reserved, not implemented |
 | Safe extensibility | BR-040 | NFR-004…NFR-006, NFR-021…NFR-024 | UC-024 | Recovery runbook | US-024 | AC-113…AC-116 | API-001…014; API-122…126 | DB-001…008/098; DB-089…092/096…098 | SEC-101…110/118; SEC-115…118/122/125…128 | TEST-113…TEST-116 | MVP |
 | Opportunity/investment | BR-002…BR-008 | FR-001…FR-009, FR-053…FR-060, FR-125…FR-137 | UC-025 | WF-002 | US-025 | AC-117…AC-121 | API-026…033; API-072/073/API-121; API-074/075/API-121/125; API-062…066 | DB-014…016; DB-079…083/093…095; DB-079…083/089…092; DB-034…040 | SEC-105/107/111/118; SEC-111/127/128; SEC-108/109/114/118/119 | TEST-117…TEST-121 | Release 1 |
@@ -105,7 +105,8 @@ This is the primary chain. API/DB/SEC ranges are capability surfaces; exact oper
 | NFR-021/023; ADR-001 | API/worker runtime + main CI/CD contract | PostgreSQL + Redis + BullMQ; worker process/container riêng; self-hosted workflow + SHA image rollout; isolated CI ports 15433/16380 | TEST-194/196 và operational smoke | Historical first run + current isolated preflight Pass; actual US-004 GitHub run/EC2 deploy/public smoke Pending | Registry/HA/SLO Proposed |
 | BR-040; NFR-007/023; SEC-124; US-024 | Controlled EC2 test delivery | `.github/workflows/main-cicd.yml`; `scripts/deploy-ec2.sh`; không đổi DB/API | TEST-196; TEST-221 subset | Implemented; runner online, first GitHub CI/CD run Pass; branch protection follow-up | Full supply-chain/production Proposed |
 | US-003 | Schedule contract | DB-101 + schedule-alert subset DB-105; API-023/024/034…037/140…142 | Current isolated integration và focused rebaseline Pass; TEST-010…013 full story/E2E vẫn Partial | Core Implemented/deployed, story not fully Pass | Proposed |
-| US-022/023/031…037 | ID stability only | DB-106…111 reserved; phần Notification ngoài schedule của DB-105 thuộc US-022 | ID/link audit; feature TEST giữ Draft | Documented/Not implemented | Proposed |
+| US-023/031…037 | ID stability only | DB-106…111 reserved | ID/link audit; feature TEST giữ Draft | Documented/Not implemented | Proposed |
+| US-022 | Inbox read/acknowledge | DB-105 tổng quát hóa; API-135/136 | TEST-103…107 một phần | Inbox Implemented local; channel/scheduler/escalation Not implemented | Partial |
 
 ## 3. Business Requirement coverage
 

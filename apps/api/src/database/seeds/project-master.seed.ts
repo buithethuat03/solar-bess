@@ -17,7 +17,7 @@ const roleCatalog = [
       'progress.record', 'progress.correct', 'user.read',
       'riskChange.read', 'riskChange.create', 'riskChange.manage', 'riskChange.submit',
       'riskChange.approve', 'riskChange.requestClosure', 'riskChange.close',
-      'riskChange.closeCritical'
+      'riskChange.closeCritical', 'notification.read', 'notification.acknowledge'
     ]
   },
   {
@@ -29,13 +29,14 @@ const roleCatalog = [
       'progress.record', 'progress.correct', 'user.read',
       'riskChange.read', 'riskChange.create', 'riskChange.manage', 'riskChange.submit',
       'riskChange.approve', 'riskChange.requestClosure', 'riskChange.close',
-      'riskChange.closeCritical'
+      'riskChange.closeCritical', 'notification.read', 'notification.acknowledge'
     ]
   },
   {
     code: 'EXECUTIVE', name: 'Executive',
     permissions: [
-      'portfolio.read', 'project.read', 'package.read', 'schedule.read', 'riskChange.read'
+      'portfolio.read', 'project.read', 'package.read', 'schedule.read', 'riskChange.read',
+      'notification.read', 'notification.acknowledge'
     ]
   },
   {
@@ -43,20 +44,21 @@ const roleCatalog = [
       'package.read', 'package.create', 'schedule.read', 'schedule.manage',
       'schedule.import', 'baseline.submit', 'progress.record', 'progress.correct',
       'user.read', 'riskChange.read', 'riskChange.create', 'riskChange.manage',
-      'riskChange.requestClosure'
+      'riskChange.requestClosure', 'notification.read', 'notification.acknowledge'
     ]
   },
   {
     code: 'PACKAGE_OWNER', name: 'Package Owner', permissions: [
       'package.read', 'schedule.read', 'progress.record', 'user.read',
       'riskChange.read', 'riskChange.create', 'riskChange.manage',
-      'riskChange.requestClosure'
+      'riskChange.requestClosure', 'notification.read', 'notification.acknowledge'
     ]
   },
   {
     code: 'TENANT_ADMIN', name: 'Tenant Administrator', permissions: [
       'organization.read', 'organization.create', 'legalEntity.read',
-      'legalEntity.create', 'roleAssignment.manage', 'systemStatus.read'
+      'legalEntity.create', 'roleAssignment.manage', 'systemStatus.read',
+      'notification.read', 'notification.acknowledge'
     ]
   }
 ] as const;

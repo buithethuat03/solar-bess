@@ -18,6 +18,20 @@ File này ghi lịch sử thay đổi phạm vi, tài liệu và governance củ
 - **Trạng thái:** Proposed | Approved | Rejected | Implemented
 ```
 
+## 2026-07-26 — Notification inbox US-022 (API-135/136) và design token layer
+
+- **Loại:** API; Security; Frontend; Test; Documentation; không thay đổi phạm vi nghiệp vụ baseline.
+- **Người yêu cầu/phê duyệt:** Người dùng/Product Owner yêu cầu hoàn thiện tiếp sản phẩm và chuẩn hóa giao diện ngày 2026-07-26; Codex quyết định theo quyền đã được ủy quyền.
+- **Mã bị ảnh hưởng:** `BR-032`, `BR-034`, `BR-038`, `FR-175`, `FR-177`, `UC-022`, `US-022`, `AC-105`, `AC-107`, `TEST-103…TEST-107`, `API-135`, `API-136`, `DB-098`, `DB-105`, `SEC-107`, `SEC-118`, `NFR-024`; không cấp requirement/API/DB ID mới.
+- **Trước thay đổi:** DB-105 đã tổng quát hóa và được worker ghi, nhưng không có endpoint, route hay UI nào đọc được; `notification.read`/`notification.acknowledge` chưa tồn tại trong role nào. OpenAPI khai báo API-135/136 bằng `Envelope`/`GenericCommand` và truy vết sai sang `DB-071`/`DB-097`. Style layer chỉ có 7 biến, phần lớn màu là literal và nút Element Plus vẫn dùng primary xanh dương mặc định.
+- **Sau thay đổi:** OpenAPI 0.9.2 đặc tả đầy đủ API-135 (cursor, filter, unread counter trong `meta`) và API-136 (body rỗng, idempotent, 404 cho ngoài scope), nâng số marker implemented từ 51 lên 53 trên tổng 164. Module `notification` của Nest re-authorize mỗi request bằng `PermissionService.accessScopeSets`, lọc scope ngay trong SQL để phân trang không trả thiếu hàng, và ghi audit DB-098 + outbox trong cùng transaction khi chuyển UNREAD→READ. Vue có route `/notifications` gated theo permission. Toàn bộ giao diện chuyển sang token layer đầy đủ và Element Plus nhận primary màu brand.
+- **Lý do:** Đóng `AC-105` (notification không phải access grant) và `AC-107` (acknowledge chỉ đổi presentation state) trên dữ liệu đã có sẵn, đồng thời loại bỏ sự thiếu nhất quán thị giác mà Product Owner nêu.
+- **Artefact bị ảnh hưởng:** `apps/api/src/modules/notification/**`, `permission.service.ts`, `app.module.ts`, `data-source.ts`, `project-master.seed.ts`, migration `1783737000000`, test API/migration; `apps/web` api/types/component/view/router/styles; `docs/08`, `docs/12`, `docs/13`, `docs/15`, `docs/openapi/openapi.yaml`, ExecPlan `2026-07-26-notification-inbox-us022.md`.
+- **Migration/tương thích:** Không có thay đổi schema — DB-105 đã tồn tại. Migration duy nhất cấp hai permission code cho sáu role catalog và nâng `policy_version` lên 4; `down()` chỉ gỡ đúng những code nó thêm nên grant có sẵn được giữ nguyên. Vì chuỗi migration nay kết thúc ở policy 4, assertion tương ứng trong test RiskChange đã được cập nhật và fixture "operator sửa tay" đổi sang version 9 để không trùng version của bất kỳ migration nào.
+- **Phạm vi acceptance:** `AC-105`/`AC-107` có bằng chứng. `AC-103` (channel/preference), `AC-104` (scheduler nhắc việc/escalation) và `AC-106` (P1 call tree) vẫn Planned vì phụ thuộc external channel provider chưa có sandbox/credential; US-022 do đó chưa `Done`.
+- **Validation:** Lint, type-check, `openapi:lint` Pass. Unit API 56 + Web 67 + Worker 61 = 184. Integration API 66 + Worker 11 = 77, gồm 12 test API-135/136 và 3 test migration up/down/up. Playwright 5/5 Pass. Web image build lại và deploy EC2 test; `/notifications` trả đúng empty state có phân quyền.
+- **Trạng thái:** Implemented/deployed EC2 test cho phần inbox; phần channel/scheduler/escalation Planned.
+
 ## 2026-07-26 — Đóng E2E gate US-004 và chuẩn hóa accessible name cho select
 
 - **Loại:** Frontend accessibility; Test; DevOps evidence; không thay đổi phạm vi nghiệp vụ baseline.

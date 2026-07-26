@@ -1,12 +1,12 @@
 # Documentation Index — Solar & BESS Project Management Platform
 
 > **Purpose:** Mục lục, thứ tự đọc, dependency, trạng thái, phiên bản và reviewer của toàn bộ bộ tài liệu phát triển phần mềm.
-> **Scope:** Governance, baseline, docs/00…17, OpenAPI và changelog; gồm US-004 local implementation/Partial acceptance/Pending deployment, canonical Swagger runtime publication và EC2 self-hosted CI/CD profile; full story/production validation còn tiếp tục.
-> **Source:** [AGENTS.md](../AGENTS.md), [Documentation Plan](./00-documentation-plan.md), [Program ExecPlan](../.agent/execplans/2026-07-11-platform-delivery-program.md), [CI/CD ExecPlan](../.agent/execplans/2026-07-12-main-self-hosted-cicd.md).
-> **Version:** 1.9
+> **Scope:** Governance, baseline, docs/00…17, OpenAPI và changelog; gồm US-004 local implementation với E2E UI journey đã Pass, US-022 notification inbox (API-135/136) Implemented/deployed, canonical Swagger runtime publication và EC2 self-hosted CI/CD profile; full story/production validation còn tiếp tục.
+> **Source:** [AGENTS.md](../AGENTS.md), [Documentation Plan](./00-documentation-plan.md), [Program ExecPlan](../.agent/execplans/2026-07-11-platform-delivery-program.md), [CI/CD ExecPlan](../.agent/execplans/2026-07-12-main-self-hosted-cicd.md), [US-022 Notification ExecPlan](../.agent/execplans/2026-07-26-notification-inbox-us022.md).
+> **Version:** 2.0
 > **Status:** Draft
 > **Owner:** Product Operations / Documentation Owner (cá nhân: TBD)
-> **Updated:** 2026-07-18
+> **Updated:** 2026-07-26
 > **Approval:** Operational foundation EC2 test và US-003/US-004 local implementation Approved — Product Owner delegated 2026-07-11/12; US-004 full acceptance/deployment và toàn platform/production vẫn TBD/Pending theo artefact owner
 
 ## 1. Status legend
