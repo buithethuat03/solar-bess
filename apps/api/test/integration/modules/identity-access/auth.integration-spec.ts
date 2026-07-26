@@ -111,7 +111,7 @@ describe('Auth API integration — TEST-230…233', () => {
     expect(implemented.paths['/v1/rfqs/{rfqId}/bids']).toBeUndefined();
     // US-022 promoted API-135/API-136 into the implemented view.
     expect(implemented.paths['/v1/notifications']).toBeDefined();
-    expect(countOpenApiOperations(implemented)).toBe(138);
+    expect(countOpenApiOperations(implemented)).toBe(154);
 
     const designPage = await request(app.getHttpServer()).get('/api/design-docs/').expect(200)
       .expect('Content-Type', /text\/html/);

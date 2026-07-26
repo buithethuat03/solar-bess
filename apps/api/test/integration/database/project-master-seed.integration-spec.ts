@@ -55,7 +55,7 @@ describe('Project Master seed — master-catalog reconciliation vs demo-project 
     // The seed re-saves every catalog role, so its constant must be the chain maximum or it
     // silently downgrades what the migrations raised. Pinned to the chain max, not a loose floor:
     // a floor would have let `rolePolicyVersion = 8` pass while the chain already ended at 12.
-    expect(pmo.policyVersion).toBe(12);
+    expect(pmo.policyVersion).toBe(14);
     expect(pmo.permissions).toEqual(expect.arrayContaining([
       'equipmentModel.read', 'bom.release', 'solarPlant.configure', 'bessSimulation.run'
     ]));

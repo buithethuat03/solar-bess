@@ -230,7 +230,9 @@ describe('Risk/Issue/Change migrations — DB-065/066/067/105/112/113', () => {
         'workfront.read', 'hseIncident.report', 'stopWork.issue',
         'supplier.read', 'opportunity.read',
         'permission.read.self', 'search.execute', 'savedView.read', 'savedView.create',
-        'report.create', 'report.read'
+        'report.create', 'report.read',
+        'commissioning.read', 'cod.read',
+        'alarmCase.read', 'serviceIncident.read', 'performance.read', 'workOrder.read'
       ]);
       // TENANT_ADMIN is outside the RiskChange grant but inside the notification and workflow ones,
       // and is the only role that may publish a workflow version. The engineering grant adds only

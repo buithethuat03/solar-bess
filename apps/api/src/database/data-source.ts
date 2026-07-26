@@ -25,6 +25,10 @@ import { CreateFieldHseQuality1783746000000 } from './migrations/1783746000000-C
 import { GrantFieldHseQualityPermissions1783747000000 } from './migrations/1783747000000-GrantFieldHseQualityPermissions';
 import { CreateProcurementLogistics1783748000000 } from './migrations/1783748000000-CreateProcurementLogistics';
 import { GrantProcurementPermissions1783749000000 } from './migrations/1783749000000-GrantProcurementPermissions';
+import { CreateCommissioningCod1783758000000 } from './migrations/1783758000000-CreateCommissioningCod';
+import { GrantCommissioningPermissions1783759000000 } from './migrations/1783759000000-GrantCommissioningPermissions';
+import { CreateOperationsMaintenance1783760000000 } from './migrations/1783760000000-CreateOperationsMaintenance';
+import { GrantOperationsMaintenancePermissions1783761000000 } from './migrations/1783761000000-GrantOperationsMaintenancePermissions';
 import { CreateDelegations1783754000000 } from './migrations/1783754000000-CreateDelegations';
 import { CreateSavedViewsAndReportJobs1783755000000 } from './migrations/1783755000000-CreateSavedViewsAndReportJobs';
 import { ExtendWorkflowEscalationNotificationSource1783756000000 } from './migrations/1783756000000-ExtendWorkflowEscalationNotificationSource';
@@ -64,7 +68,11 @@ export function typeOrmOptions(databaseUrl = loadDatabaseConfig().url): DataSour
       CreateDelegations1783754000000,
       CreateSavedViewsAndReportJobs1783755000000,
       ExtendWorkflowEscalationNotificationSource1783756000000,
-      GrantCrossCuttingPermissions1783757000000
+      GrantCrossCuttingPermissions1783757000000,
+      CreateCommissioningCod1783758000000,
+      GrantCommissioningPermissions1783759000000,
+      CreateOperationsMaintenance1783760000000,
+      GrantOperationsMaintenancePermissions1783761000000
     ],
     synchronize: false, logging: false
   };

@@ -7,6 +7,8 @@ import { ContractCostModule } from './modules/contract-cost/contract-cost.module
 import { DocumentControlModule } from './modules/document-control/document-control.module';
 import { EngineeringPlantsModule } from './modules/engineering-plants/engineering-plants.module';
 import { FieldHseQualityModule } from './modules/field-hse-quality/field-hse-quality.module';
+import { CommissioningCodModule } from './modules/commissioning-cod/commissioning-cod.module';
+import { OperationsMaintenanceModule } from './modules/operations-maintenance/operations-maintenance.module';
 import { SearchReportingModule } from './modules/search-reporting/search-reporting.module';
 import { OpportunityModule } from './modules/opportunity/opportunity.module';
 import { ProcurementLogisticsModule } from './modules/procurement-logistics/procurement-logistics.module';
@@ -38,7 +40,9 @@ import { WorkflowModule } from './modules/workflow/workflow.module';
     FieldHseQualityModule,
     ProcurementLogisticsModule,
     OpportunityModule,
-    SearchReportingModule
+    SearchReportingModule,
+    CommissioningCodModule,
+    OperationsMaintenanceModule
   ]
 })
 export class AppModule implements NestModule {

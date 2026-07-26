@@ -232,7 +232,7 @@ describe('Cross-cutting migrations — DB-008/DB-106/DB-107 + escalation vocabul
       'permission.read.self', 'delegation.create', 'delegation.revoke', 'workflow.escalate',
       'search.execute', 'savedView.read', 'savedView.create', 'report.create', 'report.read'
     ]));
-    expect(pmo.policyVersion).toBe(11);
+    expect(pmo.policyVersion).toBeGreaterThanOrEqual(11);
     // The catch-all covers the ten platform catalog roles only. A tenant-defined custom role is
     // that tenant's to govern, and every other grant migration touches only roles it names — a
     // migration that silently rewrote a customer's own role would break that contract.

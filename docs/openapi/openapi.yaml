@@ -6181,56 +6181,92 @@ paths:
       - name: projectId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     get:
       tags: ["Commissioning & COD"]
       summary: "Liệt kê system/subsystem/readiness"
+      description: >-
+        Register system/subsystem của một dự án, mới nhất trước theo keyset cursor `createdAt`/`id`,
+        lọc được theo `status`, `systemType` và `parentSystemId`. Tầm với ABAC được áp TRONG SQL
+        trước khi phân trang: principal chỉ giữ package scope nhận thêm một mệnh đề EXISTS trên các
+        gói ACTIVE của dự án ngay trong câu truy vấn, nên trang trả về không bao giờ bị khoét lỗ vì
+        lọc sau phân trang. Hàng commissioning KHÔNG có chiều package — system, test pack và test run
+        thuộc về cả dự án — nên tầm với gói được quyết định đúng một lần, ở mức dự án. Dự án ngoài
+        tenant, không tồn tại, hoặc mà người gọi không với tới đều trả 404 `PROJECT_NOT_FOUND` và
+        không phân biệt được với nhau; 403 `PERMISSION_DENIED` chỉ dành cho người thiếu hẳn quyền
+        `commissioning.read`. Cursor sai định dạng trả 400 `INVALID_CURSOR`, không bao giờ âm thầm
+        bỏ phân trang.
       operationId: api_098_get_v1_projects_projectid_commissioning_systems
       x-api-id: "API-098"
+      x-implementation-status: implemented
       x-permission: "commissioning.read"
-      x-data-scope: "project/system"
-      x-idempotency: "safe"
+      x-data-scope: "tenant/project/package; package reach giải một lần ở mức dự án — ngoài scope là 404"
+      x-idempotency: "safe; opaque keyset cursor theo createdAt/id giảm dần"
       x-related-requirements: ["FR-106"]
       x-related-data: ["DB-073"]
       x-related-security: ["SEC-111"]
+      x-error-codes: ["PROJECT_NOT_FOUND", "INVALID_CURSOR", "PERMISSION_DENIED"]
       security:
         - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/TenantHeader'
         - $ref: '#/components/parameters/CorrelationHeader'
+        - name: cursor
+          in: query
+          required: false
+          schema: {type: string, maxLength: 500}
+          description: Opaque cursor từ meta.nextCursor; đi tới null để duyệt hết
+        - name: limit
+          in: query
+          required: false
+          schema: {type: integer, minimum: 1, maximum: 100, default: 50}
+        - name: status
+          in: query
+          required: false
+          schema: {$ref: '#/components/schemas/CommissioningSystemStatus'}
+        - name: systemType
+          in: query
+          required: false
+          schema: {type: string, pattern: '^[A-Z][A-Z0-9_]{0,39}$', maxLength: 40}
+        - name: parentSystemId
+          in: query
+          required: false
+          schema: {type: string, format: uuid}
       responses:
         '200':
-          description: "Authorized result"
+          description: "Trang system/subsystem đã lọc theo scope trong SQL, mới nhất trước"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/CommissioningSystemListResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
     post:
       tags: ["Commissioning & COD"]
       summary: "Tạo system boundary"
+      description: >-
+        Tạo ranh giới system ở trạng thái NOT_READY — catalog không có operation nào chuyển trạng
+        thái system, nên NOT_READY là trạng thái duy nhất operation này sinh ra được. `parentSystemId`
+        nếu có phải là một system CÙNG dự án (422 `PARENT_SYSTEM_NOT_FOUND`) và không được là chính
+        nó (422 `PARENT_SYSTEM_INVALID`, chốt chặn cuối là `ck_commissioning_system_parent`). Trùng
+        `code` trong dự án trả 409 `COMMISSIONING_SYSTEM_CODE_CONFLICT` và không ghi thêm gì. Dự án
+        ngoài tenant hoặc ngoài tầm với trả 404 `PROJECT_NOT_FOUND`, không phải 403.
+        `Idempotency-Key` 8–200 ký tự là BẮT BUỘC (thiếu hoặc sai độ dài trả 400
+        `IDEMPOTENCY_KEY_REQUIRED`): cùng key cùng nội dung phát lại đúng 201 cũ, cùng key khác nội
+        dung trả 409 `IDEMPOTENCY_CONFLICT`. Ghi đã commit trả 201 — không bao giờ 202.
       operationId: api_099_post_v1_projects_projectid_commissioning_systems
       x-api-id: "API-099"
+      x-implementation-status: implemented
       x-permission: "commissioningSystem.create"
-      x-data-scope: "project"
-      x-idempotency: "required"
+      x-data-scope: "tenant/project/package; ngoài scope là 404"
+      x-idempotency: "required; DB-101 command receipt phát lại nguyên trạng"
       x-related-requirements: ["FR-106"]
       x-related-data: ["DB-073"]
       x-related-security: ["SEC-111"]
+      x-error-codes: ["PROJECT_NOT_FOUND", "PARENT_SYSTEM_NOT_FOUND", "PARENT_SYSTEM_INVALID", "COMMISSIONING_SYSTEM_CODE_CONFLICT", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -6241,47 +6277,51 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/CreateCommissioningSystemRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '201':
+          description: "System NOT_READY đã được ghi trong đúng dự án"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/CommissioningSystemCommandResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/commissioning-systems/{systemId}/test-packs":
     parameters:
       - name: systemId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     post:
       tags: ["Commissioning & COD"]
       summary: "Tạo/approve test pack revision"
+      description: >-
+        QUY TRÌNH THỬ NGHIỆM LÀ TÀI LIỆU ĐƯỢC KIỂM SOÁT. Pack chỉ được tạo từ một revision đã ISSUED
+        và quét mã độc CLEAN; revision ở trạng thái khác, chưa quét sạch, thuộc dự án khác hoặc
+        không tồn tại đều trả CÙNG một 422 `PROCEDURE_REVISION_LOCKED`, nên endpoint không trở thành
+        máy dò sự tồn tại của một `procedureRevisionId`. Catalog không có operation approve riêng —
+        tóm tắt là "Tạo/approve" — nên pack ra đời đã APPROVED và bị
+        `trg_test_pack_approved_immutable` đóng băng ngay từ đó; một revision quy trình mới sinh ra
+        pack MỚI chứ không sửa pack cũ. Trùng (code, procedureRevisionId) trong system trả 409
+        `TEST_PACK_CONFLICT`. Scope thật giải từ dự án của system sở hữu: system ngoài tenant hoặc
+        ngoài tầm với trả 404 `COMMISSIONING_SYSTEM_NOT_FOUND`, dự án ngoài tầm với trả 404
+        `PROJECT_NOT_FOUND` — không bao giờ 403.
       operationId: api_100_post_v1_commissioning_systems_systemid_test_packs
       x-api-id: "API-100"
+      x-implementation-status: implemented
       x-permission: "testPack.create"
-      x-data-scope: "system"
-      x-idempotency: "required"
+      x-data-scope: "scope lấy từ dự án của system sở hữu; ngoài scope là 404"
+      x-idempotency: "required; DB-101 command receipt phát lại nguyên trạng"
       x-related-requirements: ["FR-107"]
       x-related-data: ["DB-074"]
       x-related-security: ["SEC-108", "SEC-111"]
+      x-error-codes: ["COMMISSIONING_SYSTEM_NOT_FOUND", "PROJECT_NOT_FOUND", "PROCEDURE_REVISION_LOCKED", "TEST_PACK_CONFLICT", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -6292,47 +6332,49 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/CreateTestPackRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '201':
+          description: "Test pack APPROVED gắn với revision quy trình đã ISSUED + CLEAN, đóng băng ngay"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/TestPackCommandResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/test-packs/{testPackId}/test-runs":
     parameters:
       - name: testPackId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     post:
       tags: ["Commissioning & COD"]
       summary: "Start test run after prerequisites"
+      description: >-
+        Mở một lần chạy ở trạng thái IN_PROGRESS. Pack phải đang APPROVED (422
+        `TEST_PACK_NOT_APPROVED`) và mọi mục trong mảng `required` của prerequisite snapshot ĐÃ ĐÓNG
+        BĂNG của pack phải nằm trong `satisfiedPrerequisites`; thiếu thì trả 422
+        `PREREQUISITES_NOT_MET` kèm danh sách còn thiếu và không ghi gì. Mỗi pack chỉ được có ĐÚNG
+        MỘT lần chạy chưa ghi kết quả: chốt chặn là partial unique `uq_test_run_open`, lần thứ hai
+        trả 409 `RUN_IN_PROGRESS`. `runNo` được cấp bên trong chính transaction, nên hai yêu cầu
+        đồng thời thì một trong hai nhận 409 `RUN_SEQUENCE_CONFLICT` chứ không ghi đè nhau. Pack
+        ngoài tenant hoặc ngoài tầm với trả 404 `TEST_PACK_NOT_FOUND`, không phải 403.
       operationId: api_101_post_v1_test_packs_testpackid_test_runs
       x-api-id: "API-101"
+      x-implementation-status: implemented
       x-permission: "testRun.start"
-      x-data-scope: "test pack/system"
-      x-idempotency: "required"
+      x-data-scope: "scope lấy từ dự án của test pack sở hữu; ngoài scope là 404"
+      x-idempotency: "required; DB-101 command receipt phát lại nguyên trạng"
       x-related-requirements: ["FR-108"]
       x-related-data: ["DB-075"]
       x-related-security: ["SEC-108", "SEC-114"]
+      x-error-codes: ["TEST_PACK_NOT_FOUND", "PROJECT_NOT_FOUND", "TEST_PACK_NOT_APPROVED", "PREREQUISITES_NOT_MET", "RUN_IN_PROGRESS", "RUN_SEQUENCE_CONFLICT", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -6343,47 +6385,51 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/StartTestRunRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '201':
+          description: "Lần chạy IN_PROGRESS ở runNo kế tiếp, chưa có kết quả"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/TestRunCommandResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/test-runs/{testRunId}:complete":
     parameters:
       - name: testRunId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     post:
       tags: ["Commissioning & COD"]
       summary: "Record pass/fail/abort immutable result"
+      description: >-
+        MỘT KẾT QUẢ ĐÃ GHI LÀ VĨNH VIỄN. Lệnh ghi kết quả đúng MỘT lần rồi
+        `trg_test_run_result_immutable` đóng băng hàng: một lần chạy FAILED không bao giờ trở thành
+        PASSED, dù lời gọi thứ hai yêu cầu gì — lời gọi đó nhận 409 `RESULT_ALREADY_RECORDED` và
+        hàng giữ nguyên kết quả cũ. Chạy lại là một HÀNG MỚI trỏ ngược về lần thất bại (API-103),
+        không phải một lần sửa; thất bại vì thế hiển thị vĩnh viễn trong sổ. Bằng chứng là BẮT BUỘC
+        với mọi kết quả, kể cả ABORTED: `evidenceRefs` rỗng bị chặn ngay ở tầng validate (400) và
+        `ck_test_run_recorded` chặn lần nữa trong cơ sở dữ liệu (422 `EVIDENCE_REQUIRED`).
+        `expectedVersion` bắt buộc; lệch trả 409 `VERSION_CONFLICT` kèm `currentVersion`. Lần chạy
+        ngoài tenant hoặc ngoài tầm với trả 404 `TEST_RUN_NOT_FOUND`, không phải 403. Ghi đã commit
+        trả 200 — không bao giờ 202.
       operationId: api_102_post_v1_test_runs_testrunid_complete
       x-api-id: "API-102"
+      x-implementation-status: implemented
       x-permission: "testRun.complete"
-      x-data-scope: "test run"
-      x-idempotency: "required"
+      x-data-scope: "scope lấy từ dự án của lần chạy; ngoài scope là 404"
+      x-idempotency: "required; expectedVersion bắt buộc; DB-101 command receipt phát lại nguyên trạng"
       x-related-requirements: ["FR-109"]
       x-related-data: ["DB-075"]
       x-related-security: ["SEC-108", "SEC-109"]
+      x-error-codes: ["TEST_RUN_NOT_FOUND", "PROJECT_NOT_FOUND", "RESULT_ALREADY_RECORDED", "EVIDENCE_REQUIRED", "VERSION_CONFLICT", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -6394,47 +6440,50 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/CompleteTestRunRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '200':
+          description: "Lần chạy RECORDED kèm kết quả, bằng chứng và snapshot người chứng kiến; hàng bị đóng băng từ đây"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/TestRunCommandResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/test-runs/{testRunId}:create-retest":
     parameters:
       - name: testRunId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     post:
       tags: ["Commissioning & COD"]
       summary: "Create retest linked to failed/aborted run"
+      description: >-
+        Chạy lại là một HÀNG MỚI ở `runNo` kế tiếp mang `previousRunId`; lần chạy cũ KHÔNG bị chạm
+        vào, nên một thất bại vẫn hiển thị vĩnh viễn. Chỉ lần chạy đã RECORDED với kết quả FAILED
+        hoặc ABORTED mới được chạy lại (422 `RETEST_NOT_ALLOWED`): PASSED không có gì để chạy lại,
+        còn INCONCLUSIVE nằm ngoài diễn đạt "failed/aborted" của catalog nên mở rộng sẽ là đổi phạm
+        vi. Mỗi lần chạy chỉ được chạy lại một lần — `uq_test_run_retest_once` trả 409
+        `RETEST_ALREADY_EXISTS` — nên một thất bại không thể bị chạy lại cho tới khi im lặng.
+        Prerequisite của pack được kiểm lại y như API-101 (422 `PREREQUISITES_NOT_MET`) và pack vẫn
+        chỉ được có một lần chạy đang mở (409 `RUN_IN_PROGRESS`). Lần chạy ngoài tenant hoặc ngoài
+        tầm với trả 404 `TEST_RUN_NOT_FOUND`, không phải 403.
       operationId: api_103_post_v1_test_runs_testrunid_create_retest
       x-api-id: "API-103"
+      x-implementation-status: implemented
       x-permission: "testRun.retest"
-      x-data-scope: "test run"
-      x-idempotency: "required"
+      x-data-scope: "scope lấy từ dự án của lần chạy; ngoài scope là 404"
+      x-idempotency: "required; DB-101 command receipt phát lại nguyên trạng"
       x-related-requirements: ["FR-110"]
       x-related-data: ["DB-075"]
       x-related-security: ["SEC-109"]
+      x-error-codes: ["TEST_RUN_NOT_FOUND", "PROJECT_NOT_FOUND", "RETEST_NOT_ALLOWED", "PREREQUISITES_NOT_MET", "RETEST_ALREADY_EXISTS", "RUN_IN_PROGRESS", "RUN_SEQUENCE_CONFLICT", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -6445,91 +6494,130 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/CreateRetestRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '201':
+          description: "Lần chạy lại IN_PROGRESS mới, mang previousRunId trỏ về lần thất bại"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/TestRunCommandResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/projects/{projectId}/cod-readiness":
     parameters:
       - name: projectId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     get:
       tags: ["Commissioning & COD"]
       summary: "Đọc gate/evidence/expiry/confidence snapshot"
+      description: >-
+        Ma trận readiness COD tại một MỐC THỜI GIAN: `asOf` (mặc định là thời điểm gọi) là mốc so
+        sánh hạn bằng chứng, nên một câu trả lời về hết hiệu lực luôn tái lập được. Trả về số đếm
+        theo trạng thái gate, tổng hợp theo category, danh sách gate đang dựa trên bằng chứng đã hết
+        hiệu lực, và các phát hiện CHẶN COD: punch item `cod_blocking` chưa đóng, NCR CRITICAL chưa
+        đóng, lệnh dừng việc chưa được gỡ. AN TOÀN HỎNG THÌ ĐÓNG: nếu chính sổ stop-work không đọc
+        được thì kết quả vẫn là một phát hiện chặn tổng hợp, không bao giờ là một cái nhún vai cho
+        qua. Phát hiện chặn được đọc QUA tầm với của người gọi (NCR còn bị thu hẹp thêm theo package
+        reach) và chỉ mang id, mã tham chiếu và phân loại — không mô tả punch, không diễn giải NCR,
+        không lý do dừng việc. Cùng một hàm thuần này quyết định `readyToSign` cho `SIGN_COD` của
+        API-105, nên một chữ ký không bao giờ bị phán xử bởi một bản luật thứ hai đã trôi. Dự án
+        ngoài tenant hoặc ngoài tầm với trả 404 `PROJECT_NOT_FOUND`, không phải 403.
       operationId: api_104_get_v1_projects_projectid_cod_readiness
       x-api-id: "API-104"
+      x-implementation-status: implemented
       x-permission: "cod.read"
-      x-data-scope: "project/gate/document fields"
-      x-idempotency: "safe"
+      x-data-scope: "tenant/project/package; phát hiện chặn đọc qua đúng tầm với người gọi — ngoài scope là 404"
+      x-idempotency: "safe; asOf làm cho kết quả tái lập được"
       x-related-requirements: ["FR-112"]
       x-related-data: ["DB-076", "DB-077"]
       x-related-security: ["SEC-111", "SEC-112"]
+      x-error-codes: ["PROJECT_NOT_FOUND", "PERMISSION_DENIED"]
       security:
         - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/TenantHeader'
         - $ref: '#/components/parameters/CorrelationHeader'
+        - name: asOf
+          in: query
+          required: false
+          schema: {type: string, format: date-time}
+          description: Mốc đánh giá hạn bằng chứng; bỏ trống thì lấy thời điểm gọi
       responses:
         '200':
-          description: "Authorized result"
+          description: "Ma trận readiness tại asOf kèm danh sách hồ sơ COD của dự án, mới nhất trước"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/CodReadinessResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/projects/{projectId}/cod-transition-commands":
     parameters:
       - name: projectId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     post:
       tags: ["Commissioning & COD"]
       summary: "Submit/sign COD hoặc accept handover theo command type"
+      description: >-
+        LỆNH HỢP ĐÓNG trên `commandType`: `DEFINE_GATE`, `REVIEW_EVIDENCE`, `WAIVE_GATE`,
+        `SUBMIT_COD`, `SIGN_COD`, `ACCEPT_HANDOVER`. Tóm tắt trong catalog chỉ nêu
+        submit/sign/accept, nhưng AC-058 (khai báo từng điều kiện COD kèm nguồn, cờ bắt buộc/miễn
+        trừ được, người thẩm tra, bằng chứng và hạn), AC-059 (người thẩm tra độc lập ghi
+        Pass/Fail/Conditional trên bằng chứng đã nộp) và AC-060 (điều kiện đang bị chặn không được
+        miễn trừ) đều cần đường ghi mà không operation nào khác trong catalog cung cấp. Bịa thêm mã
+        API bị `AGENTS.md` §4 cấm, nên ba lệnh còn thiếu nhập vào chính union này — đúng tiền lệ
+        API-149 vốn đã mang một union đóng các chuyển tiếp dưới một mã duy nhất. Union là ĐÓNG:
+        `commandType` ngoài danh sách bị chặn ở tầng validate với 400 và không bao giờ tới service.
+        AC-059 được thi hành hai lớp: người nộp bằng chứng không bao giờ được tự thẩm tra bằng chứng
+        đó (422 `SOD_CONFLICT`, chốt chặn cuối `ck_cod_gate_review_cycle_sod`), và bằng chứng đã hết
+        hiệu lực không bao giờ kết luận đạt (422 `EVIDENCE_EXPIRED`). AC-060: gate khai báo không
+        miễn trừ được thì không bao giờ mang trạng thái WAIVED (422 `NON_WAIVABLE_GATE`, chốt chặn
+        `ck_cod_gate_waiver_allowed`). Gate đã ACCEPTED/WAIVED bị trigger đóng băng — mọi lệnh tiếp
+        theo trả 422 `INVALID_STATE_TRANSITION`.
+        FR-113: `SUBMIT_COD` ĐƯỢC PHÉP ghi lại một bức tranh No-go; chính CHỮ KÝ mới là thứ bị từ
+        chối. `SIGN_COD` đòi người ký KHÁC người trình (422 `SOD_CONFLICT`, chốt chặn
+        `ck_cod_package_sod`) và bị từ chối khi còn bất kỳ phát hiện chặn nào đang mở (422
+        `GATE_BLOCKED`): punch item hạng A, NCR CRITICAL chưa đóng, lệnh dừng việc chưa gỡ, hoặc còn
+        một điều kiện COD bắt buộc chưa đạt. Hàng đã ký lưu snapshot readiness cùng `snapshotHash`
+        là SHA-256 canonical của đúng thứ được ký, và một snapshot người ký BẤT BIẾN dùng id ổn định
+        — không bao giờ chỉ là một chuỗi hiển thị.
+        SEC-102 (step-up authentication) KHÔNG tồn tại trong auth profile đã được duyệt: không có
+        yếu tố xác thực bổ sung, không có endpoint tái xác thực, phiên không mang mức đảm bảo nào.
+        Giả lập một step-up sẽ ghi nhận một mức đảm bảo chưa từng đạt được, nên nó CỐ Ý không được
+        giả lập; bù lại là SoD trên chữ ký, snapshot người ký bất biến, và audit + outbox nằm trong
+        cùng transaction ký. Đóng SEC-102 cần thay đổi auth profile — đây được ghi nhận là khoảng
+        trống, không phải một tính năng đã có.
+        Hồ sơ đã SIGNED chỉ còn ĐÚNG HAI nước đi: handover đẩy nó sang HANDED_OVER, và đặt legal
+        hold. GỠ legal hold luôn bị trigger từ chối — hold được đặt đúng vào những hồ sơ đã hoàn tất,
+        nên từ chối việc đặt nó sẽ làm control vô dụng đúng trên thứ nó sinh ra để bảo vệ. Hồ sơ
+        HANDED_OVER là lịch sử bất biến, và một bên nhận chỉ ký nhận đúng một lần (409
+        `HANDOVER_ALREADY_ACCEPTED`). Dự án ngoài tenant hoặc ngoài tầm với trả 404
+        `PROJECT_NOT_FOUND`; gate hoặc hồ sơ không có trong dự án trả 404 `COD_GATE_NOT_FOUND` /
+        `COD_PACKAGE_NOT_FOUND` — không bao giờ 403. Mọi nhánh đã commit trả 200, không bao giờ 202.
       operationId: api_105_post_v1_projects_projectid_cod_transition_commands
       x-api-id: "API-105"
+      x-implementation-status: implemented
+      x-implementation-note: "SEC-102 step-up chưa tồn tại trong auth profile đã duyệt và cố ý không được giả lập; control bù là SoD, snapshot người ký bất biến và audit. Đóng SEC-102 cần thay đổi auth profile — Open Question cho chủ sở hữu auth profile."
       x-permission: "cod.manage"
-      x-data-scope: "project/gate/package/recipient"
-      x-idempotency: "required"
+      x-data-scope: "tenant/project/package; gate, hồ sơ và handover đều phải nằm trong dự án trên path — ngoài scope là 404"
+      x-idempotency: "required; expectedVersion bắt buộc cho mọi lệnh trên gate/hồ sơ; DB-101 command receipt phát lại nguyên trạng"
       x-related-requirements: ["FR-113", "FR-114"]
-      x-related-data: ["DB-076", "DB-077", "DB-078"]
+      x-related-data: ["DB-076", "DB-077", "DB-078", "DB-118"]
       x-related-security: ["SEC-102", "SEC-108", "SEC-109"]
+      x-error-codes: ["PROJECT_NOT_FOUND", "COD_GATE_NOT_FOUND", "COD_PACKAGE_NOT_FOUND", "CATEGORY_REQUIRED", "CODE_REQUIRED", "TITLE_REQUIRED", "OWNER_NOT_FOUND", "COD_GATE_CONFLICT", "REVIEW_ACTION_REQUIRED", "GATE_REFERENCE_REQUIRED", "PACKAGE_REFERENCE_REQUIRED", "EVIDENCE_REQUIRED", "REASON_REQUIRED", "DECISION_REQUIRED", "NO_OPEN_REVIEW_CYCLE", "REVIEW_CYCLE_OPEN", "REVIEW_CYCLE_CONFLICT", "EVIDENCE_EXPIRED", "SOD_CONFLICT", "NON_WAIVABLE_GATE", "INVALID_STATE_TRANSITION", "GATE_BLOCKED", "COD_PACKAGE_IN_FLIGHT", "COD_PACKAGE_VERSION_CONFLICT", "RECIPIENT_REQUIRED", "FROM_PARTY_REQUIRED", "PARTY_NOT_FOUND", "HANDOVER_PARTIES_INVALID", "HANDOVER_ALREADY_ACCEPTED", "VERSION_CONFLICT", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -6540,29 +6628,21 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/CodTransitionCommandRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '200':
+          description: "Kết quả đã commit của đúng một nhánh trong union: gate, hồ sơ COD kèm readiness, hoặc biên bản bàn giao"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/CodTransitionCommandResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/workflow-definitions":
     get:
       tags: ["Workflow"]
@@ -6925,63 +7005,103 @@ paths:
       - name: siteId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     get:
       tags: ["O&M"]
       summary: "Liệt kê AlarmCase local với source quality"
+      description: >-
+        Register AlarmCase LOCAL của một site, mới nhất trước theo keyset cursor `createdAt`/`id`,
+        lọc được theo `state`, `severity` và `assetId`. Site thuộc về một dự án và `role_assignments`
+        KHÔNG có scope type SITE hay ASSET, nên dự án của site chính là neo ABAC — slice này không
+        bịa thêm một mô hình phân quyền; một principal chỉ có package scope không với tới hàng O&M
+        nào, đúng theo deny-by-default. Vị từ dự án nằm trong CHÍNH câu truy vấn nên trang trả về
+        không bao giờ bị cắt sau phân trang. Site ngoài tenant, không tồn tại hoặc ngoài tầm với đều
+        trả 404 `SITE_NOT_FOUND`, không phải 403; 403 `PERMISSION_DENIED` chỉ dành cho người thiếu
+        hẳn quyền `alarmCase.read`. Projection chỉ mang `sourceEventRefs` — các id LOGIC vào kho sự
+        kiện OT DB-092 — và `sourceQuality` chép nguyên văn; không payload, không tag, không gateway,
+        không endpoint (SEC-127/SEC-128). Không operation nào trong catalog TẠO alarm case: hàng đến
+        từ đường ingress tích hợp chỉ-đọc. Cursor sai định dạng trả 400 `INVALID_CURSOR`.
       operationId: api_114_get_v1_sites_siteid_alarm_cases
       x-api-id: "API-114"
+      x-implementation-status: implemented
       x-permission: "alarmCase.read"
-      x-data-scope: "site/asset/field"
-      x-idempotency: "safe"
+      x-data-scope: "dự án của site là neo ABAC; không có SITE/ASSET scope type — ngoài scope là 404"
+      x-idempotency: "safe; opaque keyset cursor theo createdAt/id giảm dần"
       x-related-requirements: ["FR-118"]
       x-related-data: ["DB-084", "DB-092"]
       x-related-security: ["SEC-127", "SEC-128"]
+      x-error-codes: ["SITE_NOT_FOUND", "INVALID_CURSOR", "PERMISSION_DENIED"]
       security:
         - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/TenantHeader'
         - $ref: '#/components/parameters/CorrelationHeader'
+        - name: cursor
+          in: query
+          required: false
+          schema: {type: string, maxLength: 500}
+          description: Opaque cursor từ meta.nextCursor; đi tới null để duyệt hết
+        - name: limit
+          in: query
+          required: false
+          schema: {type: integer, minimum: 1, maximum: 100, default: 50}
+        - name: state
+          in: query
+          required: false
+          schema: {$ref: '#/components/schemas/AlarmCaseState'}
+        - name: severity
+          in: query
+          required: false
+          schema: {$ref: '#/components/schemas/AlarmCaseSeverity'}
+        - name: assetId
+          in: query
+          required: false
+          schema: {type: string, format: uuid}
       responses:
         '200':
-          description: "Authorized result"
+          description: "Trang alarm case local của site, mới nhất trước"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/AlarmCaseListResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/alarm-cases/{alarmCaseId}:acknowledge":
     parameters:
       - name: alarmCaseId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     post:
       tags: ["O&M"]
       summary: "Acknowledge local case; không clear/reset OT"
+      description: >-
+        XÁC NHẬN LÀ VIỆC CỤC BỘ VÀ CHỈ CỤC BỘ. Lệnh ghi đúng bốn cột trên hàng của PM Web —
+        `state`, `acknowledgedBy`, `acknowledgedAt`, `acknowledgmentNote` — và KHÔNG BAO GIỜ clear,
+        reset, suppress hay chạm tới alarm nguồn trong hệ OT. Không có trường yêu cầu, đường mã,
+        hàng đợi hay credential nào ở đây với tới được nguồn; thân yêu cầu không mang bất kỳ định
+        danh nguồn nào, và `trg_alarm_case_source_projection_immutable` từ chối mọi cập nhật lén đổi
+        projection do ingestion sở hữu. Một case đã xác nhận KHÔNG nói gì về trạng thái của nhà máy
+        (SEC-127/SEC-128, WF-025). PHÁT LẠI LÀ NO-OP IDEMPOTENT: case đã được xác nhận thì hàng,
+        `versionNo` và vết audit giữ nguyên đúng như lần xác nhận đầu tiên và response mang
+        `acknowledgementApplied: false` — không bao giờ sinh một sự kiện xác nhận thứ hai.
+        `expectedVersion` bắt buộc; lệch trả 409 `VERSION_CONFLICT` kèm `currentVersion`. Cùng
+        `Idempotency-Key` với thân khác trả 409 `IDEMPOTENCY_CONFLICT`. Case ngoài tenant hoặc ngoài
+        tầm với trả 404 `ALARM_CASE_NOT_FOUND`, không phải 403. Ghi đã commit trả 200 — không bao
+        giờ 202.
       operationId: api_115_post_v1_alarm_cases_alarmcaseid_acknowledge
       x-api-id: "API-115"
+      x-implementation-status: implemented
       x-permission: "alarmCase.acknowledge"
-      x-data-scope: "alarm case"
-      x-idempotency: "required"
+      x-data-scope: "dự án của case là neo ABAC; ngoài scope là 404"
+      x-idempotency: "required; expectedVersion bắt buộc; phát lại và xác nhận lần hai đều là no-op, DB-101 command receipt phát lại nguyên trạng"
       x-related-requirements: ["FR-118"]
       x-related-data: ["DB-084"]
-      x-related-security: ["SEC-128"]
+      x-related-security: ["SEC-127", "SEC-128"]
+      x-error-codes: ["ALARM_CASE_NOT_FOUND", "VERSION_CONFLICT", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -6992,84 +7112,111 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/AcknowledgeAlarmCaseRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '200':
+          description: "Case local đã xác nhận; acknowledgementApplied cho biết lệnh này có ghi gì hay là no-op"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/AlarmCaseCommandResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/sites/{siteId}/service-incidents":
     parameters:
       - name: siteId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     get:
       tags: ["O&M"]
       summary: "Liệt kê ServiceIncident/SLA"
+      description: >-
+        Register sự cố dịch vụ kèm đồng hồ SLA của một site, mới nhất trước theo keyset cursor
+        `createdAt`/`id`, lọc được theo `status`, `severity` và `assetId`. Cũng như API-114, dự án
+        của site là neo ABAC và vị từ dự án nằm trong chính câu truy vấn, nên trang không bao giờ bị
+        cắt sau phân trang. Site ngoài tenant hoặc ngoài tầm với trả 404 `SITE_NOT_FOUND`, không
+        phải 403; 403 `PERMISSION_DENIED` chỉ dành cho người thiếu hẳn quyền `serviceIncident.read`.
+        Các mốc SLA là dữ liệu ghi trên hàng — không có tính toán vi phạm nào được bịa ra ở đây.
+        Cursor sai định dạng trả 400 `INVALID_CURSOR`.
       operationId: api_116_get_v1_sites_siteid_service_incidents
       x-api-id: "API-116"
+      x-implementation-status: implemented
       x-permission: "serviceIncident.read"
-      x-data-scope: "site/asset"
-      x-idempotency: "safe"
+      x-data-scope: "dự án của site là neo ABAC; ngoài scope là 404"
+      x-idempotency: "safe; opaque keyset cursor theo createdAt/id giảm dần"
       x-related-requirements: ["FR-119"]
       x-related-data: ["DB-085"]
       x-related-security: ["SEC-128"]
+      x-error-codes: ["SITE_NOT_FOUND", "INVALID_CURSOR", "PERMISSION_DENIED"]
       security:
         - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/TenantHeader'
         - $ref: '#/components/parameters/CorrelationHeader'
+        - name: cursor
+          in: query
+          required: false
+          schema: {type: string, maxLength: 500}
+          description: Opaque cursor từ meta.nextCursor; đi tới null để duyệt hết
+        - name: limit
+          in: query
+          required: false
+          schema: {type: integer, minimum: 1, maximum: 100, default: 50}
+        - name: status
+          in: query
+          required: false
+          schema: {$ref: '#/components/schemas/ServiceIncidentStatus'}
+        - name: severity
+          in: query
+          required: false
+          schema: {$ref: '#/components/schemas/ServiceIncidentSeverity'}
+        - name: assetId
+          in: query
+          required: false
+          schema: {type: string, format: uuid}
       responses:
         '200':
-          description: "Authorized result"
+          description: "Trang sự cố dịch vụ của site kèm mốc SLA đã ghi, mới nhất trước"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/ServiceIncidentListResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
     post:
       tags: ["O&M"]
       summary: "Tạo ServiceIncident từ case/report"
+      description: >-
+        Mở một sự cố dịch vụ ở trạng thái OPEN — catalog không có operation chuyển trạng thái sự cố,
+        nên OPEN là trạng thái duy nhất operation này sinh ra được. Cửa sổ gián đoạn và đồng hồ SLA
+        là tùy chọn vì một báo cáo hiện trường thường đến trước cả hai; nhưng nếu có thì phải nhất
+        quán: `downtimeEnd` mà thiếu `downtimeStart` trả 422 `DOWNTIME_START_REQUIRED`, và kết thúc
+        trước khi bắt đầu trả 422 `DOWNTIME_WINDOW_INVALID` (chốt chặn cuối là
+        `ck_service_incident_downtime`). Mọi tham chiếu đều bị buộc về đúng phạm vi: `assetId` phải
+        thuộc site (422 `ASSET_NOT_FOUND`), `alarmCaseId` phải thuộc CÙNG site (422
+        `ALARM_CASE_NOT_FOUND`), `hseIncidentId` phải thuộc CÙNG dự án (422
+        `HSE_INCIDENT_NOT_FOUND`) — mỗi lần từ chối đều cuộn lại toàn bộ transaction. Site ngoài
+        tenant hoặc ngoài tầm với trả 404 `SITE_NOT_FOUND`, không phải 403. Ghi đã commit trả 201 —
+        không bao giờ 202.
       operationId: api_117_post_v1_sites_siteid_service_incidents
       x-api-id: "API-117"
+      x-implementation-status: implemented
       x-permission: "serviceIncident.create"
-      x-data-scope: "site/asset"
-      x-idempotency: "required"
+      x-data-scope: "dự án của site là neo ABAC; ngoài scope là 404"
+      x-idempotency: "required; DB-101 command receipt phát lại nguyên trạng"
       x-related-requirements: ["FR-119"]
       x-related-data: ["DB-085"]
       x-related-security: ["SEC-128"]
+      x-error-codes: ["SITE_NOT_FOUND", "ASSET_NOT_FOUND", "ALARM_CASE_NOT_FOUND", "HSE_INCIDENT_NOT_FOUND", "DOWNTIME_START_REQUIRED", "DOWNTIME_WINDOW_INVALID", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -7080,84 +7227,113 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/CreateServiceIncidentRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '201':
+          description: "Sự cố dịch vụ OPEN đã được ghi trên đúng site"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/ServiceIncidentCommandResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/assets/{assetId}/work-orders":
     parameters:
       - name: assetId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     get:
       tags: ["O&M"]
       summary: "Liệt kê work orders cùng maintenance/warranty context"
+      description: >-
+        Register work order của một asset, mới nhất trước theo keyset cursor `createdAt`/`id`, lọc
+        được theo `status` và `priority`. Asset nằm trên một site và site thuộc một dự án, nên dự án
+        là neo ABAC; asset ngoài tenant, không tồn tại hoặc ngoài tầm với đều trả 404
+        `ASSET_NOT_FOUND` và không phân biệt được với nhau, còn 403 `PERMISSION_DENIED` chỉ dành cho
+        người thiếu hẳn quyền `workOrder.read`. Ngữ cảnh đi kèm chỉ gồm những gì cơ sở dữ liệu này
+        chứng minh được: tóm tắt kế hoạch bảo trì DB-087 của đúng các hàng trên trang, và số yêu cầu
+        bảo hành DB-088 đếm theo từng work order. Không có `warrantyId`: DB-083 (Warranty) CỐ Ý
+        không được tạo vì không operation nào trong catalog ghi được vào nó, nên không có bảng nào
+        để trỏ tới — khi một slice Warranty được duyệt thì cột và khóa ngoại là một migration bồi
+        thêm. Cursor sai định dạng trả 400 `INVALID_CURSOR`.
       operationId: api_118_get_v1_assets_assetid_work_orders
       x-api-id: "API-118"
+      x-implementation-status: implemented
       x-permission: "workOrder.read"
-      x-data-scope: "asset/site"
-      x-idempotency: "safe"
+      x-data-scope: "dự án của asset là neo ABAC; ngoài scope là 404"
+      x-idempotency: "safe; opaque keyset cursor theo createdAt/id giảm dần"
       x-related-requirements: ["FR-120"]
       x-related-data: ["DB-083", "DB-086", "DB-087"]
       x-related-security: ["SEC-111", "SEC-128"]
+      x-error-codes: ["ASSET_NOT_FOUND", "INVALID_CURSOR", "PERMISSION_DENIED"]
       security:
         - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/TenantHeader'
         - $ref: '#/components/parameters/CorrelationHeader'
+        - name: cursor
+          in: query
+          required: false
+          schema: {type: string, maxLength: 500}
+          description: Opaque cursor từ meta.nextCursor; đi tới null để duyệt hết
+        - name: limit
+          in: query
+          required: false
+          schema: {type: integer, minimum: 1, maximum: 100, default: 50}
+        - name: status
+          in: query
+          required: false
+          schema: {$ref: '#/components/schemas/WorkOrderStatus'}
+        - name: priority
+          in: query
+          required: false
+          schema: {$ref: '#/components/schemas/WorkOrderPriority'}
       responses:
         '200':
-          description: "Authorized result"
+          description: "Trang work order của asset kèm tóm tắt kế hoạch bảo trì và số yêu cầu bảo hành"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/WorkOrderListResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
     post:
       tags: ["O&M"]
       summary: "Tạo work order với PTW/SLA, maintenance plan và warranty prerequisites"
+      description: >-
+        Tạo work order ở DRAFT, hoặc SCHEDULED khi có `scheduledAt` — catalog không có operation
+        approve hay schedule nào, nên đây là hai trạng thái duy nhất operation này sinh ra được.
+        Khi `requiresPermit = true`, `permitToWorkId` phải trỏ tới một permit đang còn hiệu lực,
+        TRONG cửa sổ thời hạn và thuộc ĐÚNG SITE của asset; thiếu, sai site, sai trạng thái hoặc
+        ngoài cửa sổ đều trả 422 `PTW_REQUIRED` và không ghi gì. Khi công việc không đòi permit
+        nhưng vẫn tham chiếu một permit, permit đó vẫn phải tồn tại và đúng site (422
+        `PTW_NOT_VALID`) — cửa sổ thời hạn CỐ Ý không bị kiểm ở đây, vì gắn một permit chưa tới hạn
+        lúc lập kế hoạch là bình thường và START (API-120) mới là nơi cửa sổ phải đúng. Các tham
+        chiếu còn lại bị buộc về đúng phạm vi: `assigneeUserId` phải thuộc tenant (422
+        `ASSIGNEE_NOT_FOUND`), `serviceIncidentId` phải thuộc cùng site (422
+        `SERVICE_INCIDENT_NOT_FOUND`), `maintenancePlanId` phải thuộc chính asset (422
+        `MAINTENANCE_PLAN_NOT_FOUND`). Trùng `code` trong tenant trả 409
+        `WORK_ORDER_CODE_CONFLICT`. Không có trường `warrantyId`: DB-083 cố ý không được tạo. Asset
+        ngoài tenant hoặc ngoài tầm với trả 404 `ASSET_NOT_FOUND`, không phải 403.
       operationId: api_119_post_v1_assets_assetid_work_orders
       x-api-id: "API-119"
+      x-implementation-status: implemented
       x-permission: "workOrder.create"
-      x-data-scope: "asset/site"
-      x-idempotency: "required"
+      x-data-scope: "dự án của asset là neo ABAC; permit phải thuộc đúng site của asset — ngoài scope là 404"
+      x-idempotency: "required; DB-101 command receipt phát lại nguyên trạng"
       x-related-requirements: ["FR-120"]
       x-related-data: ["DB-083", "DB-086", "DB-087"]
       x-related-security: ["SEC-108", "SEC-128"]
+      x-error-codes: ["ASSET_NOT_FOUND", "PTW_REQUIRED", "PTW_NOT_VALID", "ASSIGNEE_NOT_FOUND", "SERVICE_INCIDENT_NOT_FOUND", "MAINTENANCE_PLAN_NOT_FOUND", "WORK_ORDER_CODE_CONFLICT", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -7168,47 +7344,64 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/CreateWorkOrderRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '201':
+          description: "Work order DRAFT, hoặc SCHEDULED khi có scheduledAt, trên đúng asset và site"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/WorkOrderCommandResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/work-orders/{workOrderId}/actions":
     parameters:
       - name: workOrderId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     post:
       tags: ["O&M"]
       summary: "Dispatch/start/complete/verify/close và warranty-claim action theo state/authority"
+      description: >-
+        LỆNH HỢP ĐÓNG trên `commandType`: `DISPATCH`, `START`, `HOLD`, `RESUME`, `COMPLETE`,
+        `VERIFY`, `CLOSE`, `REOPEN`, `CANCEL`, `RAISE_WARRANTY_CLAIM`. Giá trị ngoài danh sách bị
+        chặn ở tầng validate với 400 và không bao giờ tới service; từ-trạng-thái sai cho lệnh tương
+        ứng trả 422 `INVALID_STATE_TRANSITION`.
+        KHÔNG AI ĐƯỢC TỰ NGHIỆM THU VIỆC CỦA MÌNH: `VERIFY` và `CLOSE` đòi người thực hiện KHÁC
+        người được giao và KHÁC người ghi hoàn thành (422 `SOD_CONFLICT`), và
+        `ck_work_order_verifier_independent` lặp lại đúng luật đó trong cơ sở dữ liệu nên một lệnh
+        SQL trực tiếp cũng hỏng y như một lời gọi API (SEC-108/SEC-109, WF-024).
+        `START` đòi một permit to work còn hiệu lực, TRONG cửa sổ thời hạn và thuộc ĐÚNG SITE của
+        work order khi công việc khai `requiresPermit`; mọi kiểu không hợp lệ trả 422
+        `PTW_NOT_VALID` và không có gì được ghi — đây chính là khe giữa dispatch và start mà cổng
+        này sinh ra để chặn. `COMPLETE` đòi mô tả công việc và ít nhất một bằng chứng, đồng thời mở
+        chu kỳ nghiệm thu DB-119. `CLOSE` đòi một tham chiếu bàn giao trở lại vận hành (422
+        `RETURN_TO_SERVICE_REQUIRED`, chốt chặn `ck_work_order_closed`): "đã đóng" không được phép
+        có nghĩa là "bỏ đi".
+        `REOPEN` NỐI THÊM một chu kỳ nghiệm thu mới thay vì ghi đè lần xác nhận trước: quyết định
+        cũ, người quyết định và bằng chứng của nó vẫn nằm nguyên trong hàng DB-119 đã đóng băng, chỉ
+        có work order trở lại ngoài trạng thái đã nghiệm thu. `RAISE_WARRANTY_CLAIM` nối một hàng
+        DB-088 và KHÔNG mang `warrantyId`: DB-083 cố ý không được tạo, nên yêu cầu bảo hành khóa vào
+        asset và work order đã phát hiện hư hỏng.
+        `expectedVersion` bắt buộc cho mọi lệnh; lệch trả 409 `VERSION_CONFLICT` kèm
+        `currentVersion`. Work order ngoài tenant hoặc ngoài tầm với trả 404 `WORK_ORDER_NOT_FOUND`,
+        không phải 403. Mọi nhánh đã commit trả 200 — không bao giờ 202.
       operationId: api_120_post_v1_work_orders_workorderid_actions
       x-api-id: "API-120"
+      x-implementation-status: implemented
       x-permission: "workOrder.manage"
-      x-data-scope: "work order"
-      x-idempotency: "required"
+      x-data-scope: "dự án của work order là neo ABAC; ngoài scope là 404"
+      x-idempotency: "required; expectedVersion bắt buộc; DB-101 command receipt phát lại nguyên trạng"
       x-related-requirements: ["FR-121", "FR-122"]
-      x-related-data: ["DB-086", "DB-088"]
+      x-related-data: ["DB-086", "DB-088", "DB-119"]
       x-related-security: ["SEC-108", "SEC-109", "SEC-128"]
+      x-error-codes: ["WORK_ORDER_NOT_FOUND", "INVALID_STATE_TRANSITION", "ASSIGNEE_REQUIRED", "ASSIGNEE_NOT_FOUND", "PTW_NOT_VALID", "REASON_REQUIRED", "WORK_SUMMARY_REQUIRED", "EVIDENCE_REQUIRED", "RETURN_TO_SERVICE_REQUIRED", "SOD_CONFLICT", "NO_OPEN_CYCLE", "CLOSURE_CYCLE_OPEN", "CLOSURE_CYCLE_CONFLICT", "CLAIM_CODE_REQUIRED", "FAILURE_DESCRIPTION_REQUIRED", "WARRANTY_CLAIM_CODE_CONFLICT", "VERSION_CONFLICT", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -7219,47 +7412,56 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/WorkOrderCommandRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '200':
+          description: "Work order sau lệnh; kèm chu kỳ nghiệm thu khi lệnh chạm tới nó và kèm yêu cầu bảo hành với RAISE_WARRANTY_CLAIM"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/WorkOrderCommandResultResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/assets/{assetId}/performance":
     parameters:
       - name: assetId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     get:
       tags: ["O&M"]
       summary: "Đọc Solar/BESS KPI, meter/billing provenance và read-only telemetry"
+      description: >-
+        KHÔNG BỊA TELEMETRY. `kpi` và `telemetry` LUÔN là `null` và luôn CÓ MẶT trong response: PM
+        Web không có kho telemetry hay KPI nào — DB-091/DB-092 nằm trong một kho time-series/sự kiện
+        OT riêng — và ranh giới OT cấm dựng một kho như thế ở phía này (SEC-127/SEC-128,
+        FR-116/FR-117). `0` sẽ là một lời nói dối: "không đo được" và "đo được và bằng không" là hai
+        câu trả lời khác nhau, và chỉ câu thứ hai mới được báo bằng một con số. Vì cùng lý do đó,
+        response KHÔNG có `availability`, `performanceRatio`, meter hay billing provenance nào — mã
+        catalog nêu chúng, nhưng không nguồn dữ liệu nào tồn tại ở phía này của ranh giới, nên chúng
+        vắng mặt thay vì được dựng lên.
+        Phần còn lại đều đếm từ hàng thật trong chính cơ sở dữ liệu này: danh tính asset, số work
+        order theo trạng thái, số sự cố dịch vụ theo trạng thái và số alarm case theo state. Các bản
+        đồ đếm chỉ chứa những trạng thái THỰC SỰ có hàng — một trạng thái không có hàng thì VẮNG
+        MẶT, không phải bằng 0 — nên một asset chưa ghi nhận gì trả về các bản đồ rỗng và `kpi`,
+        `telemetry` vẫn là `null`. Asset ngoài tenant hoặc ngoài tầm với trả 404 `ASSET_NOT_FOUND`,
+        không phải 403.
       operationId: api_121_get_v1_assets_assetid_performance
       x-api-id: "API-121"
+      x-implementation-status: implemented
+      x-implementation-note: "Không có kho telemetry/KPI ở phía PM Web của ranh giới OT; kpi và telemetry được đặc tả là null cố định thay vì bịa số. Mở KPI thật cần một nguồn dữ liệu được phê duyệt — Open Question cho chủ sở hữu gateway OT."
       x-permission: "performance.read"
-      x-data-scope: "asset/site/tag fields"
-      x-idempotency: "safe"
+      x-data-scope: "dự án của asset là neo ABAC; ngoài scope là 404"
+      x-idempotency: "safe; chỉ đọc, không có đường ghi nào tới OT"
       x-related-requirements: ["FR-116", "FR-117", "FR-123", "FR-124"]
       x-related-data: ["DB-080", "DB-091", "DB-093", "DB-094", "DB-095"]
       x-related-security: ["SEC-127", "SEC-128"]
+      x-error-codes: ["ASSET_NOT_FOUND", "PERMISSION_DENIED"]
       security:
         - bearerAuth: []
       parameters:
@@ -7267,25 +7469,16 @@ paths:
         - $ref: '#/components/parameters/CorrelationHeader'
       responses:
         '200':
-          description: "Authorized result"
+          description: "Danh tính asset và các số đếm chứng minh được; kpi và telemetry luôn null"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/AssetPerformanceResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/integrations/connectors":
     get:
       tags: ["Integration"]
@@ -14073,6 +14266,1164 @@ components:
       required: [data, correlationId]
       properties:
         data: {$ref: '#/components/schemas/PunchCommandView'}
+        correlationId: {type: string}
+      additionalProperties: false
+    CommissioningPageMeta:
+      type: object
+      required: [nextCursor, limit]
+      properties:
+        nextCursor: {type: [string, 'null'], maxLength: 500}
+        limit: {type: integer, minimum: 1, maximum: 100}
+      additionalProperties: false
+    CommissioningSystemStatus:
+      type: string
+      enum: [NOT_READY, READY_FOR_TEST, TESTING, PASSED, FAILED]
+      description: >-
+        API-099 chỉ tạo NOT_READY; catalog không có operation nào chuyển trạng thái system, nên các
+        giá trị còn lại là từ vựng hợp lệ chưa có đường ghi.
+    TestPackStatus:
+      type: string
+      enum: [DRAFT, APPROVED, SUPERSEDED]
+      description: >-
+        API-100 sinh thẳng APPROVED (tóm tắt catalog là "Tạo/approve"); DRAFT giữ lại cho luồng hai
+        bước tương lai, SUPERSEDED là trạng thái duy nhất một pack APPROVED còn đi tới được.
+    TestRunStatus:
+      type: string
+      enum: [IN_PROGRESS, RECORDED]
+      description: Một lần chạy được mở rồi ghi kết quả đúng một lần; chạy lại là hàng MỚI
+    TestRunResult:
+      type: string
+      enum: [PASSED, FAILED, ABORTED, INCONCLUSIVE]
+      description: Chỉ FAILED và ABORTED mới được chạy lại qua API-103
+    CommissioningSystem:
+      type: object
+      description: DB-073 hàng system/subsystem; không mang chiều package
+      required: [id, projectId, parentSystemId, code, name, systemType, boundary, status, versionNo, createdBy, updatedBy, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        parentSystemId: {type: [string, 'null'], format: uuid}
+        code: {type: string, pattern: '^[A-Z0-9][A-Z0-9_.-]{0,79}$', maxLength: 80}
+        name: {type: string, minLength: 3, maxLength: 250}
+        systemType: {type: string, pattern: '^[A-Z][A-Z0-9_]{0,39}$', maxLength: 40}
+        boundary: {type: object, additionalProperties: true}
+        status: {$ref: '#/components/schemas/CommissioningSystemStatus'}
+        versionNo: {type: integer, minimum: 1}
+        createdBy: {type: string, format: uuid}
+        updatedBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+      additionalProperties: false
+    CommissioningSystemListResponse:
+      type: object
+      required: [data, meta, correlationId]
+      properties:
+        data:
+          type: array
+          maxItems: 100
+          items: {$ref: '#/components/schemas/CommissioningSystem'}
+        meta: {$ref: '#/components/schemas/CommissioningPageMeta'}
+        correlationId: {type: string}
+      additionalProperties: false
+    CreateCommissioningSystemRequest:
+      type: object
+      required: [code, name, systemType]
+      properties:
+        code: {type: string, pattern: '^[A-Z0-9][A-Z0-9_.-]{0,79}$', maxLength: 80}
+        name: {type: string, minLength: 3, maxLength: 250}
+        systemType: {type: string, pattern: '^[A-Z][A-Z0-9_]{0,39}$', maxLength: 40}
+        parentSystemId:
+          type: string
+          format: uuid
+          description: Phải là một system CÙNG dự án; không được là chính hàng đang tạo
+        boundary: {type: object, additionalProperties: true}
+      additionalProperties: false
+    CommissioningSystemCommandResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/CommissioningSystem'}
+        correlationId: {type: string}
+      additionalProperties: false
+    TestPack:
+      type: object
+      description: DB-074 test pack; ra đời đã APPROVED và bị trigger đóng băng ngay từ đó
+      required: [id, projectId, commissioningSystemId, code, title, procedureRevisionId, prerequisitesSnapshot, status, approvedBy, approvedAt, versionNo, createdBy, updatedBy, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        commissioningSystemId: {type: string, format: uuid}
+        code: {type: string, pattern: '^[A-Z0-9][A-Z0-9_.-]{0,79}$', maxLength: 80}
+        title: {type: string, minLength: 3, maxLength: 400}
+        procedureRevisionId:
+          type: string
+          format: uuid
+          description: Revision quy trình đã ISSUED và quét mã độc CLEAN tại thời điểm tạo pack
+        prerequisitesSnapshot:
+          type: object
+          additionalProperties: true
+          description: >-
+            Snapshot đóng băng; mảng `required` là hợp đồng mà API-101/API-103 kiểm lại, phần còn
+            lại chỉ mang tính mô tả.
+        status: {$ref: '#/components/schemas/TestPackStatus'}
+        approvedBy: {type: [string, 'null'], format: uuid}
+        approvedAt: {type: [string, 'null'], format: date-time}
+        versionNo: {type: integer, minimum: 1}
+        createdBy: {type: string, format: uuid}
+        updatedBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+      additionalProperties: false
+    CreateTestPackRequest:
+      type: object
+      required: [code, title, procedureRevisionId]
+      properties:
+        code: {type: string, pattern: '^[A-Z0-9][A-Z0-9_.-]{0,79}$', maxLength: 80}
+        title: {type: string, minLength: 3, maxLength: 400}
+        procedureRevisionId: {type: string, format: uuid}
+        prerequisitesSnapshot: {type: object, additionalProperties: true}
+      additionalProperties: false
+    TestPackCommandResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/TestPack'}
+        correlationId: {type: string}
+      additionalProperties: false
+    TestRun:
+      type: object
+      description: >-
+        DB-075 một lần chạy. Kết quả được ghi đúng một lần rồi hàng bị đóng băng; một lần chạy
+        FAILED không bao giờ trở thành PASSED, và `previousRunId` là sợi dây nối tới lần thất bại.
+      required: [id, projectId, testPackId, previousRunId, runNo, status, result, rawDataRef, instrumentSnapshot, witnessSnapshot, evidenceRefs, startedAt, endedAt, startedBy, recordedBy, recordedAt, versionNo, createdBy, updatedBy, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        testPackId: {type: string, format: uuid}
+        previousRunId: {type: [string, 'null'], format: uuid}
+        runNo: {type: integer, minimum: 1}
+        status: {$ref: '#/components/schemas/TestRunStatus'}
+        result:
+          anyOf:
+            - {$ref: '#/components/schemas/TestRunResult'}
+            - {type: 'null'}
+          description: null khi đang IN_PROGRESS; sau khi RECORDED thì không bao giờ đổi
+        rawDataRef: {type: [string, 'null'], maxLength: 500}
+        instrumentSnapshot:
+          anyOf:
+            - {type: object, additionalProperties: true}
+            - {type: 'null'}
+        witnessSnapshot:
+          anyOf:
+            - {type: object, additionalProperties: true}
+            - {type: 'null'}
+        evidenceRefs:
+          type: array
+          maxItems: 50
+          items: {type: string, minLength: 1, maxLength: 500}
+          description: Rỗng khi đang chạy; RECORDED về mặt cấu trúc đòi ít nhất một phần tử
+        startedAt: {type: string, format: date-time}
+        endedAt: {type: [string, 'null'], format: date-time}
+        startedBy: {type: string, format: uuid}
+        recordedBy: {type: [string, 'null'], format: uuid}
+        recordedAt: {type: [string, 'null'], format: date-time}
+        versionNo: {type: integer, minimum: 1}
+        createdBy: {type: string, format: uuid}
+        updatedBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+      additionalProperties: false
+    StartTestRunRequest:
+      type: object
+      required: []
+      description: >-
+        Không có trường bắt buộc; `satisfiedPrerequisites` bỏ trống tương đương mảng rỗng và pack có
+        prerequisite sẽ bị từ chối 422 PREREQUISITES_NOT_MET.
+      properties:
+        satisfiedPrerequisites:
+          type: array
+          maxItems: 100
+          items: {type: string, minLength: 1, maxLength: 200}
+        instrumentSnapshot: {type: object, additionalProperties: true}
+        witnesses:
+          type: array
+          maxItems: 20
+          items: {type: object, additionalProperties: true}
+      additionalProperties: false
+    CompleteTestRunRequest:
+      type: object
+      description: Bằng chứng là bắt buộc với MỌI kết quả, kể cả FAILED và ABORTED
+      required: [expectedVersion, result, evidenceRefs]
+      properties:
+        expectedVersion: {type: integer, minimum: 1}
+        result: {$ref: '#/components/schemas/TestRunResult'}
+        evidenceRefs:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: {type: string, minLength: 1, maxLength: 500}
+        rawDataRef: {type: string, minLength: 1, maxLength: 500}
+        witnesses:
+          type: array
+          maxItems: 20
+          items: {type: object, additionalProperties: true}
+      additionalProperties: false
+    CreateRetestRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: {type: string, minLength: 3, maxLength: 2000}
+        satisfiedPrerequisites:
+          type: array
+          maxItems: 100
+          items: {type: string, minLength: 1, maxLength: 200}
+        instrumentSnapshot: {type: object, additionalProperties: true}
+      additionalProperties: false
+    TestRunCommandResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/TestRun'}
+        correlationId: {type: string}
+      additionalProperties: false
+    CodGateCategory:
+      type: string
+      enum: [LEGAL, CONTRACTUAL, TECHNICAL, QUALITY, SAFETY, DOCUMENTATION, COMMERCIAL]
+    CodGateStatus:
+      type: string
+      enum: [PENDING, UNDER_REVIEW, ACCEPTED, REJECTED, WAIVED]
+      description: ACCEPTED và WAIVED là trạng thái cuối và bị trigger đóng băng
+    CodGateReviewDecision:
+      type: string
+      enum: [PASS, FAIL, CONDITIONAL]
+      description: >-
+        Chỉ PASS chấp nhận gate. FAIL đưa gate về REJECTED; CONDITIONAL được ghi nhận như một quyết
+        định riêng nhưng đưa gate về PENDING vì điều kiện vẫn còn treo.
+    CodPackageStatus:
+      type: string
+      enum: [DRAFT, READY, SUBMITTED, SIGNED, HANDED_OVER]
+      description: >-
+        API-105 sinh SUBMITTED, rồi SIGNED, rồi HANDED_OVER. Hồ sơ SIGNED chỉ còn hai nước đi:
+        handover đẩy sang HANDED_OVER, và đặt legal hold — gỡ hold luôn bị trigger từ chối.
+    CodGate:
+      type: object
+      description: DB-076 một điều kiện COD; ACCEPTED/WAIVED là trạng thái đóng băng
+      required: [id, projectId, category, code, title, mandatory, waivable, ownerId, dueDate, status, evidenceRefs, evidenceExpiry, acceptedBy, acceptedAt, waivedBy, waivedAt, waiverReason, versionNo, createdBy, updatedBy, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        category: {$ref: '#/components/schemas/CodGateCategory'}
+        code: {type: string, pattern: '^[A-Z0-9][A-Z0-9_.-]{0,79}$', maxLength: 80}
+        title: {type: string, minLength: 3, maxLength: 400}
+        mandatory: {type: boolean}
+        waivable:
+          type: boolean
+          description: AC-060 — false thì gate không bao giờ mang trạng thái WAIVED
+        ownerId: {type: string, format: uuid}
+        dueDate: {type: [string, 'null'], format: date}
+        status: {$ref: '#/components/schemas/CodGateStatus'}
+        evidenceRefs:
+          type: array
+          maxItems: 50
+          items: {type: string, minLength: 1, maxLength: 500}
+        evidenceExpiry:
+          type: [string, 'null']
+          format: date
+          description: AC-059 — bằng chứng hết hiệu lực thì gate không còn thỏa mãn điều gì
+        acceptedBy: {type: [string, 'null'], format: uuid}
+        acceptedAt: {type: [string, 'null'], format: date-time}
+        waivedBy: {type: [string, 'null'], format: uuid}
+        waivedAt: {type: [string, 'null'], format: date-time}
+        waiverReason: {type: [string, 'null'], maxLength: 2000}
+        versionNo: {type: integer, minimum: 1}
+        createdBy: {type: string, format: uuid}
+        updatedBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+      additionalProperties: false
+    CodGateReviewCycle:
+      type: object
+      description: >-
+        DB-118 một vòng thẩm tra. `SUBMIT` mở vòng, `DECIDE` đóng vòng; người quyết định không bao
+        giờ là người nộp (`ck_cod_gate_review_cycle_sod`) và một vòng đã quyết định bị đóng băng.
+      required: [id, codGateId, sequenceNo, evidenceRefs, evidenceExpiry, submissionComment, submittedBy, submittedAt, decision, decisionComment, decidedBy, decidedAt]
+      properties:
+        id: {type: string, format: uuid}
+        codGateId: {type: string, format: uuid}
+        sequenceNo: {type: integer, minimum: 1}
+        evidenceRefs:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: {type: string, minLength: 1, maxLength: 500}
+        evidenceExpiry: {type: [string, 'null'], format: date}
+        submissionComment: {type: string, minLength: 3, maxLength: 2000}
+        submittedBy: {type: string, format: uuid}
+        submittedAt: {type: string, format: date-time}
+        decision:
+          anyOf:
+            - {$ref: '#/components/schemas/CodGateReviewDecision'}
+            - {type: 'null'}
+        decisionComment: {type: [string, 'null'], maxLength: 2000}
+        decidedBy: {type: [string, 'null'], format: uuid}
+        decidedAt: {type: [string, 'null'], format: date-time}
+      additionalProperties: false
+    CodGateCounts:
+      type: object
+      required: [total, accepted, waived, pending, underReview, rejected, mandatoryTotal, mandatoryOutstanding]
+      properties:
+        total: {type: integer, minimum: 0}
+        accepted: {type: integer, minimum: 0}
+        waived: {type: integer, minimum: 0}
+        pending: {type: integer, minimum: 0}
+        underReview: {type: integer, minimum: 0}
+        rejected: {type: integer, minimum: 0}
+        mandatoryTotal: {type: integer, minimum: 0}
+        mandatoryOutstanding:
+          type: integer
+          minimum: 0
+          description: Lớn hơn 0 thì SIGN_COD bị từ chối 422 GATE_BLOCKED
+      additionalProperties: false
+    CodCategoryReadiness:
+      type: object
+      required: [category, total, satisfied, outstanding]
+      properties:
+        category: {$ref: '#/components/schemas/CodGateCategory'}
+        total: {type: integer, minimum: 1}
+        satisfied:
+          type: integer
+          minimum: 0
+          description: Chỉ đếm gate ACCEPTED/WAIVED mà bằng chứng chưa hết hiệu lực tại asOf
+        outstanding: {type: integer, minimum: 0}
+      additionalProperties: false
+    CodBlockingFinding:
+      type: object
+      description: >-
+        Chỉ id, mã tham chiếu và phân loại — không mô tả punch, không diễn giải NCR, không lý do
+        dừng việc; projection này đã được thu hẹp theo đúng tầm với của người gọi.
+      required: [type, id, reference, detail]
+      properties:
+        type:
+          type: string
+          enum: [PUNCH_ITEM, NCR, STOP_WORK]
+        id: {type: string, format: uuid}
+        reference: {type: string, minLength: 1, maxLength: 200}
+        detail: {type: string, minLength: 1, maxLength: 400}
+      additionalProperties: false
+    CodBlockingFindings:
+      type: object
+      required: [punchItems, criticalNcrs, stopWorks, total, items]
+      properties:
+        punchItems: {type: integer, minimum: 0}
+        criticalNcrs: {type: integer, minimum: 0}
+        stopWorks:
+          type: integer
+          minimum: 0
+          description: >-
+            An toàn hỏng thì đóng — sổ stop-work không đọc được cũng sinh ra một phát hiện chặn tổng
+            hợp, không bao giờ là 0.
+        total: {type: integer, minimum: 0}
+        items:
+          type: array
+          maxItems: 1000
+          items: {$ref: '#/components/schemas/CodBlockingFinding'}
+      additionalProperties: false
+    CodReadinessEvaluation:
+      type: object
+      description: >-
+        Kết quả của một hàm THUẦN trên dữ liệu đã được ủy quyền. Đúng hàm này quyết định readyToSign
+        cho SIGN_COD, nên chữ ký không bao giờ bị phán xử bởi một bản luật thứ hai.
+      required: [asOf, gates, categories, expiredEvidenceGateIds, blockingFindings, blocked, readyToSign]
+      properties:
+        asOf: {type: string, format: date-time}
+        gates: {$ref: '#/components/schemas/CodGateCounts'}
+        categories:
+          type: array
+          maxItems: 7
+          items: {$ref: '#/components/schemas/CodCategoryReadiness'}
+        expiredEvidenceGateIds:
+          type: array
+          maxItems: 1000
+          items: {type: string, format: uuid}
+        blockingFindings: {$ref: '#/components/schemas/CodBlockingFindings'}
+        blocked: {type: boolean, description: true khi còn ít nhất một phát hiện chặn đang mở}
+        readyToSign:
+          type: boolean
+          description: true chỉ khi không có gì chặn VÀ mọi gate bắt buộc đã thỏa mãn với bằng chứng còn hiệu lực
+      additionalProperties: false
+    CodSignerSnapshot:
+      type: object
+      description: >-
+        Snapshot người ký BẤT BIẾN: id ổn định kèm danh tính tại thời điểm ký và băm canonical của
+        đúng thứ được ký — chữ ký không bao giờ chỉ là một chuỗi hiển thị (AGENTS.md §9).
+      required: [userId, displayName, email, signedAt, snapshotHash]
+      properties:
+        userId: {type: string, format: uuid}
+        displayName: {type: string, minLength: 1, maxLength: 200}
+        email: {type: string, format: email, maxLength: 254}
+        signedAt: {type: string, format: date-time}
+        snapshotHash: {type: string, pattern: '^[0-9a-f]{64}$'}
+      additionalProperties: false
+    CodPackage:
+      type: object
+      description: >-
+        DB-077 hồ sơ COD. Một dự án chỉ có một hồ sơ chưa hoàn tất tại một thời điểm
+        (`uq_cod_package_active`). Hồ sơ SIGNED chỉ còn hai nước đi: handover, và đặt legal hold.
+      required: [id, projectId, version, status, readinessSnapshot, snapshotHash, signedArtifactRef, effectiveAt, legalHold, submittedBy, submittedAt, signedBy, signedAt, signerSnapshot, versionNo, createdBy, updatedBy, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        version: {type: integer, minimum: 1}
+        status: {$ref: '#/components/schemas/CodPackageStatus'}
+        readinessSnapshot:
+          type: object
+          additionalProperties: true
+          description: Đánh giá readiness tại thời điểm trình/ký, trừ mốc đồng hồ — chính là thứ được băm
+        snapshotHash: {type: string, pattern: '^[0-9a-f]{64}$'}
+        signedArtifactRef: {type: [string, 'null'], maxLength: 500}
+        effectiveAt: {type: [string, 'null'], format: date-time}
+        legalHold:
+          type: boolean
+          description: Đặt được trên hồ sơ đã ký; GỠ luôn bị trigger từ chối
+        submittedBy: {type: [string, 'null'], format: uuid}
+        submittedAt: {type: [string, 'null'], format: date-time}
+        signedBy:
+          type: [string, 'null']
+          format: uuid
+          description: Không bao giờ bằng submittedBy; ck_cod_package_sod là chốt chặn
+        signedAt: {type: [string, 'null'], format: date-time}
+        signerSnapshot:
+          anyOf:
+            - {$ref: '#/components/schemas/CodSignerSnapshot'}
+            - {type: 'null'}
+        versionNo: {type: integer, minimum: 1}
+        createdBy: {type: string, format: uuid}
+        updatedBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+      additionalProperties: false
+    Handover:
+      type: object
+      description: DB-078 biên bản bàn giao; một bên nhận chỉ ký nhận đúng một lần và hàng bị đóng băng
+      required: [id, projectId, codPackageId, fromPartyId, recipientPartyId, itemManifest, openItems, acceptedBy, acceptedAt, versionNo, createdBy, updatedBy, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        codPackageId: {type: string, format: uuid}
+        fromPartyId: {type: string, format: uuid}
+        recipientPartyId: {type: string, format: uuid, description: Phải khác fromPartyId}
+        itemManifest:
+          type: array
+          maxItems: 500
+          items: {type: object, additionalProperties: true}
+        openItems:
+          type: array
+          maxItems: 500
+          items: {type: object, additionalProperties: true}
+        acceptedBy: {type: [string, 'null'], format: uuid}
+        acceptedAt: {type: [string, 'null'], format: date-time}
+        versionNo: {type: integer, minimum: 1}
+        createdBy: {type: string, format: uuid}
+        updatedBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+      additionalProperties: false
+    CodReadinessView:
+      type: object
+      required: [projectId, readiness, packages]
+      properties:
+        projectId: {type: string, format: uuid}
+        readiness: {$ref: '#/components/schemas/CodReadinessEvaluation'}
+        packages:
+          type: array
+          maxItems: 500
+          items: {$ref: '#/components/schemas/CodPackage'}
+          description: Mọi hồ sơ COD của dự án, version giảm dần
+      additionalProperties: false
+    CodReadinessResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/CodReadinessView'}
+        correlationId: {type: string}
+      additionalProperties: false
+    CodTransitionCommandRequest:
+      type: object
+      description: >-
+        Union ĐÓNG trên `commandType`. DEFINE_GATE cần `category`, `code`, `title`; REVIEW_EVIDENCE
+        và WAIVE_GATE cần `codGateId` + `expectedVersion`; SIGN_COD và ACCEPT_HANDOVER cần
+        `codPackageId` + `expectedVersion`; SUBMIT_COD không cần tham chiếu nào vì nó TẠO hồ sơ.
+        Trường nào bắt buộc cho lệnh nào được service kiểm và trả mã lỗi riêng cho từng trường thiếu.
+      required: [commandType]
+      properties:
+        commandType:
+          type: string
+          enum: [DEFINE_GATE, REVIEW_EVIDENCE, WAIVE_GATE, SUBMIT_COD, SIGN_COD, ACCEPT_HANDOVER]
+        expectedVersion: {type: integer, minimum: 1}
+        category: {$ref: '#/components/schemas/CodGateCategory'}
+        code: {type: string, pattern: '^[A-Z0-9][A-Z0-9_.-]{0,79}$', maxLength: 80}
+        title: {type: string, minLength: 3, maxLength: 400}
+        mandatory: {type: boolean, description: Bỏ trống thì mặc định true}
+        waivable: {type: boolean, description: Bỏ trống thì mặc định false}
+        ownerUserId: {type: string, format: uuid, description: Bỏ trống thì mặc định là người gọi}
+        dueDate: {type: string, format: date}
+        codGateId: {type: string, format: uuid}
+        reviewAction:
+          type: string
+          enum: [SUBMIT, DECIDE]
+          description: AC-059 là hai hành vi của hai người; SUBMIT mở vòng thẩm tra, DECIDE đóng vòng
+        evidenceRefs:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: {type: string, minLength: 1, maxLength: 500}
+        evidenceExpiry: {type: string, format: date}
+        decision: {$ref: '#/components/schemas/CodGateReviewDecision'}
+        reason:
+          type: string
+          minLength: 3
+          maxLength: 2000
+          description: Thuyết minh nộp bằng chứng, thuyết minh quyết định, hoặc lý do miễn trừ
+        codPackageId: {type: string, format: uuid}
+        signedArtifactRef: {type: string, minLength: 1, maxLength: 500}
+        effectiveAt: {type: string, format: date-time}
+        fromPartyId: {type: string, format: uuid}
+        recipientPartyId: {type: string, format: uuid}
+        itemManifest:
+          type: array
+          maxItems: 500
+          items: {type: object, additionalProperties: true}
+        openItems:
+          type: array
+          maxItems: 500
+          items: {type: object, additionalProperties: true}
+      additionalProperties: false
+    CodGateCommandResult:
+      type: object
+      description: >-
+        Kết quả của DEFINE_GATE, REVIEW_EVIDENCE và WAIVE_GATE. `reviewCycle` chỉ có mặt với
+        REVIEW_EVIDENCE; nó VẮNG MẶT hoàn toàn trong kết quả của DEFINE_GATE và WAIVE_GATE.
+      required: [resourceType, resourceId, gate]
+      properties:
+        resourceType: {type: string, enum: [CodGate]}
+        resourceId: {type: string, format: uuid}
+        gate: {$ref: '#/components/schemas/CodGate'}
+        reviewCycle: {$ref: '#/components/schemas/CodGateReviewCycle'}
+      additionalProperties: false
+    CodPackageCommandResult:
+      type: object
+      description: Kết quả của SUBMIT_COD và SIGN_COD, kèm đánh giá readiness mà lệnh đã dùng
+      required: [resourceType, resourceId, package, readiness]
+      properties:
+        resourceType: {type: string, enum: [CodPackage]}
+        resourceId: {type: string, format: uuid}
+        package: {$ref: '#/components/schemas/CodPackage'}
+        readiness: {$ref: '#/components/schemas/CodReadinessEvaluation'}
+      additionalProperties: false
+    HandoverCommandResult:
+      type: object
+      description: Kết quả của ACCEPT_HANDOVER; hồ sơ kèm theo đã chuyển sang HANDED_OVER
+      required: [resourceType, resourceId, handover, package]
+      properties:
+        resourceType: {type: string, enum: [Handover]}
+        resourceId: {type: string, format: uuid}
+        handover: {$ref: '#/components/schemas/Handover'}
+        package: {$ref: '#/components/schemas/CodPackage'}
+      additionalProperties: false
+    CodTransitionCommandResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data:
+          oneOf:
+            - {$ref: '#/components/schemas/CodGateCommandResult'}
+            - {$ref: '#/components/schemas/CodPackageCommandResult'}
+            - {$ref: '#/components/schemas/HandoverCommandResult'}
+          description: Nhánh nào được trả về do commandType quyết định; resourceType phân biệt chúng
+        correlationId: {type: string}
+      additionalProperties: false
+    OperationsSitePageMeta:
+      type: object
+      required: [nextCursor, limit, siteId]
+      properties:
+        nextCursor: {type: [string, 'null'], maxLength: 500}
+        limit: {type: integer, minimum: 1, maximum: 100}
+        siteId: {type: string, format: uuid}
+      additionalProperties: false
+    OperationsAssetPageMeta:
+      type: object
+      required: [nextCursor, limit, assetId, siteId]
+      properties:
+        nextCursor: {type: [string, 'null'], maxLength: 500}
+        limit: {type: integer, minimum: 1, maximum: 100}
+        assetId: {type: string, format: uuid}
+        siteId: {type: string, format: uuid}
+      additionalProperties: false
+    AlarmCaseSeverity:
+      type: string
+      enum: [LOW, MEDIUM, HIGH, CRITICAL]
+    AlarmCaseState:
+      type: string
+      enum: [OPEN, ACKNOWLEDGED, INVESTIGATING, RESOLVED, CLOSED, REOPENED]
+      description: >-
+        Mọi giá trị chỉ mô tả trạng thái của case CỤC BỘ. Không giá trị nào ở đây có ý nghĩa trong
+        nguồn OT: xác nhận, xử lý hay đóng một case không bao giờ clear, reset hay suppress alarm gốc.
+    ServiceIncidentSeverity:
+      type: string
+      enum: [LOW, MEDIUM, HIGH, CRITICAL]
+    ServiceIncidentStatus:
+      type: string
+      enum: [OPEN, INVESTIGATING, MITIGATED, RESOLVED, CLOSED]
+      description: API-117 chỉ tạo OPEN; catalog chưa có operation chuyển trạng thái sự cố dịch vụ
+    WorkOrderStatus:
+      type: string
+      enum: [DRAFT, APPROVED, SCHEDULED, DISPATCHED, IN_PROGRESS, ON_HOLD, COMPLETE, VERIFIED, CLOSED, REOPENED, CANCELLED]
+      description: >-
+        APPROVED là giá trị hợp lệ mà KHÔNG operation nào trong catalog ghi được — không có
+        operation approve hay schedule — nên API-119 dừng ở DRAFT/SCHEDULED và DISPATCH nhận mọi
+        trạng thái trước điều phối. Ghi nhận, không phải bỏ sót.
+    WorkOrderPriority:
+      type: string
+      enum: [LOW, MEDIUM, HIGH, CRITICAL]
+    WorkOrderClosureDecision:
+      type: string
+      enum: [APPROVE, RETURN]
+    WarrantyClaimStatus:
+      type: string
+      enum: [SUBMITTED, UNDER_REVIEW, APPROVED, REJECTED, WITHDRAWN]
+      description: API-120 chỉ tạo SUBMITTED; một yêu cầu đã kết luận bị trigger đóng băng
+    MaintenancePlanTriggerType:
+      type: string
+      enum: [TIME, USAGE, CONDITION]
+      description: >-
+        Assumption (owner Product Owner, xác nhận trước khi slice lập kế hoạch O&M ship): DB-087 nêu
+        triggerType mà không kèm danh sách giá trị.
+    MaintenancePlanStatus:
+      type: string
+      enum: [DRAFT, PUBLISHED, RETIRED]
+    AssetOperationalStatus:
+      type: string
+      enum: [PENDING, ACTIVE, SUSPENDED, ARCHIVED]
+    AlarmCase:
+      type: object
+      description: >-
+        DB-084 case CỤC BỘ mở cho một hoặc nhiều sự kiện alarm OT. `sourceEventRefs` là các id LOGIC
+        vào kho sự kiện DB-092 — không có payload, tag, gateway, endpoint hay credential nào được
+        lưu, nên không có gì thuộc loại đó serialize được ra đây (SEC-127/SEC-128).
+      required: [id, projectId, siteId, assetId, severity, state, ownerId, firstSeenAt, lastSeenAt, sourceEventRefs, sourceQuality, acknowledgedBy, acknowledgedAt, acknowledgmentNote, versionNo, createdBy, updatedBy, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        siteId: {type: string, format: uuid}
+        assetId: {type: [string, 'null'], format: uuid}
+        severity: {$ref: '#/components/schemas/AlarmCaseSeverity'}
+        state: {$ref: '#/components/schemas/AlarmCaseState'}
+        ownerId: {type: [string, 'null'], format: uuid}
+        firstSeenAt: {type: string, format: date-time}
+        lastSeenAt: {type: string, format: date-time}
+        sourceEventRefs:
+          type: array
+          maxItems: 1000
+          items: {type: string, minLength: 1, maxLength: 200}
+        sourceQuality:
+          type: [string, 'null']
+          maxLength: 20
+          description: >-
+            Chép nguyên văn từ projection DB-092. Từ vựng do hợp đồng gateway OT sở hữu, không phải
+            PM Web, nên CỐ Ý không có enum — Open Question cho chủ sở hữu gateway OT.
+        acknowledgedBy: {type: [string, 'null'], format: uuid}
+        acknowledgedAt: {type: [string, 'null'], format: date-time}
+        acknowledgmentNote: {type: [string, 'null'], maxLength: 2000}
+        versionNo: {type: integer, minimum: 1}
+        createdBy: {type: string, format: uuid}
+        updatedBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+      additionalProperties: false
+    AlarmCaseListResponse:
+      type: object
+      required: [data, meta, correlationId]
+      properties:
+        data:
+          type: array
+          maxItems: 100
+          items: {$ref: '#/components/schemas/AlarmCase'}
+        meta: {$ref: '#/components/schemas/OperationsSitePageMeta'}
+        correlationId: {type: string}
+      additionalProperties: false
+    AcknowledgeAlarmCaseRequest:
+      type: object
+      description: >-
+        CỐ Ý không có trường nào mô tả được một hành động phía nguồn: không clear, không reset,
+        không suppress, không source event id, không đích xác nhận. Chỉ có khóa lạc quan và một ghi
+        chú cục bộ (SEC-127/SEC-128).
+      required: [expectedVersion]
+      properties:
+        expectedVersion: {type: integer, minimum: 1}
+        note: {type: string, minLength: 3, maxLength: 2000}
+      additionalProperties: false
+    AlarmCaseAcknowledgementView:
+      type: object
+      description: >-
+        Case cục bộ sau lệnh. `acknowledgementApplied: false` nghĩa là case đã được xác nhận từ
+        trước và lệnh này là NO-OP — không tăng versionNo, không sinh vết audit thứ hai.
+      required: [id, projectId, siteId, assetId, severity, state, ownerId, firstSeenAt, lastSeenAt, sourceEventRefs, sourceQuality, acknowledgedBy, acknowledgedAt, acknowledgmentNote, versionNo, createdBy, updatedBy, createdAt, updatedAt, acknowledgementApplied]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        siteId: {type: string, format: uuid}
+        assetId: {type: [string, 'null'], format: uuid}
+        severity: {$ref: '#/components/schemas/AlarmCaseSeverity'}
+        state: {$ref: '#/components/schemas/AlarmCaseState'}
+        ownerId: {type: [string, 'null'], format: uuid}
+        firstSeenAt: {type: string, format: date-time}
+        lastSeenAt: {type: string, format: date-time}
+        sourceEventRefs:
+          type: array
+          maxItems: 1000
+          items: {type: string, minLength: 1, maxLength: 200}
+        sourceQuality: {type: [string, 'null'], maxLength: 20}
+        acknowledgedBy: {type: [string, 'null'], format: uuid}
+        acknowledgedAt: {type: [string, 'null'], format: date-time}
+        acknowledgmentNote: {type: [string, 'null'], maxLength: 2000}
+        versionNo: {type: integer, minimum: 1}
+        createdBy: {type: string, format: uuid}
+        updatedBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+        acknowledgementApplied: {type: boolean}
+      additionalProperties: false
+    AlarmCaseCommandResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/AlarmCaseAcknowledgementView'}
+        correlationId: {type: string}
+      additionalProperties: false
+    ServiceIncident:
+      type: object
+      description: DB-085 sự cố dịch vụ kèm đồng hồ SLA; các mốc SLA là dữ liệu ghi trên hàng
+      required: [id, projectId, siteId, assetId, alarmCaseId, hseIncidentId, severity, status, title, description, detectedAt, downtimeStart, downtimeEnd, slaResponseDueAt, slaRespondedAt, slaResolutionDueAt, slaResolvedAt, resolutionSummary, reportedBy, versionNo, createdBy, updatedBy, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        siteId: {type: string, format: uuid}
+        assetId: {type: [string, 'null'], format: uuid}
+        alarmCaseId: {type: [string, 'null'], format: uuid}
+        hseIncidentId: {type: [string, 'null'], format: uuid}
+        severity: {$ref: '#/components/schemas/ServiceIncidentSeverity'}
+        status: {$ref: '#/components/schemas/ServiceIncidentStatus'}
+        title: {type: string, minLength: 3, maxLength: 400}
+        description: {type: [string, 'null'], maxLength: 4000}
+        detectedAt: {type: string, format: date-time}
+        downtimeStart: {type: [string, 'null'], format: date-time}
+        downtimeEnd: {type: [string, 'null'], format: date-time}
+        slaResponseDueAt: {type: [string, 'null'], format: date-time}
+        slaRespondedAt: {type: [string, 'null'], format: date-time}
+        slaResolutionDueAt: {type: [string, 'null'], format: date-time}
+        slaResolvedAt: {type: [string, 'null'], format: date-time}
+        resolutionSummary: {type: [string, 'null'], maxLength: 4000}
+        reportedBy: {type: string, format: uuid}
+        versionNo: {type: integer, minimum: 1}
+        createdBy: {type: string, format: uuid}
+        updatedBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+      additionalProperties: false
+    ServiceIncidentListResponse:
+      type: object
+      required: [data, meta, correlationId]
+      properties:
+        data:
+          type: array
+          maxItems: 100
+          items: {$ref: '#/components/schemas/ServiceIncident'}
+        meta: {$ref: '#/components/schemas/OperationsSitePageMeta'}
+        correlationId: {type: string}
+      additionalProperties: false
+    CreateServiceIncidentRequest:
+      type: object
+      required: [severity, title, detectedAt]
+      properties:
+        severity: {$ref: '#/components/schemas/ServiceIncidentSeverity'}
+        title: {type: string, minLength: 3, maxLength: 400}
+        description: {type: string, minLength: 1, maxLength: 4000}
+        detectedAt: {type: string, format: date-time}
+        assetId: {type: string, format: uuid, description: Phải thuộc site trên path}
+        alarmCaseId: {type: string, format: uuid, description: Phải thuộc CÙNG site trên path}
+        hseIncidentId: {type: string, format: uuid, description: Phải thuộc CÙNG dự án của site}
+        downtimeStart: {type: string, format: date-time}
+        downtimeEnd:
+          type: string
+          format: date-time
+          description: Đòi downtimeStart và không được sớm hơn nó
+        slaResponseDueAt: {type: string, format: date-time}
+        slaResolutionDueAt: {type: string, format: date-time}
+      additionalProperties: false
+    ServiceIncidentCommandResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/ServiceIncident'}
+        correlationId: {type: string}
+      additionalProperties: false
+    MaintenancePlanSummary:
+      type: object
+      description: Tóm tắt DB-087 cho đúng các hàng trên trang; null khi work order không gắn kế hoạch
+      required: [id, planType, version, triggerType, intervalValue, intervalUnit, status, nextDueAt]
+      properties:
+        id: {type: string, format: uuid}
+        planType: {type: string, pattern: '^[A-Z][A-Z0-9_]{0,39}$', maxLength: 40}
+        version: {type: integer, minimum: 1}
+        triggerType: {$ref: '#/components/schemas/MaintenancePlanTriggerType'}
+        intervalValue:
+          type: [string, 'null']
+          pattern: '^\d{1,15}(\.\d{1,4})?$'
+          description: numeric(19,4) dạng chuỗi đọc lại từ Postgres; không bao giờ là JSON number
+        intervalUnit: {type: [string, 'null'], maxLength: 20}
+        status: {$ref: '#/components/schemas/MaintenancePlanStatus'}
+        nextDueAt: {type: [string, 'null'], format: date-time}
+      additionalProperties: false
+    WorkOrder:
+      type: object
+      description: >-
+        DB-086 work order. Không có `warrantyId`: DB-083 cố ý không được tạo vì không operation nào
+        trong catalog ghi được vào nó.
+      required: [id, projectId, siteId, assetId, serviceIncidentId, maintenancePlanId, permitToWorkId, code, workType, title, description, priority, status, requiresPermit, assigneeId, scheduledAt, dispatchedBy, dispatchedAt, startedBy, startedAt, holdReason, completedBy, completedAt, workSummary, verifiedBy, verifiedAt, returnToServiceRef, closedBy, closedAt, cancelledBy, cancelledAt, cancelReason, versionNo, createdBy, updatedBy, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        siteId: {type: string, format: uuid}
+        assetId: {type: string, format: uuid}
+        serviceIncidentId: {type: [string, 'null'], format: uuid}
+        maintenancePlanId: {type: [string, 'null'], format: uuid}
+        permitToWorkId: {type: [string, 'null'], format: uuid}
+        code: {type: string, pattern: '^[A-Z0-9][A-Z0-9_.-]{0,79}$', maxLength: 80}
+        workType:
+          type: string
+          pattern: '^[A-Z][A-Z0-9_]{0,39}$'
+          maxLength: 40
+          description: Không có danh sách mã được duyệt; chỉ ràng buộc bằng regex định dạng
+        title: {type: string, minLength: 3, maxLength: 400}
+        description: {type: [string, 'null'], maxLength: 4000}
+        priority: {$ref: '#/components/schemas/WorkOrderPriority'}
+        status: {$ref: '#/components/schemas/WorkOrderStatus'}
+        requiresPermit:
+          type: boolean
+          description: >-
+            Do người tạo khai báo. PM Web không có bảng ma trận loại-công-việc → permit nào — Open
+            Question thuộc HSE.
+        assigneeId: {type: [string, 'null'], format: uuid}
+        scheduledAt: {type: [string, 'null'], format: date-time}
+        dispatchedBy: {type: [string, 'null'], format: uuid}
+        dispatchedAt: {type: [string, 'null'], format: date-time}
+        startedBy: {type: [string, 'null'], format: uuid}
+        startedAt: {type: [string, 'null'], format: date-time}
+        holdReason: {type: [string, 'null'], maxLength: 2000}
+        completedBy: {type: [string, 'null'], format: uuid}
+        completedAt: {type: [string, 'null'], format: date-time}
+        workSummary: {type: [string, 'null'], maxLength: 4000}
+        verifiedBy:
+          type: [string, 'null']
+          format: uuid
+          description: Không bao giờ bằng assigneeId hay completedBy; ck_work_order_verifier_independent là chốt chặn
+        verifiedAt: {type: [string, 'null'], format: date-time}
+        returnToServiceRef: {type: [string, 'null'], maxLength: 200}
+        closedBy: {type: [string, 'null'], format: uuid}
+        closedAt: {type: [string, 'null'], format: date-time}
+        cancelledBy: {type: [string, 'null'], format: uuid}
+        cancelledAt: {type: [string, 'null'], format: date-time}
+        cancelReason: {type: [string, 'null'], maxLength: 2000}
+        versionNo: {type: integer, minimum: 1}
+        createdBy: {type: string, format: uuid}
+        updatedBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+      additionalProperties: false
+    WorkOrderRegisterRow:
+      type: object
+      description: Một hàng của register API-118 — work order kèm ngữ cảnh mà cơ sở dữ liệu này chứng minh được
+      required: [id, projectId, siteId, assetId, serviceIncidentId, maintenancePlanId, permitToWorkId, code, workType, title, description, priority, status, requiresPermit, assigneeId, scheduledAt, dispatchedBy, dispatchedAt, startedBy, startedAt, holdReason, completedBy, completedAt, workSummary, verifiedBy, verifiedAt, returnToServiceRef, closedBy, closedAt, cancelledBy, cancelledAt, cancelReason, versionNo, createdBy, updatedBy, createdAt, updatedAt, maintenancePlan, warrantyClaimCount]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        siteId: {type: string, format: uuid}
+        assetId: {type: string, format: uuid}
+        serviceIncidentId: {type: [string, 'null'], format: uuid}
+        maintenancePlanId: {type: [string, 'null'], format: uuid}
+        permitToWorkId: {type: [string, 'null'], format: uuid}
+        code: {type: string, pattern: '^[A-Z0-9][A-Z0-9_.-]{0,79}$', maxLength: 80}
+        workType: {type: string, pattern: '^[A-Z][A-Z0-9_]{0,39}$', maxLength: 40}
+        title: {type: string, minLength: 3, maxLength: 400}
+        description: {type: [string, 'null'], maxLength: 4000}
+        priority: {$ref: '#/components/schemas/WorkOrderPriority'}
+        status: {$ref: '#/components/schemas/WorkOrderStatus'}
+        requiresPermit: {type: boolean}
+        assigneeId: {type: [string, 'null'], format: uuid}
+        scheduledAt: {type: [string, 'null'], format: date-time}
+        dispatchedBy: {type: [string, 'null'], format: uuid}
+        dispatchedAt: {type: [string, 'null'], format: date-time}
+        startedBy: {type: [string, 'null'], format: uuid}
+        startedAt: {type: [string, 'null'], format: date-time}
+        holdReason: {type: [string, 'null'], maxLength: 2000}
+        completedBy: {type: [string, 'null'], format: uuid}
+        completedAt: {type: [string, 'null'], format: date-time}
+        workSummary: {type: [string, 'null'], maxLength: 4000}
+        verifiedBy: {type: [string, 'null'], format: uuid}
+        verifiedAt: {type: [string, 'null'], format: date-time}
+        returnToServiceRef: {type: [string, 'null'], maxLength: 200}
+        closedBy: {type: [string, 'null'], format: uuid}
+        closedAt: {type: [string, 'null'], format: date-time}
+        cancelledBy: {type: [string, 'null'], format: uuid}
+        cancelledAt: {type: [string, 'null'], format: date-time}
+        cancelReason: {type: [string, 'null'], maxLength: 2000}
+        versionNo: {type: integer, minimum: 1}
+        createdBy: {type: string, format: uuid}
+        updatedBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+        maintenancePlan:
+          anyOf:
+            - {$ref: '#/components/schemas/MaintenancePlanSummary'}
+            - {type: 'null'}
+        warrantyClaimCount:
+          type: integer
+          minimum: 0
+          description: Đếm hàng DB-088 thật gắn với work order này; không có warrantyId vì DB-083 không tồn tại
+      additionalProperties: false
+    WorkOrderListResponse:
+      type: object
+      required: [data, meta, correlationId]
+      properties:
+        data:
+          type: array
+          maxItems: 100
+          items: {$ref: '#/components/schemas/WorkOrderRegisterRow'}
+        meta: {$ref: '#/components/schemas/OperationsAssetPageMeta'}
+        correlationId: {type: string}
+      additionalProperties: false
+    CreateWorkOrderRequest:
+      type: object
+      description: >-
+        Không có `warrantyId` — DB-083 cố ý không được tạo. `requiresPermit = true` buộc
+        `permitToWorkId` phải trỏ tới một permit còn hiệu lực, trong cửa sổ thời hạn và thuộc đúng
+        site của asset.
+      required: [code, workType, title, priority]
+      properties:
+        code: {type: string, pattern: '^[A-Z0-9][A-Z0-9_.-]{0,79}$', maxLength: 80}
+        workType: {type: string, pattern: '^[A-Z][A-Z0-9_]{0,39}$', maxLength: 40}
+        title: {type: string, minLength: 3, maxLength: 400}
+        description: {type: string, minLength: 1, maxLength: 4000}
+        priority: {$ref: '#/components/schemas/WorkOrderPriority'}
+        requiresPermit: {type: boolean, description: Bỏ trống thì mặc định false}
+        permitToWorkId: {type: string, format: uuid}
+        assigneeUserId: {type: string, format: uuid, description: Phải thuộc tenant}
+        scheduledAt:
+          type: string
+          format: date-time
+          description: Có giá trị thì work order ra đời ở SCHEDULED thay vì DRAFT
+        serviceIncidentId: {type: string, format: uuid, description: Phải thuộc cùng site của asset}
+        maintenancePlanId: {type: string, format: uuid, description: Phải thuộc chính asset}
+      additionalProperties: false
+    WorkOrderCommandResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/WorkOrder'}
+        correlationId: {type: string}
+      additionalProperties: false
+    WorkOrderCommandRequest:
+      type: object
+      description: >-
+        Union ĐÓNG trên `commandType`. DISPATCH cần người thực hiện (trên hàng hoặc trong thân
+        lệnh); HOLD, REOPEN, CANCEL và VERIFY cần `reason`; COMPLETE cần `workSummary` và
+        `evidenceRefs`; CLOSE cần `returnToServiceRef`; RAISE_WARRANTY_CLAIM cần `claimCode` và
+        `failureDescription`. `expectedVersion` bắt buộc cho mọi lệnh.
+      required: [commandType, expectedVersion]
+      properties:
+        commandType:
+          type: string
+          enum: [DISPATCH, START, HOLD, RESUME, COMPLETE, VERIFY, CLOSE, REOPEN, CANCEL, RAISE_WARRANTY_CLAIM]
+        expectedVersion: {type: integer, minimum: 1}
+        reason: {type: string, minLength: 3, maxLength: 2000}
+        assigneeUserId: {type: string, format: uuid}
+        permitToWorkId:
+          type: string
+          format: uuid
+          description: START — phải còn hiệu lực, trong cửa sổ thời hạn và thuộc đúng site của work order
+        workSummary: {type: string, minLength: 3, maxLength: 4000}
+        evidenceRefs:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: {type: string, minLength: 1, maxLength: 500}
+        returnToServiceRef: {type: string, minLength: 1, maxLength: 200}
+        claimCode: {type: string, pattern: '^[A-Z0-9][A-Z0-9_.-]{0,79}$', maxLength: 80}
+        failureDescription: {type: string, minLength: 3, maxLength: 4000}
+      additionalProperties: false
+    WorkOrderClosureCycle:
+      type: object
+      description: >-
+        DB-119 một chu kỳ nghiệm thu. REOPEN NỐI THÊM chu kỳ kế tiếp thay vì ghi đè, nên quyết định
+        đã có không bao giờ mất; người quyết định không bao giờ là người yêu cầu.
+      required: [id, workOrderId, sequenceNo, requestComment, requestEvidenceRefs, requestedBy, requestedAt, decision, decisionComment, decidedBy, decidedAt]
+      properties:
+        id: {type: string, format: uuid}
+        workOrderId: {type: string, format: uuid}
+        sequenceNo: {type: integer, minimum: 1}
+        requestComment: {type: string, minLength: 3, maxLength: 2000}
+        requestEvidenceRefs:
+          type: array
+          maxItems: 50
+          items: {type: string, minLength: 1, maxLength: 500}
+        requestedBy: {type: string, format: uuid}
+        requestedAt: {type: string, format: date-time}
+        decision:
+          anyOf:
+            - {$ref: '#/components/schemas/WorkOrderClosureDecision'}
+            - {type: 'null'}
+        decisionComment: {type: [string, 'null'], maxLength: 2000}
+        decidedBy: {type: [string, 'null'], format: uuid}
+        decidedAt: {type: [string, 'null'], format: date-time}
+      additionalProperties: false
+    WarrantyClaim:
+      type: object
+      description: >-
+        DB-088 yêu cầu bảo hành. KHÔNG có `warrantyId`: DB-083 cố ý không được tạo, nên yêu cầu khóa
+        vào asset và work order đã phát hiện hư hỏng.
+      required: [id, projectId, siteId, assetId, workOrderId, claimCode, failureDescription, evidenceRefs, submittedAt, submittedBy, status, resolution, resolvedBy, resolvedAt, versionNo, createdBy, updatedBy, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        siteId: {type: string, format: uuid}
+        assetId: {type: string, format: uuid}
+        workOrderId: {type: [string, 'null'], format: uuid}
+        claimCode: {type: string, pattern: '^[A-Z0-9][A-Z0-9_.-]{0,79}$', maxLength: 80}
+        failureDescription: {type: string, minLength: 3, maxLength: 4000}
+        evidenceRefs:
+          type: array
+          maxItems: 50
+          items: {type: string, minLength: 1, maxLength: 500}
+        submittedAt: {type: string, format: date-time}
+        submittedBy: {type: string, format: uuid}
+        status: {$ref: '#/components/schemas/WarrantyClaimStatus'}
+        resolution: {type: [string, 'null'], maxLength: 4000}
+        resolvedBy: {type: [string, 'null'], format: uuid}
+        resolvedAt: {type: [string, 'null'], format: date-time}
+        versionNo: {type: integer, minimum: 1}
+        createdBy: {type: string, format: uuid}
+        updatedBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+      additionalProperties: false
+    WorkOrderCommandView:
+      type: object
+      description: >-
+        Work order sau lệnh. `closureCycle` là null khi lệnh không chạm tới chu kỳ nghiệm thu;
+        `warrantyClaim` chỉ có mặt với RAISE_WARRANTY_CLAIM và vắng mặt hoàn toàn ở các lệnh khác.
+      required: [id, projectId, siteId, assetId, serviceIncidentId, maintenancePlanId, permitToWorkId, code, workType, title, description, priority, status, requiresPermit, assigneeId, scheduledAt, dispatchedBy, dispatchedAt, startedBy, startedAt, holdReason, completedBy, completedAt, workSummary, verifiedBy, verifiedAt, returnToServiceRef, closedBy, closedAt, cancelledBy, cancelledAt, cancelReason, versionNo, createdBy, updatedBy, createdAt, updatedAt, closureCycle]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        siteId: {type: string, format: uuid}
+        assetId: {type: string, format: uuid}
+        serviceIncidentId: {type: [string, 'null'], format: uuid}
+        maintenancePlanId: {type: [string, 'null'], format: uuid}
+        permitToWorkId: {type: [string, 'null'], format: uuid}
+        code: {type: string, pattern: '^[A-Z0-9][A-Z0-9_.-]{0,79}$', maxLength: 80}
+        workType: {type: string, pattern: '^[A-Z][A-Z0-9_]{0,39}$', maxLength: 40}
+        title: {type: string, minLength: 3, maxLength: 400}
+        description: {type: [string, 'null'], maxLength: 4000}
+        priority: {$ref: '#/components/schemas/WorkOrderPriority'}
+        status: {$ref: '#/components/schemas/WorkOrderStatus'}
+        requiresPermit: {type: boolean}
+        assigneeId: {type: [string, 'null'], format: uuid}
+        scheduledAt: {type: [string, 'null'], format: date-time}
+        dispatchedBy: {type: [string, 'null'], format: uuid}
+        dispatchedAt: {type: [string, 'null'], format: date-time}
+        startedBy: {type: [string, 'null'], format: uuid}
+        startedAt: {type: [string, 'null'], format: date-time}
+        holdReason: {type: [string, 'null'], maxLength: 2000}
+        completedBy: {type: [string, 'null'], format: uuid}
+        completedAt: {type: [string, 'null'], format: date-time}
+        workSummary: {type: [string, 'null'], maxLength: 4000}
+        verifiedBy: {type: [string, 'null'], format: uuid}
+        verifiedAt: {type: [string, 'null'], format: date-time}
+        returnToServiceRef: {type: [string, 'null'], maxLength: 200}
+        closedBy: {type: [string, 'null'], format: uuid}
+        closedAt: {type: [string, 'null'], format: date-time}
+        cancelledBy: {type: [string, 'null'], format: uuid}
+        cancelledAt: {type: [string, 'null'], format: date-time}
+        cancelReason: {type: [string, 'null'], maxLength: 2000}
+        versionNo: {type: integer, minimum: 1}
+        createdBy: {type: string, format: uuid}
+        updatedBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+        closureCycle:
+          anyOf:
+            - {$ref: '#/components/schemas/WorkOrderClosureCycle'}
+            - {type: 'null'}
+        warrantyClaim: {$ref: '#/components/schemas/WarrantyClaim'}
+      additionalProperties: false
+    WorkOrderCommandResultResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/WorkOrderCommandView'}
+        correlationId: {type: string}
+      additionalProperties: false
+    AssetIdentity:
+      type: object
+      description: DB-080 danh tính asset; không có cột telemetry, meter, tag, gateway hay endpoint nào
+      required: [id, projectId, siteId, equipmentId, assetCode, operationalStatus, activationDate]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        siteId: {type: string, format: uuid}
+        equipmentId: {type: string, format: uuid}
+        assetCode: {type: string, minLength: 1, maxLength: 80}
+        operationalStatus: {$ref: '#/components/schemas/AssetOperationalStatus'}
+        activationDate: {type: [string, 'null'], format: date}
+      additionalProperties: false
+    OperationsStatusCounts:
+      type: object
+      description: >-
+        Bản đồ trạng thái → số hàng thật, đếm bằng GROUP BY. Chỉ chứa những trạng thái THỰC SỰ có
+        hàng: một trạng thái không có hàng thì VẮNG MẶT, không phải bằng 0. Asset chưa ghi nhận gì
+        thì bản đồ rỗng.
+      additionalProperties: {type: integer, minimum: 1}
+      propertyNames: {type: string, pattern: '^[A-Z][A-Z0-9_]{0,39}$'}
+    AssetPerformanceView:
+      type: object
+      description: >-
+        `kpi` và `telemetry` LUÔN là null và luôn có mặt: PM Web không có kho telemetry/KPI nào và
+        ranh giới OT cấm dựng một kho như thế ở phía này. `0` sẽ là một lời nói dối — "không đo
+        được" và "đo được và bằng không" là hai câu trả lời khác nhau. Không có `availability`,
+        `performanceRatio`, meter hay billing provenance vì không nguồn dữ liệu nào tồn tại ở phía
+        này của ranh giới.
+      required: [asset, workOrderCountsByStatus, serviceIncidentCountsByStatus, alarmCaseCountsByState, kpi, telemetry]
+      properties:
+        asset: {$ref: '#/components/schemas/AssetIdentity'}
+        workOrderCountsByStatus: {$ref: '#/components/schemas/OperationsStatusCounts'}
+        serviceIncidentCountsByStatus: {$ref: '#/components/schemas/OperationsStatusCounts'}
+        alarmCaseCountsByState: {$ref: '#/components/schemas/OperationsStatusCounts'}
+        kpi:
+          type: 'null'
+          description: >-
+            Luôn null. Không có kho KPI nào ở phía PM Web của ranh giới OT (SEC-127/SEC-128,
+            FR-116/FR-117); không bao giờ được thay bằng 0 hay {}.
+        telemetry:
+          type: 'null'
+          description: >-
+            Luôn null. DB-091/DB-092 nằm trong kho time-series/sự kiện OT riêng; PM Web chỉ đọc và
+            không dựng bản sao nào ở đây.
+      additionalProperties: false
+    AssetPerformanceResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/AssetPerformanceView'}
         correlationId: {type: string}
       additionalProperties: false
     EscalateWorkflowInstanceRequest:

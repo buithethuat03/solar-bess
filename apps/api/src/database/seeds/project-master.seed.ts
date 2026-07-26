@@ -16,7 +16,7 @@ import {
  * every catalog role on each run and would otherwise downgrade roles the migrations already raised.
  * Bump together with the next `*RoleGrants`/`Grant*Permissions` migration.
  */
-const rolePolicyVersion = 12;
+const rolePolicyVersion = 14;
 
 const roleCatalog = [
   {
@@ -49,7 +49,11 @@ const roleCatalog = [
       'permitToWork.request', 'hseIncident.report', 'stopWork.issue',
       'inspection.manage', 'ncr.manage', 'punch.manage',
       'permission.read.self', 'delegation.create', 'delegation.revoke', 'workflow.escalate',
-      'search.execute', 'savedView.read', 'savedView.create', 'report.create', 'report.read'
+      'search.execute', 'savedView.read', 'savedView.create', 'report.create', 'report.read',
+      'commissioning.read', 'commissioningSystem.create', 'testPack.create',
+      'testRun.start', 'testRun.complete', 'testRun.retest', 'cod.read', 'cod.manage',
+      'alarmCase.read', 'alarmCase.acknowledge', 'serviceIncident.read', 'serviceIncident.create',
+      'workOrder.read', 'workOrder.create', 'workOrder.manage', 'performance.read'
     ]
   },
   {
@@ -81,7 +85,11 @@ const roleCatalog = [
       'permitToWork.request', 'hseIncident.report', 'stopWork.issue',
       'inspection.manage', 'ncr.manage', 'punch.manage',
       'permission.read.self', 'delegation.create', 'delegation.revoke', 'workflow.escalate',
-      'search.execute', 'savedView.read', 'savedView.create', 'report.create', 'report.read'
+      'search.execute', 'savedView.read', 'savedView.create', 'report.create', 'report.read',
+      'commissioning.read', 'commissioningSystem.create', 'testPack.create',
+      'testRun.start', 'testRun.complete', 'testRun.retest', 'cod.read', 'cod.manage',
+      'alarmCase.read', 'alarmCase.acknowledge', 'serviceIncident.read', 'serviceIncident.create',
+      'workOrder.read', 'workOrder.create', 'workOrder.manage', 'performance.read'
     ]
   },
   {
@@ -95,7 +103,9 @@ const roleCatalog = [
       'supplier.read', 'opportunity.read',
       'workfront.read', 'hseIncident.report', 'stopWork.issue',
       'permission.read.self', 'search.execute', 'savedView.read', 'savedView.create',
-      'report.create', 'report.read'
+      'report.create', 'report.read',
+      'commissioning.read', 'cod.read',
+      'alarmCase.read', 'serviceIncident.read', 'workOrder.read', 'performance.read'
     ]
   },
   {
@@ -115,7 +125,9 @@ const roleCatalog = [
       'shipment.updateMilestone', 'goodsReceipt.create',
       'workfront.read', 'dailyLog.create', 'hseIncident.report', 'stopWork.issue',
       'permission.read.self', 'search.execute', 'savedView.read', 'savedView.create',
-      'report.create', 'report.read'
+      'report.create', 'report.read',
+      'commissioning.read', 'cod.read',
+      'alarmCase.read', 'serviceIncident.read', 'workOrder.read', 'performance.read'
     ]
   },
   {
@@ -156,7 +168,9 @@ const roleCatalog = [
     code: 'QAQC_MANAGER', name: 'QA/QC Manager', permissions: [
       'workfront.read', 'hseIncident.report', 'stopWork.issue',
       'inspection.manage', 'ncr.manage', 'punch.manage',
-      'permission.read.self'
+      'permission.read.self',
+      'commissioning.read', 'testPack.create', 'testRun.start', 'testRun.complete',
+      'testRun.retest', 'cod.read'
     ]
   },
   {

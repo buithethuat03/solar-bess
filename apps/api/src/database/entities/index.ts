@@ -73,6 +73,16 @@ import {
 import { DelegationEntity } from './delegation.entity';
 import { SavedViewEntity } from './saved-view.entity';
 import { ReportJobEntity } from './report-job.entity';
+import {
+  CommissioningSystemEntity, TestPackEntity, TestRunEntity
+} from './commissioning.entity';
+import {
+  CodGateEntity, CodGateReviewCycleEntity, CodPackageEntity, HandoverEntity
+} from './cod.entity';
+import {
+  AlarmCaseEntity, MaintenancePlanEntity, ServiceIncidentEntity, WarrantyClaimEntity,
+  WorkOrderClosureCycleEntity, WorkOrderEntity
+} from './operations-maintenance.entity';
 
 export {
   AuditEventEntity, AuthenticationSessionEntity, LocalCredentialEntity,
@@ -100,7 +110,11 @@ export {
   WorkfrontEntity, DailyLogEntity, QuantityProgressRecordEntity, PermitToWorkEntity,
   HseIncidentEntity, StopWorkActionEntity, InspectionTestPlanEntity, InspectionEntity,
   NcrEntity, NcrDispositionCycleEntity, PunchItemEntity, PunchClosureCycleEntity,
-  CapaActionEntity, DelegationEntity, SavedViewEntity, ReportJobEntity
+  CapaActionEntity, DelegationEntity, SavedViewEntity, ReportJobEntity,
+  CommissioningSystemEntity, TestPackEntity, TestRunEntity, CodGateEntity,
+  CodGateReviewCycleEntity, CodPackageEntity, HandoverEntity,
+  AlarmCaseEntity, ServiceIncidentEntity, WorkOrderEntity, WorkOrderClosureCycleEntity,
+  MaintenancePlanEntity, WarrantyClaimEntity
 };
 export * from './operational.enums';
 export * from './project-controls.enums';
@@ -113,6 +127,8 @@ export * from './procurement-logistics.enums';
 export * from './opportunity.enums';
 export * from './field-hse-quality.enums';
 export * from './cross-cutting.enums';
+export * from './commissioning-cod.enums';
+export * from './operations-maintenance.enums';
 export type { DelegationScopeSnapshot } from './delegation.entity';
 export * from './engineering-plants.enums';
 export type {
@@ -144,5 +160,9 @@ export const databaseEntities = [
   WorkfrontEntity, DailyLogEntity, QuantityProgressRecordEntity, PermitToWorkEntity,
   HseIncidentEntity, StopWorkActionEntity, InspectionTestPlanEntity, InspectionEntity,
   NcrEntity, NcrDispositionCycleEntity, PunchItemEntity, PunchClosureCycleEntity,
-  CapaActionEntity, DelegationEntity, SavedViewEntity, ReportJobEntity
+  CapaActionEntity, DelegationEntity, SavedViewEntity, ReportJobEntity,
+  CommissioningSystemEntity, TestPackEntity, TestRunEntity, CodGateEntity,
+  CodGateReviewCycleEntity, CodPackageEntity, HandoverEntity,
+  AlarmCaseEntity, ServiceIncidentEntity, WorkOrderEntity, WorkOrderClosureCycleEntity,
+  MaintenancePlanEntity, WarrantyClaimEntity
 ];
