@@ -18,6 +18,19 @@ File này ghi lịch sử thay đổi phạm vi, tài liệu và governance củ
 - **Trạng thái:** Proposed | Approved | Rejected | Implemented
 ```
 
+## 2026-07-26 — Sửa error mapping nuốt thông báo validation và thêm client-side guard cho login
+
+- **Loại:** Frontend defect; Test; không thay đổi phạm vi nghiệp vụ baseline.
+- **Người yêu cầu/phê duyệt:** Người dùng/Product Owner báo không đăng nhập được và chỉ thấy thông báo chung ngày 2026-07-26.
+- **Mã bị ảnh hưởng:** `AC-174…AC-177`, `TEST-230`, `TEST-231`; không cấp requirement/API ID mới.
+- **Trước thay đổi:** `ApiError.from` chỉ chấp nhận `message` kiểu string. Nest `ValidationPipe` trả `{"message":["email must be an email","password must be longer than or equal to 8 characters"],"error":"Bad Request"}`, tức `message` là mảng, nên mọi lỗi validation của toàn bộ ứng dụng rơi về chuỗi mặc định `Không thể hoàn thành yêu cầu` và người dùng không biết field nào sai. `LoginForm` cũng không kiểm tra gì phía client nên form rỗng vẫn round-trip rồi trả về đúng thông báo vô nghĩa đó.
+- **Sau thay đổi:** `ApiError.from` đọc được cả string, mảng string và `error` của Nest, gán code `REQUEST_VALIDATION_FAILED` cho 400 dạng mảng, và chỉ dùng chuỗi mặc định khi không còn nguồn nào. `LoginForm` kiểm tra tenant/email/độ dài mật khẩu theo đúng contract server trước khi submit, ưu tiên hiển thị lỗi cục bộ để không mâu thuẫn với lỗi server, và trim tenant/email khi gửi.
+- **Lý do:** Đây là defect chặn đăng nhập trên môi trường EC2 test và làm hỏng phản hồi lỗi của mọi form khác trong ứng dụng, không riêng màn hình login.
+- **Artefact bị ảnh hưởng:** `apps/web/src/api/api-error.ts`, `apps/web/src/components/auth/LoginForm.vue`, hai spec mới `api-error.spec.ts` và `LoginForm.spec.ts`, `project-structure.spec.ts`.
+- **Migration/tương thích:** Không có migration. Không đổi contract API; chỉ sửa cách client diễn giải payload lỗi đã tồn tại.
+- **Validation:** Lint, type-check Pass; Web unit tăng 67 → 78 (thêm 4 test error mapping và 6 test login guard); unit toàn workspace API 56 + Web 78 + Worker 61 = 195. Đăng nhập trên public stack trả HTTP 200.
+- **Trạng thái:** Implemented; deploy kèm release kế tiếp.
+
 ## 2026-07-26 — Notification inbox US-022 (API-135/136) và design token layer
 
 - **Loại:** API; Security; Frontend; Test; Documentation; không thay đổi phạm vi nghiệp vụ baseline.

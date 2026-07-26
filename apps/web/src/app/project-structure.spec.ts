@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 describe('frontend project structure — ADR-001/ADR-003', () => {
   it.each(['app', 'api', 'components/common', 'components/projects', 'components/schedule', 'components/risk-change', 'layouts', 'router', 'stores', 'styles', 'types', 'views/projects', 'views/schedule', 'views/risk-change',
-    'components/notification', 'views/notification'])(
+    'components/notification', 'views/notification', 'components/auth'])(
     'contains src/%s',
     (directory) => expect(existsSync(join(process.cwd(), 'src', directory))).toBe(true)
   );
