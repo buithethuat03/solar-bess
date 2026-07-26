@@ -23,7 +23,7 @@ export interface ReadinessGate {
 
 /** One open finding that blocks COD, already narrowed to what the caller may see. */
 export interface BlockingFinding {
-  type: 'PUNCH_ITEM' | 'NCR' | 'STOP_WORK';
+  type: 'PUNCH_ITEM' | 'NCR' | 'STOP_WORK' | 'FAILED_TEST_RUN';
   id: string;
   reference: string;
   detail: string;
@@ -62,6 +62,7 @@ export interface ReadinessEvaluation {
     punchItems: number;
     criticalNcrs: number;
     stopWorks: number;
+    failedTestRuns: number;
     total: number;
     items: BlockingFinding[];
   };
@@ -108,6 +109,7 @@ export function evaluateReadiness(input: ReadinessInput): ReadinessEvaluation {
     punchItems: items.filter((finding) => finding.type === 'PUNCH_ITEM').length,
     criticalNcrs: items.filter((finding) => finding.type === 'NCR').length,
     stopWorks: items.filter((finding) => finding.type === 'STOP_WORK').length,
+    failedTestRuns: items.filter((finding) => finding.type === 'FAILED_TEST_RUN').length,
     total: items.length,
     items
   };

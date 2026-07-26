@@ -18,6 +18,16 @@ File này ghi lịch sử thay đổi phạm vi, tài liệu và governance củ
 - **Trạng thái:** Proposed | Approved | Rejected | Implemented
 ```
 
+## 2026-07-26 — Một lần chạy test FAILED giờ tự nó chặn COD
+
+- **Loại:** Bug fix (behaviour). Không đổi phạm vi, không cấp ID mới.
+- **Mã bị ảnh hưởng:** `AC-060`, `API-104`, `API-105`, `DB-075`; ghi bổ sung dòng dictionary cho `DB-118`/`DB-119`.
+- **Trước thay đổi:** `evaluate()` của COD readiness đọc punch loại A, NCR nghiêm trọng và stop-work chưa hạ, nhưng **không đọc `test_runs`**. Đường duy nhất từ một lần chạy FAILED tới việc chặn COD là gián tiếp: phải có ai đó lập NCR hoặc punch từ nó. Một thất bại không được ghi chép lại sẽ để gói COD ký được — đúng thứ `AC-060` yêu cầu phải ngăn.
+- **Sau thay đổi:** thêm nguồn phát hiện chặn `FAILED_TEST_RUN`. Bản thân lần chạy là bằng chứng. Nó thôi chặn theo đúng cách domain vốn đã dùng để xóa một thất bại: khi có retest kế thừa nó (`previous_run_id`), bất kể kết quả của retest — một retest vẫn hỏng sẽ tự chặn bằng hàng của chính nó. `API-104` trả thêm bộ đếm `failedTestRuns`.
+- **Lý do phát hiện muộn:** brief xây slice liệt kê ba nguồn chặn và không nêu test run; đợt viết ExecPlan đối chiếu lại `AC-060` với mã nguồn mới lộ ra khoảng cách. Đây là lý do bước ghi chép quản trị chạy sau khi code xong vẫn có giá trị.
+- **Validation:** commissioning integration 19/19 Pass; unit API 335/43 suite Pass; lint/typecheck Pass.
+- **Trạng thái:** Implemented local; deploy theo release kế tiếp.
+
 ## 2026-07-26 — Commissioning & COD + O&M: 16 operation cuối khả thi (138 → 154 / 164)
 
 - **Loại:** Data; API; Security; Test; Documentation. Cấp mới hai DB ID theo ủy quyền Product Owner; không cấp API/requirement ID mới.

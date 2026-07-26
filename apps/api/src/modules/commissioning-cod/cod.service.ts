@@ -560,7 +560,8 @@ export class CodService {
     const findings: BlockingFinding[] = [
       ...await this.blockingPunchItems(manager, context, projectId),
       ...await this.openCriticalNcrs(manager, context, projectId, projectReach, scope.packageIds),
-      ...await this.activeStopWorks(manager, context, projectId)
+      ...await this.activeStopWorks(manager, context, projectId),
+      ...await this.failedTestRuns(manager, context, projectId)
     ];
     return evaluateReadiness({ gates, findings, asOf });
   }
@@ -579,6 +580,39 @@ export class CodService {
     return rows.map((row) => ({
       type: 'PUNCH_ITEM' as const, id: row.id, reference: row.code,
       detail: `category ${row.category} punch item is ${row.status}`
+    }));
+  }
+
+  /**
+   * AC-060: a failed commissioning test forces No-go. Without this the only path from a failed run
+   * to a blocked COD was indirect — someone had to raise an NCR or a punch item from it — so a
+   * failure nobody transcribed would let the package sign. The run itself is the evidence.
+   *
+   * A failure is cleared the way the domain already clears one: by a retest that supersedes it.
+   * `previous_run_id` chains a retest to the run it replaces, so a failed run stops blocking as
+   * soon as any later run references it, regardless of that retest's own result — a still-failing
+   * retest blocks on its own row.
+   */
+  private async failedTestRuns(
+    manager: EntityManager, context: RequestContext, projectId: string
+  ): Promise<BlockingFinding[]> {
+    const rows = await manager.query<Array<{ id: string; runNo: number; packCode: string }>>(
+      `SELECT run.id, run.run_no AS "runNo", pack.code AS "packCode"
+      FROM test_runs run
+      JOIN test_packs pack ON pack.tenant_id = run.tenant_id AND pack.id = run.test_pack_id
+      WHERE run.tenant_id = $1 AND run.project_id = $2
+        AND run.status = 'RECORDED' AND run.result = 'FAILED'
+        AND NOT EXISTS (
+          SELECT 1 FROM test_runs retest
+          WHERE retest.tenant_id = run.tenant_id AND retest.previous_run_id = run.id
+        )
+      ORDER BY pack.code, run.run_no`,
+      [context.tenantId, projectId]
+    );
+    return rows.map((row) => ({
+      type: 'FAILED_TEST_RUN' as const, id: row.id,
+      reference: `${row.packCode}#${row.runNo}`,
+      detail: 'failed test run has no retest superseding it'
     }));
   }
 

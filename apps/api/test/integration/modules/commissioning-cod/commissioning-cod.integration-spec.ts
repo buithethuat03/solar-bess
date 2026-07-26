@@ -297,7 +297,7 @@ describe('Commissioning & COD HTTP integration — API-098…API-105', () => {
     expect(blocked.body.data.readiness).toMatchObject({
       blocked: true, readyToSign: false,
       gates: { total: 2, pending: 2, mandatoryTotal: 1, mandatoryOutstanding: 1 },
-      blockingFindings: { punchItems: 1, criticalNcrs: 1, stopWorks: 1, total: 3 }
+      blockingFindings: { punchItems: 1, criticalNcrs: 1, stopWorks: 1, failedTestRuns: 0, total: 3 }
     });
     const references = blocked.body.data.readiness.blockingFindings.items
       .map((item: { id: string }) => item.id);
