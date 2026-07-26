@@ -16,7 +16,7 @@ import {
  * every catalog role on each run and would otherwise downgrade roles the migrations already raised.
  * Bump together with the next `*RoleGrants`/`Grant*Permissions` migration.
  */
-const rolePolicyVersion = 8;
+const rolePolicyVersion = 12;
 
 const roleCatalog = [
   {

@@ -6,7 +6,15 @@ import vue from 'eslint-plugin-vue';
 import vueParser from 'vue-eslint-parser';
 
 export default [
-  { ignores: ['**/dist/**', '**/coverage/**', '**/node_modules/**', 'playwright-report/**', 'test-results/**'] },
+  {
+    ignores: [
+      '**/dist/**', '**/coverage/**', '**/node_modules/**',
+      'playwright-report/**', 'test-results/**',
+      // Ephemeral worktrees for parallel agents: their contents are checked in their own tree,
+      // and linting them here reports errors for code that is not part of this checkout.
+      '.claude/worktrees/**'
+    ]
+  },
   js.configs.recommended,
   ...vue.configs['flat/recommended'],
   {

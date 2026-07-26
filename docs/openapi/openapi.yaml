@@ -7665,7 +7665,7 @@ paths:
       x-data-scope: "chỉ view do chính người gọi sở hữu; V1 chỉ có shareScope PRIVATE"
       x-idempotency: "safe; opaque keyset cursor theo createdAt/id giảm dần"
       x-related-requirements: ["FR-172"]
-      x-related-data: ["DB-096"]
+      x-related-data: ["DB-106"]
       x-related-security: ["SEC-107"]
       x-error-codes: ["INVALID_CURSOR", "PERMISSION_DENIED"]
       security:
@@ -7717,7 +7717,7 @@ paths:
       x-data-scope: "owner luôn là người gọi; shareScope chỉ PRIVATE"
       x-idempotency: "required; DB-101 command receipt phát lại nguyên trạng"
       x-related-requirements: ["FR-172"]
-      x-related-data: ["DB-096"]
+      x-related-data: ["DB-106"]
       x-related-security: ["SEC-107", "SEC-118"]
       x-error-codes: ["SHARE_SCOPE_NOT_SUPPORTED", "SAVED_VIEW_EXISTS", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
@@ -7765,7 +7765,7 @@ paths:
       x-data-scope: "dự án phải nhìn thấy được dưới scope của module đích; ngoài scope là 404"
       x-idempotency: "required; DB-101 command receipt phát lại nguyên trạng"
       x-related-requirements: ["FR-173"]
-      x-related-data: ["DB-097"]
+      x-related-data: ["DB-107"]
       x-related-security: ["SEC-108", "SEC-119"]
       x-error-codes: ["PROJECT_NOT_FOUND", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
@@ -7818,7 +7818,7 @@ paths:
       x-data-scope: "chỉ người đã yêu cầu job; job của người khác là 404"
       x-idempotency: "safe"
       x-related-requirements: ["FR-173"]
-      x-related-data: ["DB-097"]
+      x-related-data: ["DB-107"]
       x-related-security: ["SEC-107", "SEC-119"]
       x-error-codes: ["REPORT_JOB_NOT_FOUND", "PERMISSION_DENIED"]
       security:

@@ -315,11 +315,30 @@ export class IdentityAdminService {
       builder.andWhere('audit.occurredAt <= :occurredTo', { occurredTo: query.occurredTo });
     }
     if (cursor) {
+      // Compared row-wise against what `audit_events` actually stores. Spelling the boundary out as
+      // `:cursorTime` loses rows: Postgres keeps `occurred_at` at microsecond precision while the
+      // encoded cursor carries a millisecond JS `Date`, so an event written in the same millisecond
+      // as the boundary — a single command emits several — satisfies neither `<` nor `=` and
+      // vanishes from the next page. Losing audit rows is worse than losing any other list.
+      // The boundary lookup is tenant-scoped so a forged cursor cannot shift this tenant's page.
       builder.andWhere(new Brackets((where) => where
-        .where('audit.occurredAt < :cursorTime', { cursorTime: cursor.occurredAt })
-        .orWhere('audit.occurredAt = :cursorTime AND audit.id < :cursorId', {
-          cursorTime: cursor.occurredAt, cursorId: cursor.id
-        })));
+        .where(
+          `(audit.occurredAt, audit.id) < (
+             SELECT boundary.occurred_at, boundary.id FROM audit_events boundary
+             WHERE boundary.id = :cursorId AND boundary.tenant_id = :cursorTenantId
+           )`,
+          { cursorId: cursor.id, cursorTenantId: context.tenantId }
+        )
+        .orWhere(new Brackets((fallback) => fallback
+          .where(`NOT EXISTS (
+             SELECT 1 FROM audit_events missing
+             WHERE missing.id = :cursorId AND missing.tenant_id = :cursorTenantId
+           )`)
+          .andWhere(new Brackets((legacy) => legacy
+            .where('audit.occurredAt < :cursorTime', { cursorTime: cursor.occurredAt })
+            .orWhere('audit.occurredAt = :cursorTime AND audit.id < :cursorId', {
+              cursorTime: cursor.occurredAt, cursorId: cursor.id
+            })))))));
     }
     const rows = await builder
       .orderBy('audit.occurredAt', 'DESC').addOrderBy('audit.id', 'DESC')
