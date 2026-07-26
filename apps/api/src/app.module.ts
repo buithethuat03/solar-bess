@@ -5,6 +5,7 @@ import { DatabaseModule } from './database/database.module';
 import { CipherModule } from './modules/cipher/cipher.module';
 import { ContractCostModule } from './modules/contract-cost/contract-cost.module';
 import { DocumentControlModule } from './modules/document-control/document-control.module';
+import { EngineeringPlantsModule } from './modules/engineering-plants/engineering-plants.module';
 import { HealthModule } from './modules/health/health.module';
 import { IdentityAccessModule } from './modules/identity-access/identity-access.module';
 import { NotificationModule } from './modules/notification/notification.module';
@@ -28,7 +29,8 @@ import { WorkflowModule } from './modules/workflow/workflow.module';
     NotificationModule,
     WorkflowModule,
     DocumentControlModule,
-    ContractCostModule
+    ContractCostModule,
+    EngineeringPlantsModule
   ]
 })
 export class AppModule implements NestModule {

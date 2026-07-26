@@ -4379,51 +4379,86 @@ paths:
     get:
       tags: ["Engineering & Plants"]
       summary: "Liệt kê approved equipment models"
+      description: >-
+        Catalog equipment model của tenant, mới nhất trước theo keyset cursor `createdAt`/`id`.
+        Mặc định chỉ trả APPROVED — phần catalog dùng được; query param `status` nới rộng: một
+        trạng thái cụ thể hoặc `ALL` cho toàn bộ vòng đời. Catalog là phạm vi tenant-level có chủ
+        đích (model là engineering fact tái sử dụng), nên principal chỉ giữ package scope vẫn đọc
+        được catalog của tenant mình — khác mọi API còn lại của nhóm này. Lọc thêm được theo
+        `equipmentClass` và `manufacturer` bằng so khớp đúng. Cursor sai định dạng trả 400
+        `INVALID_CURSOR`, không bao giờ bỏ qua phân trang; 403 `PERMISSION_DENIED` chỉ dành cho
+        người thiếu hẳn quyền `equipmentModel.read`.
       operationId: api_067_get_v1_equipment_models
       x-api-id: "API-067"
+      x-implementation-status: implemented
       x-permission: "equipmentModel.read"
-      x-data-scope: "tenant/category"
-      x-idempotency: "safe"
+      x-data-scope: "tenant-level có chủ đích: model là engineering fact tái sử dụng — package scope vẫn đọc được"
+      x-idempotency: "safe; opaque keyset cursor theo createdAt/id giảm dần"
       x-related-requirements: ["FR-045"]
       x-related-data: ["DB-041"]
       x-related-security: ["SEC-107"]
+      x-error-codes: ["PERMISSION_DENIED", "INVALID_CURSOR"]
       security:
         - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/TenantHeader'
         - $ref: '#/components/parameters/CorrelationHeader'
+        - name: cursor
+          in: query
+          required: false
+          schema: {type: string, maxLength: 500}
+          description: Opaque cursor từ meta.nextCursor; đi tới null để duyệt hết
+        - name: limit
+          in: query
+          required: false
+          schema: {type: integer, minimum: 1, maximum: 100, default: 50}
+        - name: status
+          in: query
+          required: false
+          schema: {type: string, enum: [DRAFT, IN_REVIEW, APPROVED, SUPERSEDED, ALL]}
+          description: Bỏ trống là APPROVED — catalog dùng được; ALL nới ra toàn bộ vòng đời
+        - name: equipmentClass
+          in: query
+          required: false
+          schema: {type: string, minLength: 1, maxLength: 100}
+        - name: manufacturer
+          in: query
+          required: false
+          schema: {type: string, minLength: 1, maxLength: 200}
       responses:
         '200':
-          description: "Authorized result"
+          description: "Trang catalog theo bộ lọc trạng thái, mới nhất trước"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/EquipmentModelListResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
     post:
       tags: ["Engineering & Plants"]
       summary: "Tạo equipment model version"
+      description: >-
+        Đăng ký một model vào catalog: hàng sinh ra DRAFT và V1 dừng ở đó một cách có chủ đích —
+        catalog CHƯA có operation approve nào, nên APPROVED/SUPERSEDED chỉ đạt tới bằng
+        seed/migration (quyết định D2 được ghi nhận của lát Engineering & Plants). Khi model đạt
+        APPROVED, nội dung nghiệp vụ của nó bị trigger đóng băng và lối thoát duy nhất là
+        APPROVED → SUPERSEDED. `manufacturerCompanyId` nếu khai phải là company của tenant (422
+        `MANUFACTURER_COMPANY_NOT_FOUND`); trùng (manufacturer, model, specVersion) trong tenant
+        trả 409 `EQUIPMENT_MODEL_CONFLICT` và không ghi gì. `Idempotency-Key` bắt buộc: cùng key
+        với cùng nội dung phát lại đúng 201 cũ, cùng key với nội dung khác trả 409
+        `IDEMPOTENCY_CONFLICT`.
       operationId: api_068_post_v1_equipment_models
       x-api-id: "API-068"
+      x-implementation-status: implemented
       x-permission: "equipmentModel.create"
-      x-data-scope: "tenant/category"
-      x-idempotency: "required"
+      x-data-scope: "tenant-level có chủ đích: model là engineering fact tái sử dụng trong tenant"
+      x-idempotency: "required; DB-101 command receipt phát lại nguyên trạng"
       x-related-requirements: ["FR-045"]
       x-related-data: ["DB-041"]
       x-related-security: ["SEC-107", "SEC-118"]
+      x-error-codes: ["MANUFACTURER_COMPANY_NOT_FOUND", "EQUIPMENT_MODEL_CONFLICT", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -4434,91 +4469,117 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/CreateEquipmentModelRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '201':
+          description: "Model DRAFT đã vào catalog; chưa có đường approve nào trong catalog API"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/EquipmentModelCommandResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/projects/{projectId}/bill-of-materials":
     parameters:
       - name: projectId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     get:
       tags: ["Engineering & Plants"]
       summary: "Đọc BOM/revision/lineage"
+      description: >-
+        Register BOM version của một dự án, mới nhất trước theo keyset cursor `createdAt`/`id`,
+        mỗi item kèm `lineCount` đếm trong SQL và tham chiếu design revision đã back version đó.
+        `linesForVersion` nhúng trọn bộ dòng đã sắp theo `lineNo` cho đúng một version — chỉ khi
+        version đó nằm trong trang trả về (nhúng page-local có chủ đích); mọi item khác mang
+        `lines: null`. BOM là phạm vi project-level không có package granularity: principal chỉ
+        giữ package scope không với tới BOM nào, và dự án ngoài tenant hoặc ngoài scope trả 404
+        `PROJECT_NOT_FOUND` — không phân biệt được với dự án không tồn tại. Số lượng là chuỗi
+        thập phân numeric(19,4) đúng dạng Postgres lưu, không bao giờ là JSON number. Cursor sai
+        định dạng trả 400 `INVALID_CURSOR`.
       operationId: api_069_get_v1_projects_projectid_bill_of_materials
       x-api-id: "API-069"
+      x-implementation-status: implemented
       x-permission: "bom.read"
-      x-data-scope: "project/design"
-      x-idempotency: "safe"
+      x-data-scope: "project scope bắt buộc; BOM không có package granularity — ngoài scope là 404"
+      x-idempotency: "safe; opaque keyset cursor theo createdAt/id giảm dần"
       x-related-requirements: ["FR-046"]
       x-related-data: ["DB-042", "DB-043"]
       x-related-security: ["SEC-111"]
+      x-error-codes: ["PROJECT_NOT_FOUND", "PERMISSION_DENIED", "INVALID_CURSOR"]
       security:
         - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/TenantHeader'
         - $ref: '#/components/parameters/CorrelationHeader'
+        - name: cursor
+          in: query
+          required: false
+          schema: {type: string, maxLength: 500}
+          description: Opaque cursor từ meta.nextCursor; đi tới null để duyệt hết
+        - name: limit
+          in: query
+          required: false
+          schema: {type: integer, minimum: 1, maximum: 100, default: 50}
+        - name: linesForVersion
+          in: query
+          required: false
+          schema: {type: integer, minimum: 1}
+          description: >-
+            Nhúng trọn bộ dòng cho đúng BOM version này khi nó nằm trong trang trả về; các item
+            khác giữ lines null
       responses:
         '200':
-          description: "Authorized result"
+          description: "Trang BOM version kèm lineCount; version được yêu cầu nhúng dòng của nó"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/BillOfMaterialsListResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/projects/{projectId}/bill-of-materials:release":
     parameters:
       - name: projectId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     post:
       tags: ["Engineering & Plants"]
       summary: "Release immutable BOM version"
+      description: >-
+        Create-and-release trong MỘT lệnh — bản đọc V1 trung thực đã được ghi nhận: catalog không
+        có operation nào tạo hay sửa BOM DRAFT, nên lệnh nhận thẳng nội dung nháp
+        (`designRevisionId` + `lines`) và tạo-rồi-release version kế tiếp trong một transaction
+        (số version là MAX+1 của dự án cấp ngay trong transaction; thua cuộc đua song song trả
+        409 `BOM_VERSION_CONFLICT`). Design revision phải thuộc đúng dự án (422
+        `DESIGN_REVISION_NOT_FOUND`) và phải ISSUED với kết quả quét CLEAN (422
+        `DESIGN_REVISION_LOCKED` — chuỗi SEC-121: không BOM nào release trên bản vẽ chưa phát
+        hành hay chưa sạch). SoD là deviation được ghi nhận: luật tài liệu "người release ≠ tác
+        giả BOM" bất khả thi khi create-and-release làm người release chính là tác giả hàng, nên
+        luật được ép là người release phải khác người upload design revision (422 `RELEASE_SOD`).
+        `snapshotHash` băm canonical nội dung dòng ĐÚNG DẠNG Postgres lưu, theo thứ tự `lineNo`;
+        bản release trước bị supersede nguyên tử trong cùng transaction trước khi hàng mới thành
+        RELEASED, nên dự án không bao giờ có hai bản RELEASED. Hàng RELEASED/SUPERSEDED và dòng
+        của chúng bị trigger đóng băng kể cả qua raw SQL. Trả 200 đồng bộ (không phải 202); mọi
+        4xx không ghi gì.
       operationId: api_070_post_v1_projects_projectid_bill_of_materials_release
       x-api-id: "API-070"
+      x-implementation-status: implemented
       x-permission: "bom.release"
-      x-data-scope: "project/design"
-      x-idempotency: "required"
+      x-data-scope: "project scope bắt buộc; BOM không có package granularity — ngoài scope là 404"
+      x-idempotency: "required; DB-101 command receipt phát lại nguyên trạng"
       x-related-requirements: ["FR-047"]
       x-related-data: ["DB-042", "DB-043"]
       x-related-security: ["SEC-108", "SEC-109"]
+      x-error-codes: ["PROJECT_NOT_FOUND", "DESIGN_REVISION_NOT_FOUND", "DESIGN_REVISION_LOCKED", "RELEASE_SOD", "BOM_LINE_DUPLICATE", "QUANTITY_INVALID", "EQUIPMENT_MODEL_NOT_FOUND", "BOM_VERSION_CONFLICT", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -4529,29 +4590,21 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/ReleaseBomRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '200':
+          description: "BOM version mới RELEASED kèm trọn bộ dòng, snapshotHash và bản bị supersede"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/BillOfMaterialsReleaseResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/projects/{projectId}/substitutions":
     parameters:
       - name: projectId
@@ -4608,19 +4661,28 @@ paths:
       - name: solarPlantId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     get:
       tags: ["Engineering & Plants"]
       summary: "Đọc Solar hierarchy/config/KPI provenance"
+      description: >-
+        Read model một solar plant: hàng được địa chỉ, cấu hình RELEASED hiện hành của site
+        (`releasedConfiguration` — null khi site chưa release lần nào) và toàn bộ lịch sử version
+        của site theo `configurationVersion` tăng dần. Route plant chỉ pre-filter được ở tenant
+        level nên ABAC project thật giải từ chính hàng sở hữu bản ghi: khác tenant, ngoài project
+        scope hay chỉ có package scope đều trả 404 `SOLAR_PLANT_NOT_FOUND` chứ không phải 403 —
+        không thể dò sự tồn tại của một solarPlantId. Công suất là chuỗi numeric(19,4) đúng dạng
+        Postgres lưu, không bao giờ là JSON number.
       operationId: api_072_get_v1_solar_plants_solarplantid
       x-api-id: "API-072"
+      x-implementation-status: implemented
       x-permission: "solarPlant.read"
-      x-data-scope: "project/site/asset"
+      x-data-scope: "scope giải từ hàng plant sở hữu bản ghi (project-level, không package granularity); ngoài scope là 404"
       x-idempotency: "safe"
       x-related-requirements: ["FR-125"]
       x-related-data: ["DB-080", "DB-081", "DB-093"]
       x-related-security: ["SEC-111", "SEC-128"]
+      x-error-codes: ["SOLAR_PLANT_NOT_FOUND", "PERMISSION_DENIED"]
       security:
         - bearerAuth: []
       parameters:
@@ -4628,43 +4690,48 @@ paths:
         - $ref: '#/components/parameters/CorrelationHeader'
       responses:
         '200':
-          description: "Authorized result"
+          description: "Solar plant kèm cấu hình RELEASED hiện hành và lịch sử version của site"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/SolarPlantDetailResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/solar-plants/{solarPlantId}:release-configuration":
     parameters:
       - name: solarPlantId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     post:
       tags: ["Engineering & Plants"]
       summary: "Release Solar configuration version"
+      description: >-
+        Release version cấu hình KẾ TIẾP của site như một hàng RELEASED mới: số version là
+        MAX(configuration_version của site)+1 cấp ngay trong transaction, bản release hiện hành
+        bị supersede nguyên tử trong cùng transaction và partial unique index bảo đảm site không
+        bao giờ có hai bản RELEASED — thua cuộc đua song song trả 409
+        `CONFIGURATION_VERSION_CONFLICT`. Hàng được địa chỉ là mỏ neo danh tính và optimistic
+        concurrency: `expectedVersion` lệch trả 409 `VERSION_CONFLICT` kèm `currentVersion`, và
+        hàng đã SUPERSEDED không còn neo được release nào nữa (422 `INVALID_STATE_TRANSITION` —
+        hãy release từ bản hiện hành). `configuration` được băm canonical vào
+        `configurationHash`; công suất bỏ trống kế thừa từ mỏ neo, giá trị không dương bị check
+        của DB chặn (422 `CAPACITY_INVALID`). Hàng RELEASED/SUPERSEDED bất biến kể cả qua raw
+        SQL. Plant ngoài tenant hoặc ngoài scope trả 404 `SOLAR_PLANT_NOT_FOUND` chứ không phải
+        403. Trả 200 đồng bộ (không phải 202); mọi 4xx không ghi gì.
       operationId: api_073_post_v1_solar_plants_solarplantid_release_configuration
       x-api-id: "API-073"
+      x-implementation-status: implemented
       x-permission: "solarPlant.configure"
-      x-data-scope: "project/site"
-      x-idempotency: "required"
+      x-data-scope: "scope giải từ hàng plant sở hữu bản ghi (project-level, không package granularity); ngoài scope là 404"
+      x-idempotency: "required; expectedVersion bắt buộc; DB-101 command receipt phát lại nguyên trạng"
       x-related-requirements: ["FR-126"]
       x-related-data: ["DB-079", "DB-080", "DB-081"]
       x-related-security: ["SEC-108", "SEC-128"]
+      x-error-codes: ["SOLAR_PLANT_NOT_FOUND", "INVALID_STATE_TRANSITION", "VERSION_CONFLICT", "CONFIGURATION_VERSION_CONFLICT", "CAPACITY_INVALID", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -4675,47 +4742,49 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/ReleaseSolarConfigurationRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '200':
+          description: "Hàng cấu hình mới RELEASED kèm supersededPlantId của bản bị thay"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/SolarPlantReleaseResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/bess-plants/{bessPlantId}":
     parameters:
       - name: bessPlantId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     get:
       tags: ["Engineering & Plants"]
       summary: "Đọc BESS hierarchy/envelope/read-only status"
+      description: >-
+        Read model một BESS plant: hierarchy version, operating envelope (tài liệu ràng buộc kỹ
+        thuật thụ động — power/SOC/ramp bounds, đầu vào duy nhất của mô phỏng advisory API-075)
+        và point list version. Khối `kpi` và `telemetry` là null TƯỜNG MINH trong schema thay vì
+        bị bỏ đi: PM Web không có telemetry store nào, và theo ranh giới OT (SEC-127/SEC-128) dữ
+        liệu vận hành chỉ có thể tới read-only qua integration layer — schema DB-082 không có
+        bất kỳ cột kết nối/credential nào nên PM Web không thể lưu nổi tọa độ của một write path
+        OT. Khác tenant, ngoài project scope hay chỉ có package scope trả 404
+        `BESS_PLANT_NOT_FOUND` chứ không phải 403 — không thể dò sự tồn tại của một bessPlantId.
       operationId: api_074_get_v1_bess_plants_bessplantid
       x-api-id: "API-074"
+      x-implementation-status: implemented
       x-permission: "bessPlant.read"
-      x-data-scope: "project/site/asset/field"
+      x-data-scope: "scope giải từ hàng plant sở hữu bản ghi (project-level, không package granularity); ngoài scope là 404"
       x-idempotency: "safe"
       x-related-requirements: ["FR-130"]
       x-related-data: ["DB-080", "DB-082", "DB-090"]
       x-related-security: ["SEC-127", "SEC-128"]
+      x-error-codes: ["BESS_PLANT_NOT_FOUND", "PERMISSION_DENIED"]
       security:
         - bearerAuth: []
       parameters:
@@ -4723,43 +4792,48 @@ paths:
         - $ref: '#/components/parameters/CorrelationHeader'
       responses:
         '200':
-          description: "Authorized result"
+          description: "BESS plant kèm envelope; kpi/telemetry null tường minh theo ranh giới OT"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/BessPlantDetailResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/bess-plants/{bessPlantId}:simulate-dispatch":
     parameters:
       - name: bessPlantId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     post:
       tags: ["Engineering & Plants"]
       summary: "Chạy mô phỏng dispatch advisory; không phát setpoint"
+      description: >-
+        Advisory KHÔNG TRẠNG THÁI: thẩm định kịch bản dispatch với operating envelope ĐÃ RELEASE
+        của site — site chưa có bản release trả 422 `OPERATING_ENVELOPE_MISSING`, envelope đã
+        release nhưng thiếu cấu trúc tối thiểu trả 422 `OPERATING_ENVELOPE_INVALID` — bằng số
+        học thập phân chính xác trên chuỗi, không bao giờ float. Kịch bản bất khả thi KHÔNG phải
+        lỗi HTTP: mã BESS_CONSTRAINT_INFEASIBLE trong tài liệu được trả in-band là
+        `feasible: false` kèm danh sách ràng buộc bị vi phạm (`violations`) trong response 200.
+        Lệnh persist DUY NHẤT command receipt của nó — không audit row, không outbox event — nên
+        không thứ gì mang hình dạng lệnh có thể rời khỏi đây về phía OT (SEC-128); verdict là
+        con số tham khảo, không bao giờ là setpoint, và PM Web không phát gì tới
+        BESS/PCS/BMS/EMS/SCADA. Phát lại cùng `Idempotency-Key` trả lại verdict đã lưu thay vì
+        tính lại; plant ngoài tenant hoặc ngoài scope trả 404 `BESS_PLANT_NOT_FOUND` chứ không
+        phải 403.
       operationId: api_075_post_v1_bess_plants_bessplantid_simulate_dispatch
       x-api-id: "API-075"
+      x-implementation-status: implemented
       x-permission: "bessSimulation.run"
-      x-data-scope: "project/site/scenario"
-      x-idempotency: "required"
+      x-data-scope: "scope giải từ hàng plant sở hữu bản ghi (project-level, không package granularity); ngoài scope là 404"
+      x-idempotency: "required; DB-101 command receipt phát lại verdict nguyên trạng — persist duy nhất của lệnh"
       x-related-requirements: ["FR-133"]
       x-related-data: ["DB-016", "DB-082"]
       x-related-security: ["SEC-128"]
+      x-error-codes: ["BESS_PLANT_NOT_FOUND", "OPERATING_ENVELOPE_MISSING", "OPERATING_ENVELOPE_INVALID", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -4770,29 +4844,21 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/SimulateDispatchRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '200':
+          description: "Verdict advisory: feasible kèm danh sách vi phạm; không gì được phát về phía OT"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/DispatchSimulationResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/suppliers":
     get:
       tags: ["Procurement & Logistics"]
@@ -11246,6 +11312,530 @@ components:
       required: [data, correlationId]
       properties:
         data: {$ref: '#/components/schemas/PaymentWithComponents'}
+        correlationId: {type: string}
+      additionalProperties: false
+    EquipmentModelStatus:
+      type: string
+      enum: [DRAFT, IN_REVIEW, APPROVED, SUPERSEDED]
+      description: >-
+        Vòng đời FR-045 đầy đủ, nhưng API-068 chỉ tạo ra DRAFT: catalog chưa có operation approve
+        nào (quyết định D2), nên APPROVED/SUPERSEDED chỉ đạt tới bằng seed/migration. Nội dung
+        nghiệp vụ của model APPROVED bị trigger đóng băng; lối thoát duy nhất là APPROVED →
+        SUPERSEDED kèm supersededById.
+    BillOfMaterialsStatus:
+      type: string
+      enum: [DRAFT, IN_REVIEW, RELEASED, SUPERSEDED]
+      description: >-
+        Vòng đời FR-046/FR-047 đầy đủ, nhưng API-070 create-and-release nên qua API chỉ quan sát
+        được RELEASED và SUPERSEDED. Hàng RELEASED/SUPERSEDED bị trigger
+        protect_bill_of_materials_history đóng băng; lối thoát hợp lệ duy nhất khỏi RELEASED là
+        cú supersede nguyên tử khi API-070 release version kế tiếp.
+    BomLineSubstitutionStatus:
+      type: string
+      enum: [NONE, PROPOSED, APPROVED, REJECTED]
+      description: >-
+        FR-050 trên từng dòng BOM. API-071 (substitution) bị HOÃN — bảng của nó chưa được cấp DB
+        id — nên V1 mọi dòng luôn NONE; từ vựng ship sẵn để workflow substitution về sau điều
+        khiển trường này (quyết định D3).
+    PlantStatus:
+      type: string
+      enum: [DRAFT, RELEASED, SUPERSEDED]
+      description: >-
+        Vòng đời cấu hình plant dùng chung cho DB-081/DB-082: tối đa một hàng RELEASED mỗi site
+        (partial unique index); hàng RELEASED/SUPERSEDED bất biến ngoài đúng cú chuyển RELEASED →
+        SUPERSEDED thực hiện nguyên tử trong transaction release version kế tiếp.
+    EngineeringPlantsPageMeta:
+      type: object
+      required: [nextCursor, limit]
+      properties:
+        nextCursor: {type: [string, 'null'], maxLength: 500}
+        limit: {type: integer, minimum: 1, maximum: 100}
+      additionalProperties: false
+    EquipmentModel:
+      type: object
+      description: >-
+        DB-041 một entry của catalog equipment model tenant-scoped. ratings là tài liệu jsonb tự
+        do của kỹ thuật; supersededById chỉ khác null khi status là SUPERSEDED.
+      required: [id, manufacturerCompanyId, equipmentClass, manufacturer, model, ratings, specVersion, status, supersededById, versionNo, createdBy, updatedBy, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        manufacturerCompanyId: {type: [string, 'null'], format: uuid}
+        equipmentClass: {type: string, minLength: 1, maxLength: 100}
+        manufacturer: {type: string, minLength: 1, maxLength: 200}
+        model: {type: string, minLength: 1, maxLength: 200}
+        ratings:
+          type: object
+          additionalProperties: true
+        specVersion: {type: string, minLength: 1, maxLength: 60}
+        status: {$ref: '#/components/schemas/EquipmentModelStatus'}
+        supersededById: {type: [string, 'null'], format: uuid}
+        versionNo: {type: integer, minimum: 1}
+        createdBy: {type: string, format: uuid}
+        updatedBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+      additionalProperties: false
+    BomLine:
+      type: object
+      description: >-
+        DB-043 một dòng của BOM version. quantity là chuỗi numeric(19,4) đúng dạng Postgres lưu —
+        chính văn bản đã vào canonical snapshotHash; substitutionStatus luôn NONE trong V1
+        (API-071 hoãn).
+      required: [id, billOfMaterialsId, equipmentModelId, lineNo, itemCode, description, quantity, unit, substitutionStatus, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        billOfMaterialsId: {type: string, format: uuid}
+        equipmentModelId: {type: [string, 'null'], format: uuid}
+        lineNo: {type: integer, minimum: 1}
+        itemCode: {type: string, minLength: 1, maxLength: 80}
+        description: {type: [string, 'null'], maxLength: 1000}
+        quantity:
+          type: string
+          pattern: '^\d{1,15}(\.\d{1,4})?$'
+          description: numeric(19,4) dạng chuỗi, luôn lớn hơn 0 theo check của DB
+        unit: {type: string, minLength: 1, maxLength: 40}
+        substitutionStatus: {$ref: '#/components/schemas/BomLineSubstitutionStatus'}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+      additionalProperties: false
+    BillOfMaterialsVersion:
+      type: object
+      description: >-
+        DB-042 một BOM version trong register API-069, kèm lineCount đếm trong SQL. lines chỉ
+        khác null cho đúng version được yêu cầu qua linesForVersion và chỉ khi version đó nằm
+        trong trang trả về (nhúng page-local có chủ đích).
+      required: [id, projectId, designRevisionId, version, status, releasedBy, releasedAt, snapshotHash, versionNo, createdBy, updatedBy, createdAt, updatedAt, lineCount, lines]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        designRevisionId: {type: string, format: uuid}
+        version:
+          type: integer
+          minimum: 1
+          description: Cấp trong transaction theo MAX+1 của dự án; duy nhất trong dự án
+        status: {$ref: '#/components/schemas/BillOfMaterialsStatus'}
+        releasedBy: {type: [string, 'null'], format: uuid}
+        releasedAt: {type: [string, 'null'], format: date-time}
+        snapshotHash:
+          type: [string, 'null']
+          pattern: '^[0-9a-f]{64}$'
+          description: Canonical hash của nội dung dòng đúng dạng lưu trữ, theo thứ tự lineNo
+        versionNo: {type: integer, minimum: 1}
+        createdBy: {type: string, format: uuid}
+        updatedBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+        lineCount: {type: integer, minimum: 0}
+        lines:
+          type: [array, 'null']
+          maxItems: 500
+          items: {$ref: '#/components/schemas/BomLine'}
+      additionalProperties: false
+    BillOfMaterialsRelease:
+      type: object
+      description: >-
+        Kết quả API-070: BOM version vừa RELEASED kèm trọn bộ dòng đã ghi (đúng dạng lưu trữ đã
+        vào snapshotHash) và supersededBomId — bản release trước bị supersede nguyên tử trong
+        cùng transaction, null ở lần release đầu của dự án.
+      required: [id, projectId, designRevisionId, version, status, releasedBy, releasedAt, snapshotHash, versionNo, createdBy, updatedBy, createdAt, updatedAt, lineCount, lines, supersededBomId]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        designRevisionId: {type: string, format: uuid}
+        version: {type: integer, minimum: 1}
+        status: {$ref: '#/components/schemas/BillOfMaterialsStatus'}
+        releasedBy: {type: string, format: uuid}
+        releasedAt: {type: string, format: date-time}
+        snapshotHash: {type: string, pattern: '^[0-9a-f]{64}$'}
+        versionNo: {type: integer, minimum: 1}
+        createdBy: {type: string, format: uuid}
+        updatedBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+        lineCount: {type: integer, minimum: 1}
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items: {$ref: '#/components/schemas/BomLine'}
+        supersededBomId: {type: [string, 'null'], format: uuid}
+      additionalProperties: false
+    SolarPlant:
+      type: object
+      description: >-
+        DB-081 một configuration version của solar plant trên một site. Công suất là chuỗi
+        numeric(19,4) đọc lại từ Postgres; configurationHash là canonical hash của configuration.
+      required: [id, projectId, siteId, rootAssetId, dcCapacityKwp, acCapacityKw, configurationVersion, configuration, configurationHash, baselineRef, status, versionNo, createdBy, updatedBy, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        siteId: {type: string, format: uuid}
+        rootAssetId: {type: string, format: uuid}
+        dcCapacityKwp:
+          type: string
+          pattern: '^\d{1,15}(\.\d{1,4})?$'
+          description: numeric(19,4) dạng chuỗi, luôn lớn hơn 0 theo check của DB
+        acCapacityKw:
+          type: string
+          pattern: '^\d{1,15}(\.\d{1,4})?$'
+          description: numeric(19,4) dạng chuỗi, luôn lớn hơn 0 theo check của DB
+        configurationVersion:
+          type: integer
+          minimum: 1
+          description: Cấp trong transaction theo MAX+1 của site; duy nhất trong site
+        configuration:
+          type: object
+          additionalProperties: true
+          description: Snapshot topology trọn vẹn của version này
+        configurationHash: {type: string, pattern: '^[0-9a-f]{64}$'}
+        baselineRef:
+          type: [object, 'null']
+          additionalProperties: true
+        status: {$ref: '#/components/schemas/PlantStatus'}
+        versionNo: {type: integer, minimum: 1}
+        createdBy: {type: string, format: uuid}
+        updatedBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+      additionalProperties: false
+    SolarPlantRelease:
+      type: object
+      description: >-
+        Kết quả API-073: hàng cấu hình mới RELEASED kèm supersededPlantId của bản release trước
+        (bị supersede nguyên tử trong cùng transaction; null khi site chưa từng có bản release).
+      required: [id, projectId, siteId, rootAssetId, dcCapacityKwp, acCapacityKw, configurationVersion, configuration, configurationHash, baselineRef, status, versionNo, createdBy, updatedBy, createdAt, updatedAt, supersededPlantId]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        siteId: {type: string, format: uuid}
+        rootAssetId: {type: string, format: uuid}
+        dcCapacityKwp: {type: string, pattern: '^\d{1,15}(\.\d{1,4})?$'}
+        acCapacityKw: {type: string, pattern: '^\d{1,15}(\.\d{1,4})?$'}
+        configurationVersion: {type: integer, minimum: 1}
+        configuration:
+          type: object
+          additionalProperties: true
+        configurationHash: {type: string, pattern: '^[0-9a-f]{64}$'}
+        baselineRef:
+          type: [object, 'null']
+          additionalProperties: true
+        status: {$ref: '#/components/schemas/PlantStatus'}
+        versionNo: {type: integer, minimum: 1}
+        createdBy: {type: string, format: uuid}
+        updatedBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+        supersededPlantId: {type: [string, 'null'], format: uuid}
+      additionalProperties: false
+    SolarPlantReleasedConfiguration:
+      type: object
+      description: Cấu hình RELEASED hiện hành của site — hàng mang nó có thể khác hàng được địa chỉ
+      required: [solarPlantId, configurationVersion, configuration, configurationHash]
+      properties:
+        solarPlantId: {type: string, format: uuid}
+        configurationVersion: {type: integer, minimum: 1}
+        configuration:
+          type: object
+          additionalProperties: true
+        configurationHash: {type: string, pattern: '^[0-9a-f]{64}$'}
+      additionalProperties: false
+    SolarPlantVersionHistoryRow:
+      type: object
+      required: [id, configurationVersion, status, configurationHash, versionNo, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        configurationVersion: {type: integer, minimum: 1}
+        status: {$ref: '#/components/schemas/PlantStatus'}
+        configurationHash: {type: string, pattern: '^[0-9a-f]{64}$'}
+        versionNo: {type: integer, minimum: 1}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+      additionalProperties: false
+    BessPlant:
+      type: object
+      description: >-
+        DB-082 một hierarchy version của BESS plant. Schema CỐ Ý không có bất kỳ trường kết
+        nối/credential nào (SEC-127/SEC-128): PM Web không thể lưu nổi tọa độ của một write path
+        OT. kpi và telemetry là null tường minh — không tồn tại telemetry store trong PM Web và
+        dữ liệu vận hành chỉ có thể tới read-only qua integration layer.
+      required: [id, projectId, siteId, rootAssetId, powerMw, energyMwh, hierarchyVersion, operatingEnvelope, pointListVersion, status, versionNo, createdBy, updatedBy, createdAt, updatedAt, kpi, telemetry]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        siteId: {type: string, format: uuid}
+        rootAssetId: {type: string, format: uuid}
+        powerMw:
+          type: string
+          pattern: '^\d{1,15}(\.\d{1,4})?$'
+          description: numeric(19,4) dạng chuỗi, luôn lớn hơn 0 theo check của DB
+        energyMwh:
+          type: string
+          pattern: '^\d{1,15}(\.\d{1,4})?$'
+          description: numeric(19,4) dạng chuỗi, luôn lớn hơn 0 theo check của DB
+        hierarchyVersion: {type: integer, minimum: 1}
+        operatingEnvelope:
+          type: object
+          additionalProperties: true
+          description: >-
+            Tài liệu ràng buộc kỹ thuật thụ động (power/SOC/ramp bounds) — đầu vào duy nhất của
+            mô phỏng advisory API-075, không bao giờ là nguồn setpoint
+        pointListVersion: {type: [string, 'null'], maxLength: 60}
+        status: {$ref: '#/components/schemas/PlantStatus'}
+        versionNo: {type: integer, minimum: 1}
+        createdBy: {type: string, format: uuid}
+        updatedBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+        kpi:
+          type: 'null'
+          description: >-
+            Luôn null tường minh: PM Web không có telemetry store; KPI vận hành thuộc miền O&M
+            và chỉ tới read-only qua integration layer (SEC-127/SEC-128)
+        telemetry:
+          type: 'null'
+          description: >-
+            Luôn null tường minh: không tồn tại đường dữ liệu OT nào trong PM Web (ranh giới
+            SEC-127/SEC-128)
+      additionalProperties: false
+    DispatchViolation:
+      type: object
+      description: >-
+        Một ràng buộc envelope bị kịch bản vi phạm; limit và actual là chuỗi thập phân chính xác
+        của phép so sánh (giới hạn ramp là maxMwPerMinute × intervalMinutes).
+      required: [code, stepIndex, limit, actual]
+      properties:
+        code:
+          type: string
+          enum: [POWER_ABOVE_MAX, POWER_BELOW_MIN, RAMP_EXCEEDED, SOC_OUT_OF_ENVELOPE]
+        stepIndex:
+          type: [integer, 'null']
+          minimum: 0
+          description: Chỉ số bước vi phạm (0-based); null khi vi phạm thuộc initialSocPercent
+        limit: {type: string, pattern: '^-?\d+(\.\d+)?$'}
+        actual: {type: string, pattern: '^-?\d+(\.\d+)?$'}
+      additionalProperties: false
+    DispatchSimulationVerdict:
+      type: object
+      description: >-
+        Verdict advisory của API-075. feasible false KHÔNG phải lỗi HTTP: đây là cách mã
+        BESS_CONSTRAINT_INFEASIBLE của tài liệu được trả in-band, kèm danh sách ràng buộc bị vi
+        phạm. Không trường nào ở đây từng rời PM Web về phía OT.
+      required: [bessPlantId, envelope, advisory, feasible, evaluatedSteps, intervalMinutes, violations]
+      properties:
+        bessPlantId: {type: string, format: uuid}
+        envelope:
+          type: object
+          required: [bessPlantId, hierarchyVersion]
+          properties:
+            bessPlantId:
+              type: string
+              format: uuid
+              description: Hàng RELEASED của site mang envelope đã dùng — có thể khác hàng được địa chỉ
+            hierarchyVersion: {type: integer, minimum: 1}
+          additionalProperties: false
+        advisory:
+          type: boolean
+          const: true
+          description: Luôn true — verdict chỉ để tham khảo, không bao giờ là lệnh hay setpoint
+        feasible: {type: boolean}
+        evaluatedSteps: {type: integer, minimum: 1, maximum: 288}
+        intervalMinutes: {type: integer, minimum: 1, maximum: 60}
+        violations:
+          type: array
+          items: {$ref: '#/components/schemas/DispatchViolation'}
+      additionalProperties: false
+    CreateEquipmentModelRequest:
+      type: object
+      required: [equipmentClass, manufacturer, model, specVersion]
+      properties:
+        equipmentClass: {type: string, minLength: 1, maxLength: 100}
+        manufacturer: {type: string, minLength: 1, maxLength: 200}
+        model: {type: string, minLength: 1, maxLength: 200}
+        specVersion:
+          type: string
+          minLength: 1
+          maxLength: 60
+          description: Trùng (manufacturer, model, specVersion) trong tenant trả 409 EQUIPMENT_MODEL_CONFLICT
+        ratings:
+          type: object
+          additionalProperties: true
+          description: Tùy chọn; bỏ trống được lưu là object rỗng
+        manufacturerCompanyId:
+          type: string
+          format: uuid
+          description: Phải là company của tenant, nếu không 422 MANUFACTURER_COMPANY_NOT_FOUND
+      additionalProperties: false
+    BomLineInput:
+      type: object
+      required: [lineNo, itemCode, quantity, unit]
+      properties:
+        lineNo:
+          type: integer
+          minimum: 1
+          description: Duy nhất trong payload, nếu trùng 422 BOM_LINE_DUPLICATE
+        itemCode: {type: string, minLength: 1, maxLength: 80}
+        description: {type: string, minLength: 1, maxLength: 1000}
+        quantity:
+          type: string
+          pattern: '^\d{1,15}(\.\d{1,4})?$'
+          description: >-
+            Chuỗi thập phân đi nguyên văn vào Postgres numeric(19,4); lớn hơn 0 là check của DB,
+            không phải so sánh JS — 0 trả 422 QUANTITY_INVALID
+        unit: {type: string, minLength: 1, maxLength: 40}
+        equipmentModelId:
+          type: string
+          format: uuid
+          description: Phải tồn tại trong catalog của tenant, nếu không 422 EQUIPMENT_MODEL_NOT_FOUND
+      additionalProperties: false
+    ReleaseBomRequest:
+      type: object
+      description: >-
+        API-070 nhận thẳng nội dung nháp: catalog không có operation tạo/sửa BOM DRAFT, nên lệnh
+        release mang designRevisionId và trọn bộ dòng của version sẽ được tạo-rồi-release trong
+        một transaction.
+      required: [designRevisionId, lines]
+      properties:
+        designRevisionId:
+          type: string
+          format: uuid
+          description: >-
+            Phải là design revision của đúng dự án (422 DESIGN_REVISION_NOT_FOUND), ISSUED với
+            kết quả quét CLEAN (422 DESIGN_REVISION_LOCKED) và không do người gọi upload (422
+            RELEASE_SOD)
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items: {$ref: '#/components/schemas/BomLineInput'}
+      additionalProperties: false
+    ReleaseSolarConfigurationRequest:
+      type: object
+      required: [expectedVersion, configuration]
+      properties:
+        expectedVersion:
+          type: integer
+          minimum: 1
+          description: >-
+            versionNo hiện tại của hàng được địa chỉ (mỏ neo optimistic concurrency); lệch trả
+            409 VERSION_CONFLICT kèm currentVersion
+        configuration:
+          type: object
+          additionalProperties: true
+          description: >-
+            Snapshot topology trọn vẹn của version sẽ release; được băm canonical vào
+            configurationHash
+        dcCapacityKwp:
+          type: string
+          pattern: '^\d{1,15}(\.\d{1,4})?$'
+          description: Bỏ trống kế thừa từ mỏ neo; không dương bị check của DB chặn (422 CAPACITY_INVALID)
+        acCapacityKw:
+          type: string
+          pattern: '^\d{1,15}(\.\d{1,4})?$'
+          description: Bỏ trống kế thừa từ mỏ neo; không dương bị check của DB chặn (422 CAPACITY_INVALID)
+        baselineRef:
+          type: object
+          additionalProperties: true
+          description: Bỏ trống kế thừa từ mỏ neo
+      additionalProperties: false
+    DispatchStepInput:
+      type: object
+      required: [powerMw]
+      properties:
+        powerMw:
+          type: string
+          pattern: '^-?\d{1,15}(\.\d{1,4})?$'
+          description: >-
+            Chuỗi thập phân có dấu: dương là xả, âm là sạc theo quy ước — chỉ là con số
+            advisory, không bao giờ là setpoint
+      additionalProperties: false
+    SimulateDispatchRequest:
+      type: object
+      required: [intervalMinutes, steps]
+      properties:
+        intervalMinutes: {type: integer, minimum: 1, maximum: 60}
+        initialSocPercent:
+          type: string
+          pattern: '^\d{1,3}(\.\d{1,4})?$'
+          description: >-
+            SOC phần trăm dạng chuỗi; băng SOC của envelope mới là giới hạn thật, kiểm chính xác
+            bằng thập phân
+        steps:
+          type: array
+          minItems: 1
+          maxItems: 288
+          items: {$ref: '#/components/schemas/DispatchStepInput'}
+      additionalProperties: false
+    EquipmentModelListResponse:
+      type: object
+      required: [data, meta, correlationId]
+      properties:
+        data:
+          type: array
+          maxItems: 100
+          items: {$ref: '#/components/schemas/EquipmentModel'}
+        meta: {$ref: '#/components/schemas/EngineeringPlantsPageMeta'}
+        correlationId: {type: string}
+      additionalProperties: false
+    EquipmentModelCommandResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/EquipmentModel'}
+        correlationId: {type: string}
+      additionalProperties: false
+    BillOfMaterialsListResponse:
+      type: object
+      required: [data, meta, correlationId]
+      properties:
+        data:
+          type: array
+          maxItems: 100
+          items: {$ref: '#/components/schemas/BillOfMaterialsVersion'}
+        meta: {$ref: '#/components/schemas/EngineeringPlantsPageMeta'}
+        correlationId: {type: string}
+      additionalProperties: false
+    BillOfMaterialsReleaseResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/BillOfMaterialsRelease'}
+        correlationId: {type: string}
+      additionalProperties: false
+    SolarPlantDetailResponse:
+      type: object
+      required: [data, releasedConfiguration, versionHistory, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/SolarPlant'}
+        releasedConfiguration:
+          oneOf:
+            - $ref: '#/components/schemas/SolarPlantReleasedConfiguration'
+            - type: 'null'
+          description: Null khi site chưa release cấu hình nào
+        versionHistory:
+          type: array
+          items: {$ref: '#/components/schemas/SolarPlantVersionHistoryRow'}
+          description: Toàn bộ version của site theo configurationVersion tăng dần, không phân trang
+        correlationId: {type: string}
+      additionalProperties: false
+    SolarPlantReleaseResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/SolarPlantRelease'}
+        correlationId: {type: string}
+      additionalProperties: false
+    BessPlantDetailResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/BessPlant'}
+        correlationId: {type: string}
+      additionalProperties: false
+    DispatchSimulationResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/DispatchSimulationVerdict'}
         correlationId: {type: string}
       additionalProperties: false
     GenericCommand:

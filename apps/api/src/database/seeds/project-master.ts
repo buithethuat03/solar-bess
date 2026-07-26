@@ -1,25 +1,28 @@
 import 'reflect-metadata';
 import AppDataSource from '../data-source';
-import { TenantEntity, UserAccountEntity } from '../entities';
-import { seedProjectMaster } from './project-master.seed';
+import { runProjectMasterSeed } from './project-master.seed';
 
+/**
+ * Two-phase runner:
+ * - Phase 1 (master catalog: roles, cost codes, equipment models) reconciles into ANY environment
+ *   holding exactly one ACTIVE tenant — no user guard.
+ * - Phase 2 (demo project scaffold and demo plants) keeps the exactly-one-ACTIVE-test-user guard
+ *   and is SKIPPED, with exit code 0, when the guard does not hold. That skip is the supported
+ *   "reconcile an already-populated environment" path.
+ */
 async function run(): Promise<void> {
   await AppDataSource.initialize();
-  await AppDataSource.transaction(async (manager) => {
-    const tenants = await manager.getRepository(TenantEntity).findBy({ status: 'ACTIVE' });
-    if (tenants.length !== 1) {
-      throw new Error(`Project seed requires exactly one ACTIVE test tenant; found ${tenants.length}`);
-    }
-    const users = await manager.getRepository(UserAccountEntity).findBy({
-      tenantId: tenants[0].id, status: 'ACTIVE'
-    });
-    if (users.length !== 1) {
-      throw new Error(`Project seed requires exactly one ACTIVE test user; found ${users.length}`);
-    }
-    await seedProjectMaster(manager, tenants[0], users[0]);
-  });
+  const outcome = await AppDataSource.transaction(
+    async (manager) => runProjectMasterSeed(manager)
+  );
   await AppDataSource.destroy();
-  console.log('Project Master demo seed is ready; no credential was read or changed');
+  if (outcome.demoProjectSeeded) {
+    console.log('Project Master demo seed is ready; no credential was read or changed');
+  } else {
+    console.log(
+      `Project Master master catalog reconciled; ${outcome.skippedReason ?? 'demo phase skipped'}`
+    );
+  }
 }
 
 void run().catch(async (error: unknown) => {

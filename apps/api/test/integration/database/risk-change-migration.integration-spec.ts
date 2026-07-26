@@ -225,14 +225,16 @@ describe('Risk/Issue/Change migrations — DB-065/066/067/105/112/113', () => {
       expect(upgraded.get(`${tenantA}:EXECUTIVE`)?.permissions).toEqual([
         'custom.executive', 'riskChange.read', 'notification.read', 'notification.acknowledge',
         'workflowDefinition.read', 'workflow.read', 'approvalTask.read',
-        'document.read', 'documentRevision.read', 'contract.read', 'cost.read'
+        'document.read', 'documentRevision.read', 'contract.read', 'cost.read',
+        'equipmentModel.read', 'bom.read', 'solarPlant.read', 'bessPlant.read'
       ]);
       // TENANT_ADMIN is outside the RiskChange grant but inside the notification and workflow ones,
-      // and is the only role that may publish a workflow version.
+      // and is the only role that may publish a workflow version. The engineering grant adds only
+      // the tenant-level catalog read.
       expect(upgraded.get(`${tenantA}:TENANT_ADMIN`)?.permissions).toEqual([
         'custom.admin', 'notification.read', 'notification.acknowledge',
         'workflowDefinition.read', 'workflowDefinition.publish', 'workflow.read',
-        'document.read', 'documentRevision.read'
+        'document.read', 'documentRevision.read', 'equipmentModel.read'
       ]);
       expect(upgraded.get(`${tenantA}:CUSTOM_ROLE`)).toEqual({
         permissions: ['custom.only'], policyVersion: 7

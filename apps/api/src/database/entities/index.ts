@@ -45,6 +45,11 @@ import {
   BudgetVersionEntity, CommitmentEntity, CostCodeEntity, FxSnapshotEntity, InvoiceEntity,
   PaymentComponentEntity, PaymentEntity
 } from './cost-control.entity';
+import { EquipmentModelEntity } from './equipment-model.entity';
+import { BillOfMaterialsEntity, BomLineEntity } from './bill-of-materials.entity';
+import {
+  AssetEntity, BessPlantEntity, EquipmentEntity, SolarPlantEntity
+} from './plant-asset.entity';
 
 export {
   AuditEventEntity, AuthenticationSessionEntity, LocalCredentialEntity,
@@ -62,7 +67,9 @@ export {
   SignatureEnvelopeEntity, DocumentExternalShareEntity,
   ContractEntity, ContractPartyEntity, ContractAppendixEntity, ObligationEntity,
   CostCodeEntity, BudgetVersionEntity, CommitmentEntity, InvoiceEntity,
-  PaymentEntity, PaymentComponentEntity, FxSnapshotEntity
+  PaymentEntity, PaymentComponentEntity, FxSnapshotEntity,
+  EquipmentModelEntity, BillOfMaterialsEntity, BomLineEntity,
+  EquipmentEntity, AssetEntity, SolarPlantEntity, BessPlantEntity
 };
 export * from './operational.enums';
 export * from './project-controls.enums';
@@ -71,6 +78,7 @@ export * from './risk-change.enums';
 export * from './workflow.enums';
 export * from './document-control.enums';
 export * from './contract-cost.enums';
+export * from './engineering-plants.enums';
 export type {
   WorkflowApproverSelector, WorkflowRoutingCondition, WorkflowRoutingRules, WorkflowRoutingStep
 } from './workflow-version.entity';
@@ -91,5 +99,6 @@ export const databaseEntities = [
   DocumentExternalShareEntity, ContractEntity, ContractPartyEntity,
   ContractAppendixEntity, ObligationEntity, CostCodeEntity, BudgetVersionEntity,
   CommitmentEntity, InvoiceEntity, PaymentEntity, PaymentComponentEntity,
-  FxSnapshotEntity
+  FxSnapshotEntity, EquipmentModelEntity, BillOfMaterialsEntity, BomLineEntity,
+  EquipmentEntity, AssetEntity, SolarPlantEntity, BessPlantEntity
 ];

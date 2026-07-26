@@ -10,3 +10,6 @@ test-results/
 .deploy/
 *.log
 .DS_Store
+
+# Ephemeral git worktrees used by parallel agents
+.claude/worktrees/

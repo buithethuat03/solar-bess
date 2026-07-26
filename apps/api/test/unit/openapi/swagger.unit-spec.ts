@@ -16,7 +16,7 @@ describe('canonical Swagger contract — TEST-197/NFR-024', () => {
 
   it('derives a runtime view containing every and only implemented operation', () => {
     const implemented = createImplementedOpenApi(loadCanonicalOpenApi());
-    expect(countOpenApiOperations(implemented)).toBe(88);
+    expect(countOpenApiOperations(implemented)).toBe(96);
     const loginOperation = implemented.paths['/v1/auth/login']?.post as unknown as Record<string, unknown>;
     expect(loginOperation['x-implementation-status']).toBe('implemented');
     expect(implemented.paths['/v1/projects/{projectId}/risks']?.post).toBeDefined();
