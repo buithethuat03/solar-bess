@@ -13,6 +13,8 @@ import { AddActionResidualRationale1783734000000 } from './migrations/1783734000
 import { ReconcileRiskChangeRuntimeDrift1783735000000 } from './migrations/1783735000000-ReconcileRiskChangeRuntimeDrift';
 import { ReconcileRiskChangeRoleGrants1783736000000 } from './migrations/1783736000000-ReconcileRiskChangeRoleGrants';
 import { GrantNotificationPermissions1783737000000 } from './migrations/1783737000000-GrantNotificationPermissions';
+import { CreateWorkflowEngine1783738000000 } from './migrations/1783738000000-CreateWorkflowEngine';
+import { GrantWorkflowPermissions1783739000000 } from './migrations/1783739000000-GrantWorkflowPermissions';
 
 export function typeOrmOptions(databaseUrl = loadDatabaseConfig().url): DataSourceOptions {
   return {
@@ -28,7 +30,9 @@ export function typeOrmOptions(databaseUrl = loadDatabaseConfig().url): DataSour
       AddActionResidualRationale1783734000000,
       ReconcileRiskChangeRuntimeDrift1783735000000,
       ReconcileRiskChangeRoleGrants1783736000000,
-      GrantNotificationPermissions1783737000000
+      GrantNotificationPermissions1783737000000,
+      CreateWorkflowEngine1783738000000,
+      GrantWorkflowPermissions1783739000000
     ],
     synchronize: false, logging: false
   };

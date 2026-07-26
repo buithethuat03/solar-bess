@@ -3,7 +3,8 @@ import { join } from 'node:path';
 
 describe('frontend project structure — ADR-001/ADR-003', () => {
   it.each(['app', 'api', 'components/common', 'components/projects', 'components/schedule', 'components/risk-change', 'layouts', 'router', 'stores', 'styles', 'types', 'views/projects', 'views/schedule', 'views/risk-change',
-    'components/notification', 'views/notification', 'components/auth'])(
+    'components/notification', 'views/notification', 'components/auth',
+    'components/workflow', 'views/workflow'])(
     'contains src/%s',
     (directory) => expect(existsSync(join(process.cwd(), 'src', directory))).toBe(true)
   );
@@ -20,6 +21,8 @@ describe('frontend project structure — ADR-001/ADR-003', () => {
       'src/views/risk-change/ProjectRiskChangeView.vue',
       'src/views/notification/NotificationInboxView.vue',
       'src/components/notification/NotificationInbox.vue',
+      'src/views/workflow/ApprovalInboxView.vue',
+      'src/components/workflow/ApprovalTaskList.vue',
       'src/components/projects/ProjectForm.vue',
       'src/components/schedule/ScheduleGantt.vue',
       'src/components/risk-change/RiskHeatmap.vue',
@@ -36,5 +39,6 @@ describe('frontend project structure — ADR-001/ADR-003', () => {
     expect(existsSync(join(process.cwd(), 'src/api/risk-change.api.ts'))).toBe(true);
     expect(existsSync(join(process.cwd(), 'src/api/user.api.ts'))).toBe(true);
     expect(existsSync(join(process.cwd(), 'src/api/notification.api.ts'))).toBe(true);
+    expect(existsSync(join(process.cwd(), 'src/api/workflow.api.ts'))).toBe(true);
   });
 });

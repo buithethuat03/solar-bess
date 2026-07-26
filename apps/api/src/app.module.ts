@@ -10,6 +10,7 @@ import { OperationalFoundationModule } from './modules/operational-foundation/op
 import { ProjectManagementModule } from './modules/project-management/project-management.module';
 import { ProjectControlsModule } from './modules/project-controls/project-controls.module';
 import { RiskChangeModule } from './modules/risk-change/risk-change.module';
+import { WorkflowModule } from './modules/workflow/workflow.module';
 
 @Module({
   imports: [
@@ -22,7 +23,8 @@ import { RiskChangeModule } from './modules/risk-change/risk-change.module';
     ProjectManagementModule,
     ProjectControlsModule,
     RiskChangeModule,
-    NotificationModule
+    NotificationModule,
+    WorkflowModule
   ]
 })
 export class AppModule implements NestModule {

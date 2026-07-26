@@ -36,7 +36,9 @@ describe('Notification permission grant migration — US-022 role policy', () =>
     for (const roleId of [pmo, admin]) {
       const role = await readRole(roleId);
       expect(role.permissions).toEqual(expect.arrayContaining([...notificationPermissions]));
-      expect(role.policy_version).toBe(4);
+      // Later grant migrations in the same chain raise this further; assert the floor this
+      // migration guarantees rather than pinning it to whatever currently ends the chain.
+      expect(role.policy_version).toBeGreaterThanOrEqual(4);
     }
 
     await revertThroughMigration(migrationName);
@@ -46,7 +48,7 @@ describe('Notification permission grant migration — US-022 role policy', () =>
       for (const permission of notificationPermissions) {
         expect(role.permissions).not.toContain(permission);
       }
-      // The pre-existing grant survives the revert.
+      // Each down() in the chain restores the version it captured, unwinding to the seeded value.
       expect(role.policy_version).toBe(3);
     }
     expect(await readRole(pmo).then((role) => role.permissions)).toContain('project.read');

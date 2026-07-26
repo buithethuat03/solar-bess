@@ -2,7 +2,7 @@ openapi: 3.1.0
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 info:
   title: Solar & BESS Project Management Platform API
-  version: 0.9.2
+  version: 0.9.3
   description: >-
     Draft vendor-neutral contract. Unknown domain fields remain TBD. PM/O&M operations
     cannot start, stop, reset, bypass, clear source alarms, or send BESS/OT setpoints.
@@ -6181,56 +6181,63 @@ paths:
       summary: "Liệt kê workflow definitions/versions"
       operationId: api_106_get_v1_workflow_definitions
       x-api-id: "API-106"
+      x-implementation-status: implemented
       x-permission: "workflowDefinition.read"
       x-data-scope: "tenant/process"
-      x-idempotency: "safe"
+      x-idempotency: "safe; opaque cursor với thứ tự createdAt/id ổn định"
       x-related-requirements: ["FR-138"]
       x-related-data: ["DB-069", "DB-070"]
       x-related-security: ["SEC-104", "SEC-107"]
+      x-error-codes: ["INVALID_CURSOR", "PERMISSION_DENIED"]
       security:
         - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/TenantHeader'
         - $ref: '#/components/parameters/CorrelationHeader'
+        - name: cursor
+          in: query
+          description: Opaque keyset cursor; client không được tự tạo hoặc parse
+          schema: {type: string, maxLength: 500}
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 100, default: 50}
+        - name: objectType
+          in: query
+          schema: {$ref: '#/components/schemas/WorkflowObjectType'}
+        - name: status
+          in: query
+          schema: {$ref: '#/components/schemas/WorkflowDefinitionStatus'}
       responses:
         '200':
-          description: "Authorized result"
+          description: "Trang definition trong tenant; mỗi definition kèm toàn bộ version theo thứ tự version giảm dần"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/WorkflowDefinitionListResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/workflow-definitions/{definitionId}:publish":
     parameters:
       - name: definitionId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     post:
       tags: ["Workflow"]
       summary: "Publish immutable workflow version"
       operationId: api_107_post_v1_workflow_definitions_definitionid_publish
       x-api-id: "API-107"
+      x-implementation-status: implemented
       x-permission: "workflowDefinition.publish"
       x-data-scope: "tenant/process"
-      x-idempotency: "required"
+      x-idempotency: "DB-104 required"
       x-related-requirements: ["FR-138"]
-      x-related-data: ["DB-070"]
+      x-related-data: ["DB-069", "DB-070", "DB-098"]
       x-related-security: ["SEC-104", "SEC-108"]
+      x-error-codes: ["WORKFLOW_DEFINITION_NOT_FOUND", "WORKFLOW_VERSION_NOT_FOUND", "WORKFLOW_PUBLISH_SOD", "WORKFLOW_RULES_INVALID", "INVALID_STATE_TRANSITION", "VERSION_CONFLICT", "IDEMPOTENCY_KEY_REQUIRED", "PERMISSION_DENIED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -6241,41 +6248,35 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/PublishWorkflowVersionRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '200':
+          description: "Version đã publish; version PUBLISHED trước đó tự động chuyển SUPERSEDED trong cùng transaction"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/WorkflowVersionCommandResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/workflow-instances":
     post:
       tags: ["Workflow"]
       summary: "Start workflow with object/version snapshot"
       operationId: api_108_post_v1_workflow_instances
       x-api-id: "API-108"
+      x-implementation-status: implemented
       x-permission: "workflow.start"
-      x-data-scope: "object/data scope"
-      x-idempotency: "required"
+      x-data-scope: "scope lấy từ target aggregate đã resolve, không bao giờ lấy từ request body"
+      x-idempotency: "DB-104 required"
       x-related-requirements: ["FR-139"]
-      x-related-data: ["DB-071"]
+      x-related-data: ["DB-069", "DB-070", "DB-071", "DB-098"]
       x-related-security: ["SEC-108", "SEC-110"]
+      x-error-codes: ["WORKFLOW_DEFINITION_NOT_FOUND", "WORKFLOW_TARGET_NOT_FOUND", "WORKFLOW_VERSION_NOT_PUBLISHED", "WORKFLOW_CONFIGURATION_ERROR", "WORKFLOW_INSTANCE_ACTIVE", "INVALID_STATE_TRANSITION", "IDEMPOTENCY_KEY_REQUIRED", "PERMISSION_DENIED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -6286,47 +6287,40 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/StartWorkflowInstanceRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '201':
+          description: "Instance khởi tạo ở state SUBMITTED với route snapshot đã đóng băng theo version PUBLISHED"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/WorkflowInstanceCommandResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/workflow-instances/{workflowInstanceId}":
     parameters:
       - name: workflowInstanceId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     get:
       tags: ["Workflow"]
       summary: "Đọc workflow history và current tasks"
       operationId: api_109_get_v1_workflow_instances_workflowinstanceid
       x-api-id: "API-109"
+      x-implementation-status: implemented
       x-permission: "workflow.read"
-      x-data-scope: "instance/object"
+      x-data-scope: "instance/object; instance ngoài scope trả 404 giống hệt instance không tồn tại"
       x-idempotency: "safe"
       x-related-requirements: ["FR-139"]
       x-related-data: ["DB-071", "DB-072"]
       x-related-security: ["SEC-107"]
+      x-error-codes: ["WORKFLOW_INSTANCE_NOT_FOUND", "PERMISSION_DENIED"]
       security:
         - bearerAuth: []
       parameters:
@@ -6334,81 +6328,82 @@ paths:
         - $ref: '#/components/parameters/CorrelationHeader'
       responses:
         '200':
-          description: "Authorized result"
+          description: "Instance detail kèm toàn bộ decision ledger append-only theo sequenceNo tăng dần"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/WorkflowInstanceDetailResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/approval-tasks":
     get:
       tags: ["Workflow"]
       summary: "Liệt kê task của effective actor"
       operationId: api_110_get_v1_approval_tasks
       x-api-id: "API-110"
+      x-implementation-status: implemented
       x-permission: "approvalTask.read"
-      x-data-scope: "actor/delegation/data scope"
-      x-idempotency: "safe"
+      x-data-scope: "actor/delegation/data scope; chỉ instance chưa kết thúc trong scope của actor"
+      x-idempotency: "safe; opaque cursor với thứ tự createdAt/id ổn định"
       x-related-requirements: ["FR-140"]
-      x-related-data: ["DB-071", "DB-072"]
+      x-related-data: ["DB-071"]
       x-related-security: ["SEC-107", "SEC-110"]
+      x-error-codes: ["INVALID_CURSOR", "PERMISSION_DENIED"]
       security:
         - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/TenantHeader'
         - $ref: '#/components/parameters/CorrelationHeader'
+        - name: cursor
+          in: query
+          description: Opaque keyset cursor; client không được tự tạo hoặc parse
+          schema: {type: string, maxLength: 500}
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 100, default: 50}
+        - name: state
+          in: query
+          schema: {$ref: '#/components/schemas/WorkflowInstanceState'}
+        - name: objectType
+          in: query
+          schema: {$ref: '#/components/schemas/WorkflowObjectType'}
+        - name: projectId
+          in: query
+          schema: {type: string, format: uuid}
       responses:
         '200':
-          description: "Authorized result"
+          description: "Inbox chỉ chứa instance còn hành động được; state kết thúc luôn bị loại bỏ"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/ApprovalTaskListResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/workflow-instances/{workflowInstanceId}/decisions":
     parameters:
       - name: workflowInstanceId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     post:
       tags: ["Workflow"]
       summary: "Ghi approve/reject/return/conditional decision"
       operationId: api_111_post_v1_workflow_instances_workflowinstanceid_decisions
       x-api-id: "API-111"
+      x-implementation-status: implemented
       x-permission: "approval.decide"
-      x-data-scope: "instance/step"
-      x-idempotency: "required"
+      x-data-scope: "instance/step; instance ngoài scope trả 404 giống hệt instance không tồn tại"
+      x-idempotency: "DB-104 required"
       x-related-requirements: ["FR-140"]
-      x-related-data: ["DB-072"]
+      x-related-data: ["DB-071", "DB-072", "DB-098"]
       x-related-security: ["SEC-102", "SEC-108", "SEC-110"]
+      x-error-codes: ["WORKFLOW_INSTANCE_NOT_FOUND", "WORKFLOW_CONFIGURATION_ERROR", "INVALID_STATE_TRANSITION", "VERSION_CONFLICT", "SOD_CONFLICT", "APPROVER_NOT_FOUND", "DECISION_ALREADY_RECORDED", "CONDITIONAL_APPROVE_NOT_ENABLED", "IDEMPOTENCY_KEY_REQUIRED", "PERMISSION_DENIED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -6419,47 +6414,40 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/RecordApprovalDecisionRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '200':
+          description: "Decision đã ghi vào ledger; data là instance sau chuyển trạng thái kèm sequenceNo của decision vừa ghi"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/WorkflowInstanceCommandResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/workflow-instances/{workflowInstanceId}:cancel":
     parameters:
       - name: workflowInstanceId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     post:
       tags: ["Workflow"]
       summary: "Cancel workflow theo policy"
       operationId: api_112_post_v1_workflow_instances_workflowinstanceid_cancel
       x-api-id: "API-112"
+      x-implementation-status: implemented
       x-permission: "workflow.cancel"
-      x-data-scope: "instance/object"
-      x-idempotency: "required"
+      x-data-scope: "instance/object; instance ngoài scope trả 404 giống hệt instance không tồn tại"
+      x-idempotency: "DB-104 required"
       x-related-requirements: ["FR-141"]
-      x-related-data: ["DB-071"]
+      x-related-data: ["DB-071", "DB-098"]
       x-related-security: ["SEC-108", "SEC-109"]
+      x-error-codes: ["WORKFLOW_INSTANCE_NOT_FOUND", "INVALID_STATE_TRANSITION", "VERSION_CONFLICT", "IDEMPOTENCY_KEY_REQUIRED", "PERMISSION_DENIED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -6470,29 +6458,21 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/CancelWorkflowInstanceRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '200':
+          description: "Instance chuyển CANCELLED; cancel không bao giờ là phê duyệt ngầm"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/WorkflowInstanceCommandResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/workflow-instances/{workflowInstanceId}:escalate":
     parameters:
       - name: workflowInstanceId
@@ -9102,6 +9082,186 @@ components:
       properties:
         nextCursor: {type: [string, 'null']}
         limit: {type: integer, minimum: 1, maximum: 100}
+      additionalProperties: false
+    WorkflowDefinitionStatus:
+      type: string
+      enum: [ACTIVE, INACTIVE, ARCHIVED]
+    WorkflowObjectType:
+      type: string
+      enum: [ChangeRequest]
+      description: MVP engine chỉ định tuyến đúng một aggregate family; binding là cột tường minh có CHECK đóng
+    WorkflowVersionStatus:
+      type: string
+      enum: [DRAFT, PUBLISHED, SUPERSEDED]
+    WorkflowInstanceState:
+      type: string
+      enum: [SUBMITTED, IN_REVIEW, RETURNED, REJECTED, CONDITIONALLY_APPROVED, APPROVED, CANCELLED, CONFIGURATION_ERROR, EXPIRED]
+      description: Không có DRAFT; Draft thuộc về domain object trước khi API-108 tạo instance, và instance luôn sinh ra ở SUBMITTED
+    WorkflowDecision:
+      type: string
+      enum: [APPROVE, REJECT, RETURN, CONDITIONAL_APPROVE]
+      description: CONDITIONAL_APPROVE nằm trong vocabulary nhưng bị từ chối tại service cho tới khi có danh sách control không thể miễn trừ
+    WorkflowPageMeta:
+      type: object
+      required: [nextCursor, limit]
+      properties:
+        nextCursor: {type: [string, 'null'], description: Null khi đã hết trang; ngược lại là cursor cho request kế tiếp}
+        limit: {type: integer, minimum: 1, maximum: 100}
+      additionalProperties: false
+    WorkflowVersionView:
+      type: object
+      required: [id, workflowDefinitionId, version, status, rulesHash, stepCount, effectiveFrom, effectiveTo, createdBy, publishedBy, publishedAt]
+      properties:
+        id: {type: string, format: uuid}
+        workflowDefinitionId: {type: string, format: uuid}
+        version: {type: integer, minimum: 1}
+        status: {$ref: '#/components/schemas/WorkflowVersionStatus'}
+        rulesHash: {type: string, pattern: '^[0-9a-f]{64}$'}
+        stepCount: {type: integer, minimum: 0, description: Số step trong routing rules; bản thân routing rules không được trả về}
+        effectiveFrom: {type: string, format: date-time}
+        effectiveTo: {type: [string, 'null'], format: date-time}
+        createdBy: {type: string, format: uuid}
+        publishedBy: {type: [string, 'null'], format: uuid, description: BR-034 maker-checker; luôn khác createdBy}
+        publishedAt: {type: [string, 'null'], format: date-time}
+      additionalProperties: false
+    WorkflowDefinitionView:
+      type: object
+      required: [id, code, name, objectType, processOwnerId, status, versionNo, createdAt, updatedAt, versions]
+      properties:
+        id: {type: string, format: uuid}
+        code: {type: string, pattern: '^[A-Z0-9][A-Z0-9_.-]{1,79}$', maxLength: 80}
+        name: {type: string, minLength: 1, maxLength: 200}
+        objectType: {$ref: '#/components/schemas/WorkflowObjectType'}
+        processOwnerId: {type: string, format: uuid}
+        status: {$ref: '#/components/schemas/WorkflowDefinitionStatus'}
+        versionNo: {type: integer, minimum: 1}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+        versions:
+          type: array
+          items: {$ref: '#/components/schemas/WorkflowVersionView'}
+          description: Toàn bộ version của definition theo thứ tự version giảm dần; không phân trang riêng
+      additionalProperties: false
+    WorkflowInstanceView:
+      type: object
+      required: [id, workflowDefinitionId, workflowVersionId, objectType, objectId, objectVersion, projectId, packageId, state, currentStepKey, currentAttemptNo, routeHash, requestedBy, closedBy, closedAt, closureReason, versionNo, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        workflowDefinitionId: {type: string, format: uuid}
+        workflowVersionId: {type: string, format: uuid}
+        objectType: {$ref: '#/components/schemas/WorkflowObjectType'}
+        objectId: {type: string, format: uuid}
+        objectVersion: {type: integer, minimum: 1, description: 'Version của target aggregate tại thời điểm start, lấy từ aggregate đã resolve'}
+        projectId: {type: string, format: uuid, description: 'Suy ra từ target aggregate, không bao giờ lấy từ request body'}
+        packageId: {type: [string, 'null'], format: uuid}
+        state: {$ref: '#/components/schemas/WorkflowInstanceState'}
+        currentStepKey: {type: [string, 'null'], maxLength: 80, description: Null khi instance đã kết thúc hoặc ở CONFIGURATION_ERROR}
+        currentAttemptNo: {type: integer, minimum: 1, description: Tăng khi một RETURN mở lại đúng step đó dưới attempt mới}
+        routeHash: {type: string, pattern: '^[0-9a-f]{64}$', description: Hash của route đã đóng băng lúc start; republish definition không làm đổi giá trị này}
+        requestedBy: {type: string, format: uuid}
+        closedBy: {type: [string, 'null'], format: uuid}
+        closedAt: {type: [string, 'null'], format: date-time}
+        closureReason: {type: [string, 'null'], maxLength: 2000}
+        versionNo: {type: integer, minimum: 1, description: Optimistic version dùng cho expectedVersion của API-111 và API-112}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+        sequenceNo:
+          type: integer
+          minimum: 1
+          description: Chỉ xuất hiện trong response của API-111; là số thứ tự của decision vừa được ghi vào ledger
+      additionalProperties: false
+    ApprovalDecisionView:
+      type: object
+      required: [id, sequenceNo, stepKey, attemptNo, decision, actorId, effectiveActorId, comment, decidedAt]
+      properties:
+        id: {type: string, format: uuid}
+        sequenceNo: {type: integer, minimum: 1}
+        stepKey: {type: string, pattern: '^[A-Z0-9][A-Z0-9_.-]{1,79}$', maxLength: 80}
+        attemptNo: {type: integer, minimum: 1}
+        decision: {$ref: '#/components/schemas/WorkflowDecision'}
+        actorId: {type: string, format: uuid, description: Tài khoản đã đăng nhập}
+        effectiveActorId: {type: string, format: uuid, description: Người mà decision được tính cho; bằng actorId cho tới khi có delegation US-018}
+        comment: {type: string, minLength: 3, maxLength: 2000, description: 'AC-070: mọi decision đều phải có lý do, kể cả APPROVE'}
+        decidedAt: {type: string, format: date-time}
+      additionalProperties: false
+    WorkflowDefinitionListResponse:
+      type: object
+      required: [data, meta, correlationId]
+      properties:
+        data: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/WorkflowDefinitionView'}}
+        meta: {$ref: '#/components/schemas/WorkflowPageMeta'}
+        correlationId: {type: string}
+      additionalProperties: false
+    WorkflowInstanceDetailResponse:
+      type: object
+      required: [data, decisions, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/WorkflowInstanceView'}
+        decisions:
+          type: array
+          items: {$ref: '#/components/schemas/ApprovalDecisionView'}
+          description: Toàn bộ decision ledger append-only của instance theo sequenceNo tăng dần; không phân trang
+        correlationId: {type: string}
+      additionalProperties: false
+    ApprovalTaskListResponse:
+      type: object
+      required: [data, meta, correlationId]
+      properties:
+        data: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/WorkflowInstanceView'}}
+        meta: {$ref: '#/components/schemas/WorkflowPageMeta'}
+        correlationId: {type: string}
+      additionalProperties: false
+    WorkflowInstanceCommandResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/WorkflowInstanceView'}
+        correlationId: {type: string}
+      additionalProperties: false
+    WorkflowVersionCommandResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/WorkflowVersionView'}
+        correlationId: {type: string}
+      additionalProperties: false
+    PublishWorkflowVersionRequest:
+      type: object
+      required: [workflowVersionId, expectedVersion, comment]
+      properties:
+        workflowVersionId: {type: string, format: uuid, description: Version DRAFT thuộc definition trong path}
+        expectedVersion: {type: integer, minimum: 1, description: Số hiệu version đang được publish; chặn publish một draft đã đổi kể từ lần đọc gần nhất}
+        comment: {type: string, minLength: 3, maxLength: 2000}
+      additionalProperties: false
+    StartWorkflowInstanceRequest:
+      type: object
+      required: [workflowDefinitionId, objectType, objectId]
+      properties:
+        workflowDefinitionId: {type: string, format: uuid, description: Definition phải ACTIVE và phục vụ đúng objectType này}
+        objectType: {$ref: '#/components/schemas/WorkflowObjectType'}
+        objectId: {type: string, format: uuid}
+      additionalProperties: false
+      description: Không nhận projectId/packageId; scope được suy ra từ target aggregate đã resolve
+    RecordApprovalDecisionRequest:
+      type: object
+      required: [decision, stepKey, expectedVersion, comment]
+      properties:
+        decision: {$ref: '#/components/schemas/WorkflowDecision'}
+        stepKey: {type: string, pattern: '^[A-Z0-9][A-Z0-9_.-]{1,79}$', maxLength: 80, description: Phải đúng bước hiện tại của instance}
+        expectedVersion: {type: integer, minimum: 1, description: versionNo hiện tại của instance}
+        comment: {type: string, minLength: 3, maxLength: 2000}
+        conditions:
+          type: array
+          maxItems: 50
+          items: {type: object, additionalProperties: true}
+          description: Chỉ dành cho CONDITIONAL_APPROVE; decision đó hiện bị từ chối nên ledger luôn ghi mảng rỗng
+      additionalProperties: false
+    CancelWorkflowInstanceRequest:
+      type: object
+      required: [expectedVersion, reason]
+      properties:
+        expectedVersion: {type: integer, minimum: 1, description: versionNo hiện tại của instance}
+        reason: {type: string, minLength: 3, maxLength: 2000}
       additionalProperties: false
     NotificationStatus:
       type: string

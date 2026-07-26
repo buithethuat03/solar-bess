@@ -18,6 +18,21 @@ File này ghi lịch sử thay đổi phạm vi, tài liệu và governance củ
 - **Trạng thái:** Proposed | Approved | Rejected | Implemented
 ```
 
+## 2026-07-26 — Approval workflow engine US-015 (API-106…112, DB-069…072)
+
+- **Loại:** Architecture; Data; API; Security; Frontend; Test; Documentation; không thay đổi phạm vi nghiệp vụ baseline.
+- **Người yêu cầu/phê duyệt:** Người dùng/Product Owner yêu cầu hoàn thành toàn bộ yêu cầu trong story và trao toàn quyền quyết định ngày 2026-07-26.
+- **Mã bị ảnh hưởng:** `BR-008`, `BR-011`, `BR-015`, `BR-026`, `BR-034`, `FR-138…FR-141`, `UC-015`, `US-015`, `AC-068…AC-071`, `TEST-068…TEST-071`, `API-106…API-112`, `DB-069…DB-072`, `DB-098`, `SEC-106…SEC-110`, `SEC-118`; không cấp requirement/API/DB ID mới.
+- **Trước thay đổi:** `API-106…112` chỉ tồn tại dưới dạng thiết kế với `GenericCommand`/`Envelope` và bốn lệnh khai báo sai `202`; `DB-069…072` chưa có bảng nào; phê duyệt duy nhất trong hệ thống là logic hard-code của Change Request trong US-004.
+- **Sau thay đổi:** OpenAPI 0.9.3 đặc tả đầy đủ bảy operation với schema cụ thể, `404` cho mọi đường đọc, `x-error-codes` và status code đúng với controller (200/201, không phải 202); marker implemented tăng 53 → 60 trên tổng 164. Module `workflow` của Nest cung cấp definition list, publish có maker-checker, start instance đóng băng route, actor inbox, ghi quyết định và cancel. Bốn bảng mới có composite FK mang `tenant_id`, partial unique index cho "một version PUBLISHED" và "một instance sống trên mỗi object", trigger cấm sửa/xóa ledger quyết định và cấm ghi đè rules của version đã publish. Vue có route `/approvals` gated theo `approvalTask.read`.
+- **Lý do:** Đây là năng lực nền mà mọi domain phê duyệt sau này (`US-005`, `US-006…008`, `US-012/013`) đều phụ thuộc, nên làm trước các slice có blocker bên ngoài.
+- **Quyết định đã chốt theo quyền được ủy quyền:** (a) thêm cột `object_type` cho DB-069 và `project_id`/`package_id` cho DB-071 — không có thì FR-139 routing xác định và ABAC package trong SQL đều không khả thi; (b) thêm `attempt_no` cho DB-072 để RETURN → nộp lại không bị chặn bởi quy tắc "một quyết định mỗi actor mỗi bước"; (c) lệnh commit đồng bộ 200/201 thay vì 202 đã khai báo, vì trả 202 cho một ghi đã commit là hợp đồng sai; (d) `expectedVersion` trong body thay cho `If-Match`, đồng bộ với toàn bộ slice hiện hữu.
+- **Phạm vi acceptance:** `AC-068…AC-071` có bằng chứng. **`AC-072`/`TEST-072` Not covered** — SLA/nhắc việc/escalation phụ thuộc quy tắc calendar/timezone/pause chưa có chủ sở hữu; cột `sla_due_at` và partial index đã đặt sẵn nên slice sau không cần migration. `CONDITIONAL_APPROVE` bị từ chối bằng `CONDITIONAL_APPROVE_NOT_ENABLED` cho tới khi có danh sách control không thể miễn trừ. `SEC-102` MFA/step-up không thể triển khai trong base auth profile đã phê duyệt; đây là cổng chặn production. Delegation `AC-085…087` thuộc US-018; `effective_actor_id` đã tách khỏi `actor_id` để không cần migration khi có delegation.
+- **Artefact bị ảnh hưởng:** `apps/api/src/modules/workflow/**`, bốn entity mới, migration `1783738000000` và `1783739000000`, `data-source.ts`, `app.module.ts`, `project-master.seed.ts`; `apps/web` types/api/component/view/router/styles; `docs/openapi/openapi.yaml`, `docs/12`, `docs/15`, ExecPlan `2026-07-26-workflow-engine-us015.md`.
+- **Migration/tương thích:** Hai migration mới, cả hai có `down()` đối xứng và đã test up/down/up. Chuỗi grant nay kết thúc ở `policy_version` 5; seed dùng hằng `rolePolicyVersion` thay vì literal, sửa một defect trong đó seed ghi 3 và sẽ hạ cấp role mà migration đã nâng lên 4. Assertion policy version trong hai migration spec chuyển sang ngưỡng tối thiểu để migration grant sau không làm vỡ test cũ. Engine chạy độc lập, không đụng `API-154…156`.
+- **Validation:** Lint, type-check, `openapi:lint`, build Pass. Unit API 69 + Web 92 + Worker 61 = 222. Integration API 93 + Worker 11 = 104, gồm 18 test HTTP workflow và 9 test migration/constraint.
+- **Trạng thái:** Implemented local; deploy EC2 test ghi nhận theo release kế tiếp.
+
 ## 2026-07-26 — Sửa error mapping nuốt thông báo validation và thêm client-side guard cho login
 
 - **Loại:** Frontend defect; Test; không thay đổi phạm vi nghiệp vụ baseline.

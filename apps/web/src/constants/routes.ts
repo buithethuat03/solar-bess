@@ -6,7 +6,8 @@ export const RouteName = {
   projectDetail: 'project-detail',
   projectSchedule: 'project-schedule',
   projectRiskChange: 'project-risk-change',
-  notifications: 'notifications'
+  notifications: 'notifications',
+  approvals: 'approvals'
 } as const;
 
 export const RoutePath = {
@@ -17,5 +18,6 @@ export const RoutePath = {
   projectDetail: '/projects/:projectId',
   projectSchedule: '/projects/:projectId/schedule',
   projectRiskChange: '/projects/:projectId/risk-change',
-  notifications: '/notifications'
+  notifications: '/notifications',
+  approvals: '/approvals'
 } as const;

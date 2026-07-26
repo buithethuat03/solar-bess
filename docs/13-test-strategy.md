@@ -1,9 +1,9 @@
 # Test Strategy — Nền tảng Solar & BESS
 
 > **Purpose:** Định nghĩa test levels, environments, data, automation, entry/exit, defects và 233 high-level test scenarios truy tới 177 AC, 24 NFR và 32 SEC.
-> **Scope:** Test design toàn platform; execution evidence cho base/auth, US-001, operational foundation/US-003 và US-004. US-004 lint/type/unit/full isolated-port integration/migration/OpenAPI/build pre-push evidence đã Pass. Ngày 2026-07-26 toàn bộ 5 Playwright spec Pass lần đầu trên EC2 test, đóng phần UI journey của `TEST-001…004`, `TEST-010`, `TEST-014…017` và `TEST-230…233`; remaining TEST-014…017 API-level matrix và actual GitHub Actions/EC2 deployment cho US-004 vẫn Pending. Production verification vẫn Proposed.
+> **Scope:** Test design toàn platform; execution evidence cho base/auth, US-001, operational foundation/US-003 và US-004. US-004 lint/type/unit/full isolated-port integration/migration/OpenAPI/build pre-push evidence đã Pass. Ngày 2026-07-26 bổ sung evidence US-022 inbox và US-015 approval engine (TEST-068…071); toàn bộ 5 Playwright spec Pass lần đầu trên EC2 test, đóng phần UI journey của `TEST-001…004`, `TEST-010`, `TEST-014…017` và `TEST-230…233`; remaining TEST-014…017 API-level matrix và actual GitHub Actions/EC2 deployment cho US-004 vẫn Pending. Production verification vẫn Proposed.
 > **Source:** [SRS](./04-SRS.md), [Data Model](./07-data-model.md), [API/OpenAPI](./08-api-specification.md), [Security](./09-security-and-permissions.md), [UX](./10-ux-information-architecture.md), [Workflows](./11-workflows-and-state-machines.md), [Backlog](./12-product-backlog.md), [Operational Foundation ExecPlan](../.agent/execplans/2026-07-11-operational-foundation.md), [US-003 ExecPlan](../.agent/execplans/2026-07-11-project-controls-us003.md).
-> **Version:** 1.9
+> **Version:** 2.0
 > **Status:** Draft toàn platform; Swagger current/design separation TEST-197 EC2 test deployed/verified; E2E UI journey Pass 5/5, TEST-014…017 API matrix Partial, production acceptance chưa Pass
 > **Owner:** QA/Test Architecture (cá nhân: TBD)
 > **Updated:** 2026-07-26

@@ -27,6 +27,10 @@ import { IssueEntity } from './issue.entity';
 import { RiskEntity } from './risk.entity';
 import { RiskIssueActionEntity } from './risk-issue-action.entity';
 import { RiskIssueClosureCycleEntity } from './risk-issue-closure-cycle.entity';
+import { WorkflowDefinitionEntity } from './workflow-definition.entity';
+import { WorkflowVersionEntity } from './workflow-version.entity';
+import { WorkflowInstanceEntity } from './workflow-instance.entity';
+import { ApprovalDecisionEntity } from './approval-decision.entity';
 
 export {
   AuditEventEntity, AuthenticationSessionEntity, LocalCredentialEntity,
@@ -38,12 +42,17 @@ export {
   ProjectScheduleEntity, ScheduleActivityEntity, ScheduleBaselineEntity,
   NotificationEntity, NotificationEntity as ScheduleNotificationEntity, WbsNodeEntity,
   ChangeRequestEntity, IssueEntity, RiskEntity, RiskIssueActionEntity,
-  RiskIssueClosureCycleEntity
+  RiskIssueClosureCycleEntity, WorkflowDefinitionEntity, WorkflowVersionEntity,
+  WorkflowInstanceEntity, ApprovalDecisionEntity
 };
 export * from './operational.enums';
 export * from './project-controls.enums';
 export * from './project.enums';
 export * from './risk-change.enums';
+export * from './workflow.enums';
+export type {
+  WorkflowApproverSelector, WorkflowRoutingCondition, WorkflowRoutingRules, WorkflowRoutingStep
+} from './workflow-version.entity';
 
 export const databaseEntities = [
   TenantEntity, UserAccountEntity, LocalCredentialEntity,
@@ -54,5 +63,6 @@ export const databaseEntities = [
   ProjectScheduleEntity, WbsNodeEntity, ScheduleActivityEntity,
   ActivityDependencyEntity, ScheduleBaselineEntity, ProgressUpdateEntity,
   NotificationEntity, RiskEntity, IssueEntity, ChangeRequestEntity,
-  RiskIssueActionEntity, RiskIssueClosureCycleEntity
+  RiskIssueActionEntity, RiskIssueClosureCycleEntity, WorkflowDefinitionEntity,
+  WorkflowVersionEntity, WorkflowInstanceEntity, ApprovalDecisionEntity
 ];

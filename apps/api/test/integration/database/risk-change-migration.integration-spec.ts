@@ -201,9 +201,9 @@ describe('Risk/Issue/Change migrations — DB-065/066/067/105/112/113', () => {
     try {
       await AppDataSource.runMigrations({ transaction: 'all' });
       const upgraded = await readRoleCatalog();
-      // The chain now ends at the US-022 notification grant, so every catalog role reaches
-      // policy_version 4 and carries the two notification codes on top of the RiskChange ones.
-      expect(upgraded.get(`${tenantA}:PMO`)).toMatchObject({ policyVersion: 4 });
+      // Every later grant migration in the chain raises this further, so assert the floor this
+      // migration guarantees rather than pinning to whatever currently ends the chain.
+      expect(upgraded.get(`${tenantA}:PMO`)?.policyVersion).toBeGreaterThanOrEqual(3);
       expect(upgraded.get(`${tenantA}:PMO`)?.permissions).toEqual(expect.arrayContaining([
         'custom.audit', 'riskChange.read', 'riskChange.create', 'riskChange.manage',
         'riskChange.submit', 'riskChange.approve', 'riskChange.requestClosure',
@@ -220,13 +220,18 @@ describe('Risk/Issue/Change migrations — DB-065/066/067/105/112/113', () => {
           'custom.package', 'riskChange.read', 'riskChange.create', 'riskChange.manage',
           'riskChange.requestClosure', 'user.read'
         ]));
-      expect(upgraded.get(`${tenantA}:EXECUTIVE`)?.permissions)
-        .toEqual(['custom.executive', 'riskChange.read', 'notification.read', 'notification.acknowledge']);
-      // TENANT_ADMIN is outside the RiskChange grant but inside the notification grant.
-      expect(upgraded.get(`${tenantA}:TENANT_ADMIN`)).toEqual({
-        permissions: ['custom.admin', 'notification.read', 'notification.acknowledge'],
-        policyVersion: 4
-      });
+      // EXECUTIVE gets read-only codes from each grant and never a write code — that narrowness is
+      // the point of the assertion, so it stays exact.
+      expect(upgraded.get(`${tenantA}:EXECUTIVE`)?.permissions).toEqual([
+        'custom.executive', 'riskChange.read', 'notification.read', 'notification.acknowledge',
+        'workflowDefinition.read', 'workflow.read', 'approvalTask.read'
+      ]);
+      // TENANT_ADMIN is outside the RiskChange grant but inside the notification and workflow ones,
+      // and is the only role that may publish a workflow version.
+      expect(upgraded.get(`${tenantA}:TENANT_ADMIN`)?.permissions).toEqual([
+        'custom.admin', 'notification.read', 'notification.acknowledge',
+        'workflowDefinition.read', 'workflowDefinition.publish', 'workflow.read'
+      ]);
       expect(upgraded.get(`${tenantA}:CUSTOM_ROLE`)).toEqual({
         permissions: ['custom.only'], policyVersion: 7
       });

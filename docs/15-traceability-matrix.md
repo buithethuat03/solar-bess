@@ -3,7 +3,7 @@
 > **Purpose:** Cung cấp chuỗi truy vết Business Goal → BR → FR/NFR → UC → WF → US → AC → API → DB → SEC → TEST → Release và công khai mọi gap/mâu thuẫn.
 > **Scope:** Toàn bộ artefact Draft và implementation profiles; matrix dùng range inclusive. US-001 và operational foundation/core US-003 đã deploy EC2 test; US-004 Implemented local với acceptance Partial và deployment Pending; production vẫn Proposed.
 > **Source:** [Vision](./01-product-vision-and-scope.md), [BRD](./02-BRD.md), [PRD](./03-PRD.md), [SRS](./04-SRS.md), [Domain](./05-domain-model.md), [Architecture](./06-solution-architecture.md), [Data](./07-data-model.md), [API](./08-api-specification.md), [Security](./09-security-and-permissions.md), [UX](./10-ux-information-architecture.md), [Workflow](./11-workflows-and-state-machines.md), [Backlog](./12-product-backlog.md), [Test](./13-test-strategy.md), [Operational Foundation ExecPlan](../.agent/execplans/2026-07-11-operational-foundation.md), [US-003 ExecPlan](../.agent/execplans/2026-07-11-project-controls-us003.md), [US-004 ExecPlan](../.agent/execplans/2026-07-12-risk-issue-change-us004.md).
-> **Version:** 1.7
+> **Version:** 1.8
 > **Status:** Draft toàn platform; US-001/operational foundation/US-003 core Implemented; US-004 Implemented local, TEST-014…017 Partial và GitHub Actions/EC2 deployment Pending; production Proposed
 > **Owner:** Product Operations / Business Analysis / QA (cá nhân: TBD)
 > **Updated:** 2026-07-26
@@ -18,8 +18,8 @@
 | NFR-001…024 | 24 | 03-PRD | TEST-174…197 |
 | UC-001…037 | 37 | 03-PRD | One-to-one source US-E |
 | ADR-001…010 | 10 | 06 Architecture | One-to-one ARC-001…010 |
-| DB-001…113 | 113 | 07 Data Model | DB-101…105 và DB-112/113 materialized local; DB-106…111 reserved; US-004 forward reconcile đã test local, actual deploy Pending |
-| API-001…164 | 164 | 08 API/OpenAPI | x-api-id exact/unique; 53 implemented markers gồm API-008/036/038/135/136/143…164; direct/dependency ownership vẫn tách rõ |
+| DB-001…113 | 113 | 07 Data Model | DB-069…072 materialized 2026-07-26; DB-101…105 và DB-112/113 materialized local; DB-106…111 reserved; US-004 forward reconcile đã test local, actual deploy Pending |
+| API-001…164 | 164 | 08 API/OpenAPI | x-api-id exact/unique; 60 implemented markers gồm API-008/036/038/106…112/135/136/143…164; direct/dependency ownership vẫn tách rõ |
 | SEC-101…132 | 32 | 09 Security | TEST-198…229 |
 | WF-001…026 | 26 | 11 Workflow | 26 Mermaid state machines |
 | US-001…037 | 37 | 12 Backlog | One-to-one US-E01…37 |
@@ -46,7 +46,7 @@ This is the primary chain. API/DB/SEC ranges are capability surfaces; exact oper
 | COD-to-O&M continuity | BR-023…BR-025 | FR-106…FR-112 | UC-012 | WF-022 | US-012 | AC-053…AC-057 | API-098…105; API-095…097; API-067…071 | DB-073…078; DB-058…061; DB-041…043/079…083 | SEC-102/108/109/111/112/118; SEC-108/109/111/118; SEC-105/107/111/127/128 | TEST-053…TEST-057 | MVP |
 | COD-to-O&M continuity | BR-023…BR-026 | FR-109…FR-114, FR-026…FR-044 | UC-013 | WF-023 | US-013 | AC-058…AC-062 | API-098…105; API-053…061; API-039…052; API-114…121 | DB-073…078; DB-028…033; DB-022…027; DB-079…095 | SEC-102/108/109/111/112/118; SEC-108/109/114/118/119/126/130; SEC-109/112/113/118…123/126; SEC-111/127/128 | TEST-058…TEST-062 | MVP |
 | COD-to-O&M continuity | BR-027…BR-030, BR-040 | FR-115…FR-124, FR-165…FR-170 | UC-014 | WF-024/025 | US-014 | AC-063…AC-067 | API-114…121; API-091…094 | DB-079…095; DB-062…064 | SEC-111/127/128; SEC-108/114/118/130/131 | TEST-063…TEST-067 | Release 1 |
-| Enterprise control | BR-008, BR-011, BR-015, BR-026, BR-034 | FR-138…FR-145 | UC-015 | WF-001…025 | US-015 | AC-068…AC-072 | API-106…113 | DB-069…072 | SEC-102/106…110/118 | TEST-068…TEST-072 | MVP |
+| Enterprise control | BR-008, BR-011, BR-015, BR-026, BR-034 | FR-138…FR-145 | UC-015 | WF-001…025 | US-015 | AC-068…AC-072 | **Direct:** API-106…112<br>**Deferred:** API-113 escalate | DB-069…072; DB-098 audit | SEC-106…110/118; SEC-102 MFA Not implementable trong base auth profile | TEST-068…TEST-071 | MVP; engine Implemented local, AC-068…071 đóng; AC-072/TEST-072 Not covered pending SLA calendar decision |
 | Enterprise control | BR-001, BR-033, BR-040 | FR-146…FR-155, NFR-007…NFR-013 | UC-016 | WF-001…025 policy | US-016 | AC-073…AC-078 | API-001…014 | DB-001…008/098 | SEC-101…110/118 | TEST-073…TEST-078 | MVP |
 | Enterprise control | BR-015, BR-033, BR-034 | FR-139…FR-155 | UC-017 | WF-002…024 approval | US-017 | AC-079…AC-083 | API-001…014; API-106…113; API-062…066; API-076…082 | DB-001…008/098; DB-069…072; DB-034…040; DB-044…050 | SEC-101…110/118; SEC-102/106…110/118; SEC-108/109/114/118/119; SEC-108/114/118/125 | TEST-079…TEST-083 | MVP |
 | Enterprise control | BR-033, BR-034 | FR-141, FR-146…FR-153 | UC-018 | WF-001…025 delegation | US-018 | AC-084…AC-087 | API-106…113; API-001…014 | DB-069…072; DB-001…008/098 | SEC-102/106…110/118; SEC-101…110/118 | TEST-084…TEST-087 | MVP |

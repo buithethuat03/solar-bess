@@ -6,6 +6,13 @@ import {
   ProjectType, RoleAssignmentEntity, RoleEntity, SiteEntity, TenantEntity, UserAccountEntity
 } from '../entities';
 
+/**
+ * Must equal the highest policy version any role-grant migration writes, because this seed re-saves
+ * every catalog role on each run and would otherwise downgrade roles the migrations already raised.
+ * Bump together with the next `*RoleGrants`/`Grant*Permissions` migration.
+ */
+const rolePolicyVersion = 5;
+
 const roleCatalog = [
   {
     code: 'PMO', name: 'PMO', permissions: [
@@ -17,7 +24,9 @@ const roleCatalog = [
       'progress.record', 'progress.correct', 'user.read',
       'riskChange.read', 'riskChange.create', 'riskChange.manage', 'riskChange.submit',
       'riskChange.approve', 'riskChange.requestClosure', 'riskChange.close',
-      'riskChange.closeCritical', 'notification.read', 'notification.acknowledge'
+      'riskChange.closeCritical', 'notification.read', 'notification.acknowledge',
+      'workflowDefinition.read', 'workflow.start', 'workflow.read', 'approvalTask.read',
+      'approval.decide', 'workflow.cancel'
     ]
   },
   {
@@ -29,14 +38,17 @@ const roleCatalog = [
       'progress.record', 'progress.correct', 'user.read',
       'riskChange.read', 'riskChange.create', 'riskChange.manage', 'riskChange.submit',
       'riskChange.approve', 'riskChange.requestClosure', 'riskChange.close',
-      'riskChange.closeCritical', 'notification.read', 'notification.acknowledge'
+      'riskChange.closeCritical', 'notification.read', 'notification.acknowledge',
+      'workflowDefinition.read', 'workflow.start', 'workflow.read', 'approvalTask.read',
+      'approval.decide', 'workflow.cancel'
     ]
   },
   {
     code: 'EXECUTIVE', name: 'Executive',
     permissions: [
       'portfolio.read', 'project.read', 'package.read', 'schedule.read', 'riskChange.read',
-      'notification.read', 'notification.acknowledge'
+      'notification.read', 'notification.acknowledge', 'workflowDefinition.read',
+      'workflow.read', 'approvalTask.read'
     ]
   },
   {
@@ -44,21 +56,24 @@ const roleCatalog = [
       'package.read', 'package.create', 'schedule.read', 'schedule.manage',
       'schedule.import', 'baseline.submit', 'progress.record', 'progress.correct',
       'user.read', 'riskChange.read', 'riskChange.create', 'riskChange.manage',
-      'riskChange.requestClosure', 'notification.read', 'notification.acknowledge'
+      'riskChange.requestClosure', 'notification.read', 'notification.acknowledge',
+      'workflowDefinition.read', 'workflow.start', 'workflow.read', 'approvalTask.read'
     ]
   },
   {
     code: 'PACKAGE_OWNER', name: 'Package Owner', permissions: [
       'package.read', 'schedule.read', 'progress.record', 'user.read',
       'riskChange.read', 'riskChange.create', 'riskChange.manage',
-      'riskChange.requestClosure', 'notification.read', 'notification.acknowledge'
+      'riskChange.requestClosure', 'notification.read', 'notification.acknowledge',
+      'workflow.read', 'approvalTask.read'
     ]
   },
   {
     code: 'TENANT_ADMIN', name: 'Tenant Administrator', permissions: [
       'organization.read', 'organization.create', 'legalEntity.read',
       'legalEntity.create', 'roleAssignment.manage', 'systemStatus.read',
-      'notification.read', 'notification.acknowledge'
+      'notification.read', 'notification.acknowledge', 'workflowDefinition.read',
+      'workflowDefinition.publish', 'workflow.read'
     ]
   }
 ] as const;
@@ -73,7 +88,7 @@ export async function seedProjectMaster(
     role = await roleRepository.save({
       ...(role ?? { id: randomUUID(), tenantId: tenant.id }),
       code: definition.code, name: definition.name, permissions: [...definition.permissions],
-      policyVersion: 3, status: MasterRecordStatus.ACTIVE
+      policyVersion: rolePolicyVersion, status: MasterRecordStatus.ACTIVE
     });
     if (definition.code === 'PMO' || definition.code === 'TENANT_ADMIN') {
       const assignment = await assignmentRepository.findOneBy({

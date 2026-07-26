@@ -45,6 +45,12 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, permission: 'notification.read' }
   },
   {
+    path: RoutePath.approvals,
+    name: RouteName.approvals,
+    component: () => import('@/views/workflow/ApprovalInboxView.vue'),
+    meta: { requiresAuth: true, permission: 'approvalTask.read' }
+  },
+  {
     path: RoutePath.login,
     name: RouteName.login,
     component: () => import('@/views/auth/LoginView.vue'),
