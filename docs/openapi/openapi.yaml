@@ -3668,56 +3668,86 @@ paths:
       - name: projectId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     get:
       tags: ["Contract & Cost"]
       summary: "Liệt kê contract register"
+      description: >-
+        Trang register hợp đồng của một dự án, mới nhất trước theo keyset cursor `createdAt`/`id`,
+        lọc được theo `type` và `status`. Hợp đồng là phạm vi project-level và không có package
+        granularity: principal chỉ giữ package scope không với tới bất kỳ hợp đồng nào, và dự án
+        ngoài tenant hoặc ngoài scope trả 404 `PROJECT_NOT_FOUND` — không phân biệt được với dự án
+        không tồn tại. 403 `PERMISSION_DENIED` chỉ dành cho người thiếu hẳn quyền `contract.read`.
+        Mọi giá trị tiền là chuỗi thập phân đúng như Postgres `numeric(19,4)` lưu, không bao giờ là
+        JSON number. Cursor sai định dạng trả 400 `INVALID_CURSOR`, không bao giờ bỏ qua phân trang.
       operationId: api_053_get_v1_projects_projectid_contracts
       x-api-id: "API-053"
+      x-implementation-status: implemented
       x-permission: "contract.read"
-      x-data-scope: "project/legal entity/field"
-      x-idempotency: "safe"
+      x-data-scope: "project scope bắt buộc; hợp đồng không có package granularity — ngoài scope là 404"
+      x-idempotency: "safe; opaque keyset cursor theo createdAt/id giảm dần"
       x-related-requirements: ["FR-036"]
       x-related-data: ["DB-028"]
       x-related-security: ["SEC-114"]
+      x-error-codes: ["PROJECT_NOT_FOUND", "PERMISSION_DENIED", "INVALID_CURSOR"]
       security:
         - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/TenantHeader'
         - $ref: '#/components/parameters/CorrelationHeader'
+        - name: cursor
+          in: query
+          required: false
+          schema: {type: string, maxLength: 500}
+          description: Opaque cursor từ meta.nextCursor; đi tới null để duyệt hết
+        - name: limit
+          in: query
+          required: false
+          schema: {type: integer, minimum: 1, maximum: 100, default: 50}
+        - name: type
+          in: query
+          required: false
+          schema: {$ref: '#/components/schemas/ContractType'}
+        - name: status
+          in: query
+          required: false
+          schema: {$ref: '#/components/schemas/ContractStatus'}
       responses:
         '200':
-          description: "Authorized result"
+          description: "Trang contract register đã lọc theo scope, mới nhất trước"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/ContractListResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
     post:
       tags: ["Contract & Cost"]
       summary: "Tạo contract record"
+      description: >-
+        Đăng ký hợp đồng vào register: hàng sinh ra DRAFT, chưa ký (`signedBy`/`signedAt` null) và
+        không legal hold. V1 dừng ở đó một cách có chủ đích — catalog chưa có operation ký hay kích
+        hoạt, nên DRAFT là trạng thái duy nhất API này có thể tạo ra. `value` là chuỗi thập phân đi
+        thẳng vào Postgres `numeric(19,4)` và response đọc lại từ cơ sở dữ liệu, nên tiền trả về
+        đúng dạng lưu trữ chứ không phải cách viết của client. `effectiveTo` sớm hơn `effectiveFrom`
+        trả 422 `CONTRACT_DATES_INVALID`; `rootDocumentId` phải là tài liệu của đúng dự án, nếu
+        không 422 `DOCUMENT_NOT_FOUND`; trùng `contractNo` trong dự án trả 409
+        `CONTRACT_NUMBER_CONFLICT` và không ghi thêm gì. Dự án ngoài tenant hoặc ngoài scope trả
+        404 `PROJECT_NOT_FOUND`. `Idempotency-Key` bắt buộc: cùng key với cùng nội dung phát lại
+        đúng 201 cũ, cùng key với nội dung khác trả 409 `IDEMPOTENCY_CONFLICT`.
       operationId: api_054_post_v1_projects_projectid_contracts
       x-api-id: "API-054"
+      x-implementation-status: implemented
       x-permission: "contract.create"
-      x-data-scope: "project/legal entity"
-      x-idempotency: "required"
+      x-data-scope: "project scope bắt buộc; hợp đồng không có package granularity — ngoài scope là 404"
+      x-idempotency: "required; DB-101 command receipt phát lại nguyên trạng"
       x-related-requirements: ["FR-036"]
       x-related-data: ["DB-028"]
       x-related-security: ["SEC-108", "SEC-114"]
+      x-error-codes: ["PROJECT_NOT_FOUND", "CONTRACT_DATES_INVALID", "DOCUMENT_NOT_FOUND", "CONTRACT_NUMBER_CONFLICT", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -3728,47 +3758,47 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/CreateContractRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '201':
+          description: "Hợp đồng DRAFT đã vào register; tiền trả về đúng dạng numeric lưu trữ"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/ContractCommandResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/contracts/{contractId}":
     parameters:
       - name: contractId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     get:
       tags: ["Contract & Cost"]
       summary: "Đọc contract consolidated view"
+      description: >-
+        Read model hợp nhất của một hợp đồng: register row kèm toàn bộ parties, toàn bộ appendices
+        và `consolidatedValue` = `value` + SUM(`valueImpact` của các phụ lục EFFECTIVE) — tổng được
+        tính trọn vẹn trong Postgres `numeric` và trả về dạng chuỗi; phụ lục
+        DRAFT/SUPERSEDED/CANCELLED không được cộng. Scope giải từ chính register row sở hữu hợp
+        đồng: khác tenant, ngoài project scope hoặc chỉ có package scope đều trả 404
+        `CONTRACT_NOT_FOUND` chứ không phải 403, nên không thể dò sự tồn tại của một contractId.
       operationId: api_055_get_v1_contracts_contractid
       x-api-id: "API-055"
+      x-implementation-status: implemented
       x-permission: "contract.read"
-      x-data-scope: "contract/field"
+      x-data-scope: "scope lấy từ register row sở hữu hợp đồng; ngoài scope là 404"
       x-idempotency: "safe"
       x-related-requirements: ["FR-036"]
       x-related-data: ["DB-028", "DB-029", "DB-030"]
       x-related-security: ["SEC-114"]
+      x-error-codes: ["CONTRACT_NOT_FOUND", "PERMISSION_DENIED"]
       security:
         - bearerAuth: []
       parameters:
@@ -3776,88 +3806,88 @@ paths:
         - $ref: '#/components/parameters/CorrelationHeader'
       responses:
         '200':
-          description: "Authorized result"
+          description: "Hợp đồng kèm parties, appendices và consolidatedValue tính trong SQL"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/ContractDetailResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
     patch:
       tags: ["Contract & Cost"]
       summary: "Cập nhật contract draft bằng version"
+      description: >-
+        Sửa trực tiếp chỉ dành cho hợp đồng DRAFT — mọi trạng thái khác trả 422
+        `INVALID_STATE_TRANSITION`, và legal hold đóng băng cả bản nháp bằng 422 `LEGAL_HOLD`.
+        Optimistic concurrency dùng `expectedVersion` trong body (không dùng If-Match): lệch phiên
+        bản trả 409 `VERSION_CONFLICT` kèm `currentVersion`. Cửa sổ hiệu lực được kiểm lại trên giá
+        trị sau khi gộp với hàng hiện tại (422 `CONTRACT_DATES_INVALID`) và `rootDocumentId` mới
+        vẫn phải thuộc đúng dự án (422 `DOCUMENT_NOT_FOUND`). Hợp đồng ngoài tenant hoặc ngoài
+        scope trả 404 `CONTRACT_NOT_FOUND` chứ không phải 403.
       operationId: api_056_patch_v1_contracts_contractid
       x-api-id: "API-056"
+      x-implementation-status: implemented
       x-permission: "contract.update"
-      x-data-scope: "contract/field"
-      x-idempotency: "required"
+      x-data-scope: "scope lấy từ register row sở hữu hợp đồng; ngoài scope là 404"
+      x-idempotency: "required; expectedVersion bắt buộc; DB-101 command receipt phát lại nguyên trạng"
       x-related-requirements: ["FR-036"]
       x-related-data: ["DB-028"]
       x-related-security: ["SEC-109", "SEC-114"]
+      x-error-codes: ["CONTRACT_NOT_FOUND", "LEGAL_HOLD", "INVALID_STATE_TRANSITION", "VERSION_CONFLICT", "CONTRACT_DATES_INVALID", "DOCUMENT_NOT_FOUND", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/TenantHeader'
         - $ref: '#/components/parameters/CorrelationHeader'
         - $ref: '#/components/parameters/IdempotencyHeader'
-        - $ref: '#/components/parameters/IfMatchHeader'
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/UpdateContractRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '200':
+          description: "Bản nháp đã cập nhật; versionNo tăng và tiền trả về đúng dạng lưu trữ"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/ContractCommandResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/contracts/{contractId}/parties":
     parameters:
       - name: contractId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     post:
       tags: ["Contract & Cost"]
       summary: "Thêm ContractParty legal snapshot"
+      description: >-
+        Ghi thêm một bên tham gia dưới dạng legal snapshot append-only (FR-037): tên pháp lý, quốc
+        gia, số đăng ký và mã số thuế được copy từ legal-entity master trong cùng transaction và
+        băm canonical vào `snapshotHash`, nên sửa master về sau không viết lại được ai đã đứng trong
+        hợp đồng. Pháp nhân không thuộc đúng company trong tenant trả 422 `LEGAL_ENTITY_NOT_FOUND`;
+        cùng pháp nhân giữ cùng vai trò lần thứ hai trả 409 `CONTRACT_PARTY_CONFLICT` và không ghi
+        gì. Hợp đồng ngoài tenant hoặc ngoài scope trả 404 `CONTRACT_NOT_FOUND` chứ không phải 403.
       operationId: api_057_post_v1_contracts_contractid_parties
       x-api-id: "API-057"
+      x-implementation-status: implemented
       x-permission: "contractParty.create"
-      x-data-scope: "contract/legal entity"
-      x-idempotency: "required"
+      x-data-scope: "scope lấy từ register row sở hữu hợp đồng; ngoài scope là 404"
+      x-idempotency: "required; DB-101 command receipt phát lại nguyên trạng"
       x-related-requirements: ["FR-037"]
       x-related-data: ["DB-029"]
       x-related-security: ["SEC-108", "SEC-114"]
+      x-error-codes: ["CONTRACT_NOT_FOUND", "LEGAL_ENTITY_NOT_FOUND", "CONTRACT_PARTY_CONFLICT", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -3868,47 +3898,51 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/CreateContractPartyRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '201':
+          description: "Snapshot pháp lý đã được ghi kèm snapshotHash; không bao giờ sửa lại"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/ContractPartyCommandResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/contracts/{contractId}/appendices":
     parameters:
       - name: contractId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     post:
       tags: ["Contract & Cost"]
       summary: "Tạo appendix bắt buộc parent"
+      description: >-
+        Tạo phụ lục dưới tiền đề V1 đã nới lỏng một cách có chủ đích và được ghi nhận: hợp đồng cha
+        phải tồn tại và không ở CLOSED/EXPIRED (422 `INVALID_STATE_TRANSITION`), thay cho tiền đề
+        "parent effective" trong tài liệu — tiền đề đó bất khả thi vì catalog chưa có operation nào
+        đưa hợp đồng tới EFFECTIVE. Phụ lục sinh ra DRAFT (mặc định) hoặc trực tiếp EFFECTIVE, khi
+        đó bắt buộc `effectiveDate` (422 `EFFECTIVE_DATE_REQUIRED`). `currency` luôn là loại tiền
+        của hợp đồng cha: khai khác đi trả 422 `CURRENCY_MISMATCH`, và khóa ngoại composite theo
+        (tenant, contract, currency) làm hàng khác tiền không thể tồn tại. `valueImpact` là tiền có
+        dấu — phụ lục giảm giá trị là hợp lệ — và chỉ phụ lục EFFECTIVE mới được cộng vào
+        `consolidatedValue` của API-055. Trùng (appendixNo, revisionNo) trong hợp đồng trả 409
+        `CONTRACT_APPENDIX_CONFLICT`; `documentId` ngoài dự án trả 422 `DOCUMENT_NOT_FOUND`.
       operationId: api_058_post_v1_contracts_contractid_appendices
       x-api-id: "API-058"
+      x-implementation-status: implemented
       x-permission: "contractAppendix.create"
-      x-data-scope: "contract"
-      x-idempotency: "required"
+      x-data-scope: "scope lấy từ register row sở hữu hợp đồng; ngoài scope là 404"
+      x-idempotency: "required; DB-101 command receipt phát lại nguyên trạng"
       x-related-requirements: ["FR-038"]
       x-related-data: ["DB-030"]
       x-related-security: ["SEC-109", "SEC-114"]
+      x-error-codes: ["CONTRACT_NOT_FOUND", "INVALID_STATE_TRANSITION", "CURRENCY_MISMATCH", "EFFECTIVE_DATE_REQUIRED", "DOCUMENT_NOT_FOUND", "CONTRACT_APPENDIX_CONFLICT", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -3919,84 +3953,96 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/CreateContractAppendixRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '201':
+          description: "Phụ lục đã ghi với đúng loại tiền của hợp đồng cha"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/ContractAppendixCommandResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/contracts/{contractId}/obligations":
     parameters:
       - name: contractId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     get:
       tags: ["Contract & Cost"]
       summary: "Liệt kê nghĩa vụ/permit/guarantee"
+      description: >-
+        Trang nghĩa vụ của một hợp đồng, mới nhất trước theo keyset cursor `createdAt`/`id`.
+        `status` là projection suy ra ngay trong SQL tại thời điểm đọc: nghĩa vụ OPEN đã quá
+        `dueDate` đọc thành OVERDUE, đến hạn đúng hôm nay đọc thành DUE — hai giá trị này không bao
+        giờ được ghi xuống hàng, và `storedStatus` phơi đúng cột lưu trữ để chứng minh điều đó. So
+        sánh dùng CURRENT_DATE của cơ sở dữ liệu nên register không thể lệch khỏi đồng hồ mà
+        constraint dùng. V1 chỉ phục vụ register nghĩa vụ (DB-031); register permit/guarantee riêng
+        (DB-032/DB-033) chưa xuất hiện trong response. Hợp đồng ngoài tenant hoặc ngoài scope trả
+        404 `CONTRACT_NOT_FOUND`; cursor sai định dạng trả 400 `INVALID_CURSOR`.
       operationId: api_059_get_v1_contracts_contractid_obligations
       x-api-id: "API-059"
+      x-implementation-status: implemented
       x-permission: "obligation.read"
-      x-data-scope: "contract/field"
-      x-idempotency: "safe"
+      x-data-scope: "scope lấy từ register row sở hữu hợp đồng; ngoài scope là 404"
+      x-idempotency: "safe; opaque keyset cursor theo createdAt/id giảm dần"
       x-related-requirements: ["FR-039"]
       x-related-data: ["DB-031", "DB-032", "DB-033"]
       x-related-security: ["SEC-114"]
+      x-error-codes: ["CONTRACT_NOT_FOUND", "PERMISSION_DENIED", "INVALID_CURSOR"]
       security:
         - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/TenantHeader'
         - $ref: '#/components/parameters/CorrelationHeader'
+        - name: cursor
+          in: query
+          required: false
+          schema: {type: string, maxLength: 500}
+          description: Opaque cursor từ meta.nextCursor; đi tới null để duyệt hết
+        - name: limit
+          in: query
+          required: false
+          schema: {type: integer, minimum: 1, maximum: 100, default: 50}
       responses:
         '200':
-          description: "Authorized result"
+          description: "Trang nghĩa vụ; status là projection DUE/OVERDUE suy ra tại thời điểm đọc"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/ObligationListResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
     post:
       tags: ["Contract & Cost"]
       summary: "Tạo obligation có clause/trigger/evidence rule"
+      description: >-
+        Tạo nghĩa vụ trên các bên của đúng hợp đồng này: obligor và beneficiary phải là
+        ContractParty của chính hợp đồng (422 `CONTRACT_PARTY_NOT_FOUND` — khóa ngoại composite
+        mang contract_id là chốt chặn cuối, nên bên của hợp đồng khác không thể được tham chiếu) và
+        phải khác nhau (422 `CONTRACT_PARTY_DUPLICATED`). `ownerUserId` bỏ trống thì mặc định là
+        người gọi; owner khai báo rõ vẫn phải thuộc cùng tenant (422 `OWNER_NOT_FOUND`);
+        `appendixId` nếu có phải thuộc hợp đồng (422 `APPENDIX_NOT_FOUND`). Nghĩa vụ sinh ra OPEN,
+        chưa có quyết định nào; hợp đồng ngoài tenant hoặc ngoài scope trả 404 chứ không phải 403.
       operationId: api_060_post_v1_contracts_contractid_obligations
       x-api-id: "API-060"
+      x-implementation-status: implemented
       x-permission: "obligation.create"
-      x-data-scope: "contract"
-      x-idempotency: "required"
+      x-data-scope: "scope lấy từ register row sở hữu hợp đồng; ngoài scope là 404"
+      x-idempotency: "required; DB-101 command receipt phát lại nguyên trạng"
       x-related-requirements: ["FR-039"]
       x-related-data: ["DB-031"]
       x-related-security: ["SEC-114"]
+      x-error-codes: ["CONTRACT_NOT_FOUND", "CONTRACT_PARTY_DUPLICATED", "CONTRACT_PARTY_NOT_FOUND", "APPENDIX_NOT_FOUND", "OWNER_NOT_FOUND", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -4007,47 +4053,50 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/CreateObligationRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '201':
+          description: "Nghĩa vụ OPEN đã được ghi trên các bên của đúng hợp đồng này"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/ObligationCommandResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/obligations/{obligationId}:fulfill":
     parameters:
       - name: obligationId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     post:
       tags: ["Contract & Cost"]
       summary: "Ghi fulfillment/waiver có evidence/authority"
+      description: >-
+        Ghi quyết định FULFILLED hoặc WAIVED với bằng chứng bắt buộc — FR-040 yêu cầu tối thiểu một
+        `evidenceRefs`, không có quyết định nào thiếu bằng chứng. Segregation of duties ở mức hàng:
+        người quyết định không được là owner của nghĩa vụ và không được là người tạo nó, vi phạm
+        trả 422 `SOD_CONFLICT`; luật này được kiểm ở service và chốt lại bằng constraint
+        `ck_obligation_sod` của cơ sở dữ liệu nên không đường ghi nào lách qua được. Chỉ nghĩa vụ
+        đang OPEN theo trạng thái lưu trữ mới được quyết định, ngược lại 422
+        `INVALID_STATE_TRANSITION`; `expectedVersion` lệch trả 409 `VERSION_CONFLICT` kèm
+        `currentVersion`. Nghĩa vụ ngoài tenant hoặc ngoài scope trả 404 `OBLIGATION_NOT_FOUND`
+        chứ không phải 403.
       operationId: api_061_post_v1_obligations_obligationid_fulfill
       x-api-id: "API-061"
+      x-implementation-status: implemented
       x-permission: "obligation.fulfill"
-      x-data-scope: "obligation"
-      x-idempotency: "required"
+      x-data-scope: "scope lấy từ dự án sở hữu nghĩa vụ; ngoài scope là 404"
+      x-idempotency: "required; expectedVersion bắt buộc; DB-101 command receipt phát lại nguyên trạng"
       x-related-requirements: ["FR-040"]
       x-related-data: ["DB-031"]
       x-related-security: ["SEC-108", "SEC-109", "SEC-114"]
+      x-error-codes: ["OBLIGATION_NOT_FOUND", "INVALID_STATE_TRANSITION", "SOD_CONFLICT", "VERSION_CONFLICT", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -4058,47 +4107,47 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/FulfillObligationRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '200':
+          description: "Nghĩa vụ chuyển sang FULFILLED/WAIVED kèm decisionBy/decisionAt/evidence"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/ObligationCommandResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/projects/{projectId}/cost-summary":
     parameters:
       - name: projectId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     get:
       tags: ["Contract & Cost"]
       summary: "Đọc budget/commitment/payment grouped currency"
+      description: >-
+        Read model chi phí của dự án, nhóm theo loại tiền: `budget` lấy phiên bản mới nhất cho từng
+        trạng thái hiện diện, `commitments` nhóm thêm theo cost code và trạng thái, `payments` nhóm
+        theo trạng thái. Mọi con số là SQL aggregate trên Postgres `numeric` trả về dạng chuỗi;
+        không có gì được quy đổi hay cộng xuyên loại tiền — `reportingCurrency` luôn null một cách
+        có chủ đích để nói đúng điều đó, mỗi loại tiền đứng thành dòng riêng. Dự án ngoài tenant
+        hoặc ngoài scope (kể cả principal chỉ có package scope) trả 404 `PROJECT_NOT_FOUND`.
       operationId: api_062_get_v1_projects_projectid_cost_summary
       x-api-id: "API-062"
+      x-implementation-status: implemented
       x-permission: "cost.read"
-      x-data-scope: "project/legal entity/cost code"
+      x-data-scope: "project scope bắt buộc; package scope không có hiệu lực — ngoài scope là 404"
       x-idempotency: "safe"
       x-related-requirements: ["FR-053"]
       x-related-data: ["DB-034", "DB-035", "DB-036", "DB-038", "DB-040"]
       x-related-security: ["SEC-114", "SEC-119"]
+      x-error-codes: ["PROJECT_NOT_FOUND", "PERMISSION_DENIED"]
       security:
         - bearerAuth: []
       parameters:
@@ -4106,43 +4155,44 @@ paths:
         - $ref: '#/components/parameters/CorrelationHeader'
       responses:
         '200':
-          description: "Authorized result"
+          description: "Tổng hợp chi phí theo từng loại tiền; không quy đổi, reportingCurrency null"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/CostSummaryResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/projects/{projectId}/budget-versions":
     parameters:
       - name: projectId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     post:
       tags: ["Contract & Cost"]
       summary: "Tạo/submit budget version"
+      description: >-
+        Nộp một budget version mới: số phiên bản được cấp ngay trong transaction (MAX+1 của dự án)
+        và hàng sinh ra SUBMITTED kèm `submittedBy`/`submittedAt`. Hai yêu cầu song song tranh cùng
+        một số thì bên thua trả 409 `BUDGET_VERSION_CONFLICT` và thử lại được với key mới.
+        `snapshot` tùy chọn được băm canonical vào `snapshotHash`. V1 là header-only: line items bị
+        hoãn có chủ đích, và operation phê duyệt budget chưa có trong catalog nên
+        `approvedBy`/`approvedAt` luôn null — SoD người duyệt khác người nộp đã được constraint của
+        cơ sở dữ liệu chốt sẵn cho thời điểm đó. Dự án ngoài tenant hoặc ngoài scope trả 404
+        `PROJECT_NOT_FOUND`.
       operationId: api_063_post_v1_projects_projectid_budget_versions
       x-api-id: "API-063"
+      x-implementation-status: implemented
       x-permission: "budget.submit"
-      x-data-scope: "project/legal entity"
-      x-idempotency: "required"
+      x-data-scope: "project scope bắt buộc; package scope không có hiệu lực — ngoài scope là 404"
+      x-idempotency: "required; DB-101 command receipt phát lại nguyên trạng"
       x-related-requirements: ["FR-053"]
       x-related-data: ["DB-035"]
       x-related-security: ["SEC-108", "SEC-114"]
+      x-error-codes: ["PROJECT_NOT_FOUND", "BUDGET_VERSION_CONFLICT", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -4153,47 +4203,51 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/CreateBudgetVersionRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '201':
+          description: "Budget version SUBMITTED với số phiên bản cấp trong transaction"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/BudgetVersionCommandResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/projects/{projectId}/commitments":
     parameters:
       - name: projectId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     post:
       tags: ["Contract & Cost"]
       summary: "Ghi commitment từ contract/PO idempotent"
+      description: >-
+        Ghi nhận một commitment vào ledger append-only. Chống trùng bằng khóa duy nhất
+        (sourceType, sourceId, sourceVersion): phát lại đúng phiên bản nguồn đó trả 409
+        `COMMITMENT_SOURCE_CONFLICT` thay vì đếm đôi mức cam kết. Nguồn V1 chỉ có CONTRACT và
+        CONTRACT_APPENDIX — Procurement/PO bị hoãn; nguồn CONTRACT phải trỏ đúng hợp đồng đã khai
+        (422 `COMMITMENT_SOURCE_INVALID`), nguồn CONTRACT_APPENDIX phải là phụ lục của hợp đồng đó
+        (422 `APPENDIX_NOT_FOUND`). Hợp đồng phải thuộc dự án (422 `CONTRACT_NOT_FOUND`), cost code
+        phải tồn tại và ACTIVE (422 `COST_CODE_NOT_FOUND`), tiền mặc định theo hợp đồng và khai
+        khác đi là 422 `CURRENCY_MISMATCH`. Đảo commitment là hàng mới mang số âm tham chiếu bản
+        gốc qua `reversesCommitmentId` (bản gốc phải thuộc dự án — 422 `COMMITMENT_NOT_FOUND`);
+        bản gốc dương, bản đảo âm, sai dấu trả 422 `COMMITMENT_AMOUNT_SIGN_INVALID`.
       operationId: api_064_post_v1_projects_projectid_commitments
       x-api-id: "API-064"
+      x-implementation-status: implemented
       x-permission: "commitment.create"
-      x-data-scope: "project/contract/cost code"
-      x-idempotency: "required"
+      x-data-scope: "project scope bắt buộc; package scope không có hiệu lực — ngoài scope là 404"
+      x-idempotency: "required; DB-101 command receipt phát lại nguyên trạng; chống trùng nghiệp vụ theo (sourceType, sourceId, sourceVersion)"
       x-related-requirements: ["FR-054"]
       x-related-data: ["DB-036"]
       x-related-security: ["SEC-108", "SEC-114"]
+      x-error-codes: ["PROJECT_NOT_FOUND", "CONTRACT_NOT_FOUND", "CURRENCY_MISMATCH", "COMMITMENT_SOURCE_INVALID", "APPENDIX_NOT_FOUND", "COST_CODE_NOT_FOUND", "COMMITMENT_NOT_FOUND", "COMMITMENT_SOURCE_CONFLICT", "COMMITMENT_AMOUNT_SIGN_INVALID", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -4204,47 +4258,55 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/CreateCommitmentRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '201':
+          description: "Commitment ACTIVE đã vào ledger; phát lại cùng phiên bản nguồn sẽ 409"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/CommitmentCommandResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/contracts/{contractId}/payments":
     parameters:
       - name: contractId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     post:
       tags: ["Contract & Cost"]
       summary: "Tạo payment có payer/payee/components/currency và invoice reference"
+      description: >-
+        Một transaction duy nhất cho cả lát thanh toán. Hóa đơn (nếu gửi kèm) được reuse-or-create
+        trên khóa chống trùng (contract, pháp nhân cung cấp, số hóa đơn): cùng khóa với đúng facts
+        thì dùng lại hóa đơn cũ, cùng khóa với facts khác trả 409 `INVOICE_DUPLICATE` — so khớp
+        chạy bằng Postgres `numeric`, không bao giờ bằng so sánh chuỗi hay số JS. Payment sinh ra
+        DRAFT; nếu có components thì tổng `amount` của chúng phải đúng bằng `requestedAmount` —
+        đẳng thức do constraint trigger DEFERRABLE của cơ sở dữ liệu kiểm và được ép chạy ngay
+        trong transaction, nên lệch tổng trả 422 `COMPONENT_SUM_MISMATCH` và toàn bộ lát ghi
+        (payment, components, cả hóa đơn mới) rollback cùng nhau. FX snapshot tùy chọn cũng
+        reuse-or-create trên (source, ngày, cặp tiền); cùng khóa khác tỷ giá trả 409
+        `FX_SNAPSHOT_CONFLICT` — snapshot bất biến, chỉ ghi lại tỷ giá được tham chiếu, không quy
+        đổi gì. Payer và payee phải là hai pháp nhân khác nhau (422 `PAYER_PAYEE_SAME`) và phải tồn
+        tại trong đúng company (422 `PAYER_NOT_FOUND`/`PAYEE_NOT_FOUND`). Tiền đề V1 đã nới lỏng
+        như API-058: hợp đồng cha chỉ cần tồn tại và không CLOSED/EXPIRED (422
+        `INVALID_STATE_TRANSITION`) vì catalog chưa có operation nào đưa hợp đồng tới EFFECTIVE.
       operationId: api_065_post_v1_contracts_contractid_payments
       x-api-id: "API-065"
+      x-implementation-status: implemented
       x-permission: "payment.create"
-      x-data-scope: "contract/legal entity"
-      x-idempotency: "required"
+      x-data-scope: "scope lấy từ register row sở hữu hợp đồng; ngoài scope là 404"
+      x-idempotency: "required; DB-101 command receipt phát lại nguyên trạng"
       x-related-requirements: ["FR-056"]
       x-related-data: ["DB-037", "DB-038", "DB-039", "DB-040"]
       x-related-security: ["SEC-108", "SEC-114", "SEC-118"]
+      x-error-codes: ["CONTRACT_NOT_FOUND", "INVALID_STATE_TRANSITION", "PAYER_PAYEE_SAME", "PAYER_NOT_FOUND", "PAYEE_NOT_FOUND", "SUPPLIER_NOT_FOUND", "INVOICE_DUPLICATE", "FX_SNAPSHOT_CONFLICT", "FX_RATE_INVALID", "FX_CURRENCY_INVALID", "PAYMENT_AMOUNT_INVALID", "CURRENCY_MISMATCH", "COMPONENT_SIGN_INVALID", "COMPONENT_SEQUENCE_CONFLICT", "COMPONENT_SUM_MISMATCH", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -4255,47 +4317,47 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/CreatePaymentRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '201':
+          description: "Payment DRAFT kèm components; hóa đơn/FX snapshot được tạo hoặc dùng lại trong cùng transaction"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/PaymentResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/payments/{paymentId}":
     parameters:
       - name: paymentId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     get:
       tags: ["Contract & Cost"]
       summary: "Đọc payment/approval/posting/reconciliation"
+      description: >-
+        Đọc một payment kèm đầy đủ breakdown components sắp theo `sequenceNo`. Scope giải từ dự án
+        sở hữu payment: khác tenant hoặc ngoài project scope (kể cả principal chỉ có package scope)
+        đều trả 404 `PAYMENT_NOT_FOUND` chứ không phải 403, nên không thể dò một paymentId. Các
+        trường approval/posting/reconciliation (`approvedAmount`, `paidAmount`, `bankReference`,
+        `externalPostingRef`, `submittedBy`, `approvedBy`) có mặt trong schema nhưng luôn null ở
+        V1 vì các operation submit/approve/post chưa có trong catalog.
       operationId: api_066_get_v1_payments_paymentid
       x-api-id: "API-066"
+      x-implementation-status: implemented
       x-permission: "payment.read"
-      x-data-scope: "payment/field"
+      x-data-scope: "scope lấy từ dự án sở hữu payment; ngoài scope là 404"
       x-idempotency: "safe"
       x-related-requirements: ["FR-060"]
       x-related-data: ["DB-038", "DB-039"]
       x-related-security: ["SEC-114", "SEC-119"]
+      x-error-codes: ["PAYMENT_NOT_FOUND", "PERMISSION_DENIED"]
       security:
         - bearerAuth: []
       parameters:
@@ -4303,25 +4365,16 @@ paths:
         - $ref: '#/components/parameters/CorrelationHeader'
       responses:
         '200':
-          description: "Authorized result"
+          description: "Payment kèm breakdown components; tiền là chuỗi numeric"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/PaymentResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/equipment-models":
     get:
       tags: ["Engineering & Plants"]
@@ -10323,6 +10376,876 @@ components:
       required: [data, correlationId]
       properties:
         data: {$ref: '#/components/schemas/SignatureEnvelope'}
+        correlationId: {type: string}
+      additionalProperties: false
+    ContractType:
+      type: string
+      enum: [EPC, EQUIPMENT_LEASE, PPA, ESCO, SUBCONTRACT, EQUIPMENT_PURCHASE]
+    ContractStatus:
+      type: string
+      enum: [DRAFT, REVIEW, APPROVED, SIGNED, EFFECTIVE, SUSPENDED, EXPIRED, CLOSED]
+      description: >-
+        Vòng đời FR-036 đầy đủ, nhưng V1 chỉ tạo ra DRAFT: catalog chưa có operation ký hay kích
+        hoạt, nên các trạng thái sau DRAFT chưa thể đạt tới qua API này. Hợp đồng CLOSED/EXPIRED
+        không nhận phụ lục hay payment mới.
+    ContractPartyRole:
+      type: string
+      enum: [OWNER, EPC, VENDOR, LENDER, SUBCONTRACTOR, OFFTAKER]
+    ContractAppendixType:
+      type: string
+      enum: [AMENDMENT, ADDENDUM]
+    ContractAppendixStatus:
+      type: string
+      enum: [DRAFT, EFFECTIVE, SUPERSEDED, CANCELLED]
+      description: >-
+        API-058 chỉ tạo DRAFT hoặc trực tiếp EFFECTIVE; SUPERSEDED/CANCELLED chưa có operation
+        chuyển trạng thái trong catalog. Chỉ phụ lục EFFECTIVE được cộng vào consolidatedValue.
+    ObligationStatus:
+      type: string
+      enum: [OPEN, DUE, OVERDUE, FULFILLED, WAIVED, CANCELLED]
+      description: >-
+        DUE và OVERDUE chỉ tồn tại trong projection đọc của API-059: chúng được suy ra tại thời
+        điểm đọc từ dueDate so với CURRENT_DATE của cơ sở dữ liệu và không bao giờ được ghi xuống
+        hàng — trạng thái lưu trữ giữ OPEN cho tới khi có người quyết định.
+    ObligationStoredStatus:
+      type: string
+      enum: [OPEN, FULFILLED, WAIVED, CANCELLED]
+      description: Trạng thái thật nằm trong cột status; không bao giờ chứa DUE/OVERDUE
+    ObligationDecisionType:
+      type: string
+      enum: [FULFILLED, WAIVED]
+    BudgetVersionStatus:
+      type: string
+      enum: [DRAFT, SUBMITTED, APPROVED, SUPERSEDED]
+      description: API-063 sinh SUBMITTED; operation phê duyệt budget chưa có trong catalog
+    CommitmentStatus:
+      type: string
+      enum: [ACTIVE, REVERSED, CLOSED]
+    CommitmentSourceType:
+      type: string
+      enum: [CONTRACT, CONTRACT_APPENDIX]
+      description: Procurement purchase order bị hoãn; V1 chỉ có nguồn thuộc họ hợp đồng
+    PaymentStatus:
+      type: string
+      enum: [DRAFT, SUBMITTED, APPROVED, REJECTED, SENT, PAID, RECONCILED, CANCELLED]
+      description: API-065 chỉ tạo DRAFT; submit/approve/post/reconcile chưa có operation trong catalog
+    PaymentComponentType:
+      type: string
+      enum: [BASE, VAT, RETENTION, RETENTION_RELEASE, WITHHOLDING, ADVANCE_RECOVERY, OTHER_DEDUCTION]
+      description: >-
+        Loại khấu trừ (RETENTION, WITHHOLDING, ADVANCE_RECOVERY, OTHER_DEDUCTION) phải mang amount
+        nhỏ hơn hoặc bằng 0; loại cộng (BASE, VAT, RETENTION_RELEASE) phải mang amount lớn hơn hoặc
+        bằng 0 — sai dấu trả 422 COMPONENT_SIGN_INVALID.
+    ContractCostPageMeta:
+      type: object
+      required: [nextCursor, limit]
+      properties:
+        nextCursor: {type: [string, 'null'], maxLength: 500}
+        limit: {type: integer, minimum: 1, maximum: 100}
+      additionalProperties: false
+    Contract:
+      type: object
+      description: >-
+        DB-028 register row. Tiền là chuỗi thập phân numeric(19,4) đọc lại từ Postgres — không
+        trường tiền nào trong nhóm API này là JSON number.
+      required: [id, projectId, contractNo, title, type, status, effectiveFrom, effectiveTo, value, currency, rootDocumentId, legalHold, signedAt, signedBy, versionNo, createdBy, updatedBy, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        contractNo: {type: string, pattern: '^[A-Z0-9][A-Z0-9_./-]{1,79}$', maxLength: 80}
+        title: {type: string, minLength: 3, maxLength: 400}
+        type: {$ref: '#/components/schemas/ContractType'}
+        status: {$ref: '#/components/schemas/ContractStatus'}
+        effectiveFrom: {type: [string, 'null'], format: date}
+        effectiveTo: {type: [string, 'null'], format: date}
+        value:
+          type: string
+          pattern: '^\d{1,15}(\.\d{1,4})?$'
+          description: Tiền numeric(19,4) không âm dạng chuỗi
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        rootDocumentId: {type: [string, 'null'], format: uuid}
+        legalHold: {type: boolean}
+        signedAt:
+          type: [string, 'null']
+          format: date-time
+          description: Luôn null trong V1 — chưa có operation ký trong catalog
+        signedBy:
+          type: [string, 'null']
+          format: uuid
+          description: Luôn null trong V1 — chưa có operation ký trong catalog
+        versionNo: {type: integer, minimum: 1}
+        createdBy: {type: string, format: uuid}
+        updatedBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+      additionalProperties: false
+    ContractConsolidatedView:
+      type: object
+      description: >-
+        Register row kèm consolidatedValue = value + SUM(valueImpact của phụ lục EFFECTIVE), tính
+        trọn vẹn trong Postgres numeric; phụ lục chưa EFFECTIVE không được cộng.
+      required: [id, projectId, contractNo, title, type, status, effectiveFrom, effectiveTo, value, currency, rootDocumentId, legalHold, signedAt, signedBy, versionNo, createdBy, updatedBy, createdAt, updatedAt, consolidatedValue]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        contractNo: {type: string, pattern: '^[A-Z0-9][A-Z0-9_./-]{1,79}$', maxLength: 80}
+        title: {type: string, minLength: 3, maxLength: 400}
+        type: {$ref: '#/components/schemas/ContractType'}
+        status: {$ref: '#/components/schemas/ContractStatus'}
+        effectiveFrom: {type: [string, 'null'], format: date}
+        effectiveTo: {type: [string, 'null'], format: date}
+        value:
+          type: string
+          pattern: '^\d{1,15}(\.\d{1,4})?$'
+          description: Tiền numeric(19,4) không âm dạng chuỗi
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        rootDocumentId: {type: [string, 'null'], format: uuid}
+        legalHold: {type: boolean}
+        signedAt: {type: [string, 'null'], format: date-time}
+        signedBy: {type: [string, 'null'], format: uuid}
+        versionNo: {type: integer, minimum: 1}
+        createdBy: {type: string, format: uuid}
+        updatedBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+        consolidatedValue:
+          type: string
+          pattern: '^-?\d+(\.\d{1,4})?$'
+          description: >-
+            SQL aggregate dạng chuỗi trong cùng loại tiền của hợp đồng; có thể âm khi các phụ lục
+            giảm giá trị vượt quá value
+      additionalProperties: false
+    ContractParty:
+      type: object
+      description: >-
+        DB-029 legal snapshot append-only (FR-037). Các trường *Snapshot được copy từ legal-entity
+        master trong cùng transaction và băm canonical vào snapshotHash; không có operation sửa hay
+        xóa.
+      required: [id, contractId, projectId, companyId, legalEntityId, partyRole, legalNameSnapshot, countrySnapshot, registrationNoSnapshot, taxIdSnapshot, representativeName, representativeTitle, authorityReference, snapshotAt, snapshotHash, createdBy, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        contractId: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        companyId: {type: string, format: uuid}
+        legalEntityId: {type: string, format: uuid}
+        partyRole: {$ref: '#/components/schemas/ContractPartyRole'}
+        legalNameSnapshot: {type: string, minLength: 1, maxLength: 250}
+        countrySnapshot: {type: string, pattern: '^[A-Z]{2}$'}
+        registrationNoSnapshot: {type: string, minLength: 1, maxLength: 100}
+        taxIdSnapshot: {type: [string, 'null'], maxLength: 100}
+        representativeName: {type: [string, 'null'], maxLength: 200}
+        representativeTitle: {type: [string, 'null'], maxLength: 200}
+        authorityReference: {type: [string, 'null'], maxLength: 400}
+        snapshotAt: {type: string, format: date-time}
+        snapshotHash: {type: string, pattern: '^[0-9a-f]{64}$'}
+        createdBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+      additionalProperties: false
+    ContractAppendix:
+      type: object
+      description: >-
+        DB-030. currency luôn bằng loại tiền của hợp đồng cha — khóa ngoại composite làm phụ lục
+        khác tiền không thể tồn tại; valueImpact là tiền có dấu, phụ lục giảm giá trị là hợp lệ.
+      required: [id, contractId, projectId, appendixNo, revisionNo, type, effectiveDate, valueImpact, currency, documentId, status, versionNo, createdBy, updatedBy, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        contractId: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        appendixNo: {type: string, pattern: '^[A-Z0-9][A-Z0-9_./-]{1,79}$', maxLength: 80}
+        revisionNo: {type: integer, minimum: 1}
+        type: {$ref: '#/components/schemas/ContractAppendixType'}
+        effectiveDate:
+          type: [string, 'null']
+          format: date
+          description: Không bao giờ null khi status là EFFECTIVE
+        valueImpact:
+          type: string
+          pattern: '^-?\d{1,15}(\.\d{1,4})?$'
+          description: Tiền có dấu numeric(19,4) dạng chuỗi
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        documentId: {type: [string, 'null'], format: uuid}
+        status: {$ref: '#/components/schemas/ContractAppendixStatus'}
+        versionNo: {type: integer, minimum: 1}
+        createdBy: {type: string, format: uuid}
+        updatedBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+      additionalProperties: false
+    Obligation:
+      type: object
+      description: >-
+        DB-031 qua các command API-060/061. status ở đây là trạng thái lưu trữ — không bao giờ
+        DUE/OVERDUE; bộ trường decision* chỉ khác null sau khi API-061 quyết định.
+      required: [id, contractId, projectId, appendixId, clauseRef, title, obligorPartyId, beneficiaryPartyId, ownerUserId, triggerType, triggerReference, dueDate, status, evidenceRefs, consequence, decisionType, decisionBy, decisionAt, decisionReason, decisionEvidenceRefs, versionNo, createdBy, updatedBy, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        contractId: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        appendixId: {type: [string, 'null'], format: uuid}
+        clauseRef: {type: string, minLength: 1, maxLength: 200}
+        title: {type: string, minLength: 3, maxLength: 400}
+        obligorPartyId: {type: string, format: uuid}
+        beneficiaryPartyId: {type: string, format: uuid}
+        ownerUserId: {type: string, format: uuid}
+        triggerType: {type: string, pattern: '^[A-Z][A-Z0-9_]{0,29}$'}
+        triggerReference: {type: [string, 'null'], maxLength: 400}
+        dueDate: {type: [string, 'null'], format: date}
+        status: {$ref: '#/components/schemas/ObligationStoredStatus'}
+        evidenceRefs:
+          type: array
+          maxItems: 50
+          items: {type: string, maxLength: 500}
+        consequence: {type: [string, 'null'], maxLength: 2000}
+        decisionType:
+          oneOf:
+            - $ref: '#/components/schemas/ObligationDecisionType'
+            - type: 'null'
+        decisionBy:
+          type: [string, 'null']
+          format: uuid
+          description: Không bao giờ trùng ownerUserId hay createdBy — SoD mức hàng ck_obligation_sod
+        decisionAt: {type: [string, 'null'], format: date-time}
+        decisionReason: {type: [string, 'null'], maxLength: 2000}
+        decisionEvidenceRefs:
+          type: [array, 'null']
+          maxItems: 50
+          items: {type: string, maxLength: 500}
+          description: Tối thiểu một phần tử khi đã FULFILLED/WAIVED; null khi chưa quyết định
+        versionNo: {type: integer, minimum: 1}
+        createdBy: {type: string, format: uuid}
+        updatedBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+      additionalProperties: false
+    ObligationRegisterRow:
+      type: object
+      description: >-
+        Một dòng API-059. status là projection suy ra tại thời điểm đọc (OPEN quá hạn đọc thành
+        OVERDUE, đến hạn hôm nay thành DUE); storedStatus là cột status thật — hàng đã quyết định
+        hoặc hủy luôn giữ trạng thái lưu trữ của nó.
+      required: [id, contractId, projectId, appendixId, clauseRef, title, obligorPartyId, beneficiaryPartyId, ownerUserId, triggerType, triggerReference, dueDate, status, storedStatus, evidenceRefs, consequence, decisionType, decisionBy, decisionAt, decisionReason, decisionEvidenceRefs, versionNo, createdBy, updatedBy, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        contractId: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        appendixId: {type: [string, 'null'], format: uuid}
+        clauseRef: {type: string, minLength: 1, maxLength: 200}
+        title: {type: string, minLength: 3, maxLength: 400}
+        obligorPartyId: {type: string, format: uuid}
+        beneficiaryPartyId: {type: string, format: uuid}
+        ownerUserId: {type: string, format: uuid}
+        triggerType: {type: string, pattern: '^[A-Z][A-Z0-9_]{0,29}$'}
+        triggerReference: {type: [string, 'null'], maxLength: 400}
+        dueDate: {type: [string, 'null'], format: date}
+        status: {$ref: '#/components/schemas/ObligationStatus'}
+        storedStatus: {$ref: '#/components/schemas/ObligationStoredStatus'}
+        evidenceRefs:
+          type: array
+          maxItems: 50
+          items: {type: string, maxLength: 500}
+        consequence: {type: [string, 'null'], maxLength: 2000}
+        decisionType:
+          oneOf:
+            - $ref: '#/components/schemas/ObligationDecisionType'
+            - type: 'null'
+        decisionBy: {type: [string, 'null'], format: uuid}
+        decisionAt: {type: [string, 'null'], format: date-time}
+        decisionReason: {type: [string, 'null'], maxLength: 2000}
+        decisionEvidenceRefs:
+          type: [array, 'null']
+          maxItems: 50
+          items: {type: string, maxLength: 500}
+        versionNo: {type: integer, minimum: 1}
+        createdBy: {type: string, format: uuid}
+        updatedBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+      additionalProperties: false
+    BudgetVersion:
+      type: object
+      description: >-
+        DB-035 header-only trong V1: line items bị hoãn có chủ đích. approvedBy/approvedAt luôn
+        null vì operation phê duyệt budget chưa có trong catalog.
+      required: [id, projectId, budgetVersion, currency, totalAmount, status, snapshot, snapshotHash, submittedBy, submittedAt, approvedBy, approvedAt, versionNo, createdBy, updatedBy, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        budgetVersion:
+          type: integer
+          minimum: 1
+          description: Cấp trong transaction theo MAX+1 của dự án; duy nhất trong dự án
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        totalAmount:
+          type: string
+          pattern: '^\d{1,15}(\.\d{1,4})?$'
+          description: Tiền numeric(19,4) không âm dạng chuỗi
+        status: {$ref: '#/components/schemas/BudgetVersionStatus'}
+        snapshot:
+          type: [object, 'null']
+          additionalProperties: true
+        snapshotHash:
+          type: [string, 'null']
+          pattern: '^[0-9a-f]{64}$'
+          description: Canonical hash của snapshot; null khi không gửi snapshot
+        submittedBy: {type: string, format: uuid}
+        submittedAt: {type: string, format: date-time}
+        approvedBy: {type: [string, 'null'], format: uuid}
+        approvedAt: {type: [string, 'null'], format: date-time}
+        versionNo: {type: integer, minimum: 1}
+        createdBy: {type: string, format: uuid}
+        updatedBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+      additionalProperties: false
+    Commitment:
+      type: object
+      description: >-
+        DB-036 ledger append-only: bản gốc dương, bản đảo âm và tham chiếu bản gốc qua
+        reversesCommitmentId; không có operation sửa hay xóa.
+      required: [id, projectId, contractId, costCodeId, amount, currency, status, sourceType, sourceId, sourceVersion, reversesCommitmentId, versionNo, createdBy, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        contractId: {type: string, format: uuid}
+        costCodeId: {type: string, format: uuid}
+        amount:
+          type: string
+          pattern: '^-?\d{1,15}(\.\d{1,4})?$'
+          description: Tiền có dấu numeric(19,4) dạng chuỗi; dương cho bản gốc, âm cho bản đảo
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+          description: Luôn là loại tiền của hợp đồng nguồn
+        status: {$ref: '#/components/schemas/CommitmentStatus'}
+        sourceType: {$ref: '#/components/schemas/CommitmentSourceType'}
+        sourceId: {type: string, format: uuid}
+        sourceVersion: {type: integer, minimum: 1}
+        reversesCommitmentId: {type: [string, 'null'], format: uuid}
+        versionNo: {type: integer, minimum: 1}
+        createdBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+      additionalProperties: false
+    PaymentComponent:
+      type: object
+      description: >-
+        DB-039 một dòng breakdown. currency bị ràng vào payment bởi khóa ngoại composite; tổng
+        amount của mọi component phải đúng bằng requestedAmount của payment — đẳng thức do trigger
+        DEFERRABLE của Postgres kiểm.
+      required: [id, paymentId, sequenceNo, componentType, basisAmount, rate, amount, currency, ruleVersion, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        paymentId: {type: string, format: uuid}
+        sequenceNo: {type: integer, minimum: 1}
+        componentType: {$ref: '#/components/schemas/PaymentComponentType'}
+        basisAmount:
+          type: [string, 'null']
+          pattern: '^-?\d{1,15}(\.\d{1,4})?$'
+        rate:
+          type: [string, 'null']
+          pattern: '^-?\d{1,3}(\.\d{1,6})?$'
+          description: numeric(9,6) dạng chuỗi
+        amount:
+          type: string
+          pattern: '^-?\d{1,15}(\.\d{1,4})?$'
+          description: Tiền có dấu numeric(19,4) dạng chuỗi; dấu bị ràng theo componentType
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        ruleVersion: {type: string, minLength: 1, maxLength: 40}
+        createdAt: {type: string, format: date-time}
+      additionalProperties: false
+    PaymentWithComponents:
+      type: object
+      description: >-
+        DB-038 payment kèm breakdown DB-039, sắp theo sequenceNo. approvedAmount, paidAmount,
+        paidAt, bankReference, externalPostingRef, submittedBy và approvedBy luôn null trong V1 vì
+        các operation submit/approve/post chưa có trong catalog.
+      required: [id, projectId, contractId, invoiceId, payerCompanyId, payerLegalEntityId, payeeCompanyId, payeeLegalEntityId, fxSnapshotId, milestoneRef, requestedAmount, approvedAmount, paidAmount, currency, status, paidAt, bankReference, externalPostingRef, evidenceRefs, requestedBy, submittedBy, approvedBy, versionNo, createdBy, updatedBy, createdAt, updatedAt, components]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        contractId: {type: string, format: uuid}
+        invoiceId:
+          type: [string, 'null']
+          format: uuid
+          description: Hóa đơn được tạo hoặc dùng lại trong cùng transaction; null khi không gửi kèm
+        payerCompanyId: {type: string, format: uuid}
+        payerLegalEntityId: {type: string, format: uuid}
+        payeeCompanyId: {type: string, format: uuid}
+        payeeLegalEntityId:
+          type: string
+          format: uuid
+          description: Luôn khác payerLegalEntityId theo ck_payment_distinct_parties
+        fxSnapshotId: {type: [string, 'null'], format: uuid}
+        milestoneRef: {type: [string, 'null'], maxLength: 200}
+        requestedAmount:
+          type: string
+          pattern: '^\d{1,15}(\.\d{1,4})?$'
+          description: Tiền numeric(19,4) dạng chuỗi, luôn lớn hơn 0
+        approvedAmount: {type: [string, 'null'], pattern: '^\d{1,15}(\.\d{1,4})?$'}
+        paidAmount: {type: [string, 'null'], pattern: '^\d{1,15}(\.\d{1,4})?$'}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        status: {$ref: '#/components/schemas/PaymentStatus'}
+        paidAt: {type: [string, 'null'], format: date-time}
+        bankReference: {type: [string, 'null'], maxLength: 200}
+        externalPostingRef: {type: [string, 'null'], maxLength: 200}
+        evidenceRefs:
+          type: array
+          maxItems: 50
+          items: {type: string, maxLength: 500}
+        requestedBy: {type: string, format: uuid}
+        submittedBy: {type: [string, 'null'], format: uuid}
+        approvedBy: {type: [string, 'null'], format: uuid}
+        versionNo: {type: integer, minimum: 1}
+        createdBy: {type: string, format: uuid}
+        updatedBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+        components:
+          type: array
+          maxItems: 50
+          items: {$ref: '#/components/schemas/PaymentComponent'}
+      additionalProperties: false
+    CostSummaryBudgetRow:
+      type: object
+      description: Budget version mới nhất cho từng trạng thái hiện diện trong dự án
+      required: [status, budgetVersion, currency, totalAmount]
+      properties:
+        status: {$ref: '#/components/schemas/BudgetVersionStatus'}
+        budgetVersion: {type: integer, minimum: 1}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        totalAmount: {type: string, pattern: '^\d+(\.\d{1,4})?$'}
+      additionalProperties: false
+    CostSummaryCommitmentRow:
+      type: object
+      required: [currency, status, costCodeId, costCode, amount]
+      properties:
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        status: {$ref: '#/components/schemas/CommitmentStatus'}
+        costCodeId: {type: string, format: uuid}
+        costCode: {type: string, pattern: '^[A-Z0-9][A-Z0-9_.-]{0,39}$', maxLength: 40}
+        amount:
+          type: string
+          pattern: '^-?\d+(\.\d{1,4})?$'
+          description: SUM tính trong Postgres numeric, chỉ cộng trong đúng một loại tiền
+      additionalProperties: false
+    CostSummaryPaymentRow:
+      type: object
+      required: [currency, status, requestedAmount, approvedAmount, paidAmount, paymentCount]
+      properties:
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        status: {$ref: '#/components/schemas/PaymentStatus'}
+        requestedAmount: {type: string, pattern: '^-?\d+(\.\d{1,4})?$'}
+        approvedAmount: {type: [string, 'null'], pattern: '^-?\d+(\.\d{1,4})?$'}
+        paidAmount: {type: [string, 'null'], pattern: '^-?\d+(\.\d{1,4})?$'}
+        paymentCount: {type: integer, minimum: 1}
+      additionalProperties: false
+    CostSummary:
+      type: object
+      required: [projectId, reportingCurrency, budget, commitments, payments]
+      properties:
+        projectId: {type: string, format: uuid}
+        reportingCurrency:
+          type: 'null'
+          description: >-
+            Luôn null một cách có chủ đích: không tồn tại quy đổi hay tổng xuyên loại tiền nào
+            trong read model này
+        budget:
+          type: array
+          items: {$ref: '#/components/schemas/CostSummaryBudgetRow'}
+        commitments:
+          type: array
+          items: {$ref: '#/components/schemas/CostSummaryCommitmentRow'}
+        payments:
+          type: array
+          items: {$ref: '#/components/schemas/CostSummaryPaymentRow'}
+      additionalProperties: false
+    CreateContractRequest:
+      type: object
+      required: [contractNo, title, type, value, currency]
+      properties:
+        contractNo: {type: string, pattern: '^[A-Z0-9][A-Z0-9_./-]{1,79}$', maxLength: 80}
+        title: {type: string, minLength: 3, maxLength: 400}
+        type: {$ref: '#/components/schemas/ContractType'}
+        value:
+          type: string
+          pattern: '^\d{1,15}(\.\d{1,4})?$'
+          description: >-
+            Tiền dạng chuỗi thập phân đi nguyên văn vào Postgres numeric(19,4); không bao giờ được
+            parse thành JS number
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        effectiveFrom: {type: string, format: date}
+        effectiveTo:
+          type: string
+          format: date
+          description: Phải không sớm hơn effectiveFrom, nếu không 422 CONTRACT_DATES_INVALID
+        rootDocumentId:
+          type: string
+          format: uuid
+          description: Phải là tài liệu của đúng dự án, nếu không 422 DOCUMENT_NOT_FOUND
+      additionalProperties: false
+    UpdateContractRequest:
+      type: object
+      required: [expectedVersion]
+      properties:
+        expectedVersion:
+          type: integer
+          minimum: 1
+          description: versionNo hiện tại của hợp đồng; lệch trả 409 VERSION_CONFLICT kèm currentVersion
+        title: {type: string, minLength: 3, maxLength: 400}
+        type: {$ref: '#/components/schemas/ContractType'}
+        value: {type: string, pattern: '^\d{1,15}(\.\d{1,4})?$'}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        effectiveFrom: {type: string, format: date}
+        effectiveTo: {type: string, format: date}
+        rootDocumentId: {type: string, format: uuid}
+      additionalProperties: false
+    CreateContractPartyRequest:
+      type: object
+      required: [companyId, legalEntityId, partyRole]
+      properties:
+        companyId: {type: string, format: uuid}
+        legalEntityId:
+          type: string
+          format: uuid
+          description: Phải thuộc đúng company trong cùng tenant, nếu không 422 LEGAL_ENTITY_NOT_FOUND
+        partyRole: {$ref: '#/components/schemas/ContractPartyRole'}
+        representativeName: {type: string, minLength: 1, maxLength: 200}
+        representativeTitle: {type: string, minLength: 1, maxLength: 200}
+        authorityReference: {type: string, minLength: 1, maxLength: 400}
+      additionalProperties: false
+    CreateContractAppendixRequest:
+      type: object
+      required: [appendixNo, type]
+      properties:
+        appendixNo: {type: string, pattern: '^[A-Z0-9][A-Z0-9_./-]{1,79}$', maxLength: 80}
+        revisionNo: {type: integer, minimum: 1, default: 1}
+        type: {$ref: '#/components/schemas/ContractAppendixType'}
+        effectiveDate:
+          type: string
+          format: date
+          description: Bắt buộc khi status là EFFECTIVE, nếu thiếu 422 EFFECTIVE_DATE_REQUIRED
+        valueImpact:
+          type: string
+          pattern: '^-?\d{1,15}(\.\d{1,4})?$'
+          default: '0'
+          description: Tiền có dấu dạng chuỗi; bỏ trống được hiểu là 0
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+          description: Mặc định theo hợp đồng cha; giá trị khác trả 422 CURRENCY_MISMATCH
+        documentId:
+          type: string
+          format: uuid
+          description: Phải là tài liệu của đúng dự án, nếu không 422 DOCUMENT_NOT_FOUND
+        status:
+          type: string
+          enum: [DRAFT, EFFECTIVE]
+          default: DRAFT
+          description: >-
+            Chỉ DRAFT hoặc trực tiếp EFFECTIVE — chưa có operation chuyển trạng thái phụ lục trong
+            catalog, và phụ lục không bao giờ EFFECTIVE được thì không bao giờ hợp nhất được giá
+            trị hợp đồng
+      additionalProperties: false
+    CreateObligationRequest:
+      type: object
+      required: [clauseRef, title, obligorPartyId, beneficiaryPartyId, triggerType]
+      properties:
+        clauseRef: {type: string, minLength: 1, maxLength: 200}
+        title: {type: string, minLength: 3, maxLength: 400}
+        obligorPartyId:
+          type: string
+          format: uuid
+          description: Phải là ContractParty của chính hợp đồng này, nếu không 422 CONTRACT_PARTY_NOT_FOUND
+        beneficiaryPartyId:
+          type: string
+          format: uuid
+          description: Phải khác obligorPartyId, nếu không 422 CONTRACT_PARTY_DUPLICATED
+        ownerUserId:
+          type: string
+          format: uuid
+          description: Mặc định là người gọi; owner khai báo rõ vẫn phải thuộc cùng tenant
+        triggerType: {type: string, pattern: '^[A-Z][A-Z0-9_]{0,29}$'}
+        triggerReference: {type: string, minLength: 1, maxLength: 400}
+        dueDate: {type: string, format: date}
+        consequence: {type: string, minLength: 1, maxLength: 2000}
+        appendixId:
+          type: string
+          format: uuid
+          description: Phải là phụ lục của chính hợp đồng này, nếu không 422 APPENDIX_NOT_FOUND
+        evidenceRefs:
+          type: array
+          maxItems: 50
+          items: {type: string, maxLength: 500}
+      additionalProperties: false
+    FulfillObligationRequest:
+      type: object
+      required: [expectedVersion, decisionType, reason, evidenceRefs]
+      properties:
+        expectedVersion:
+          type: integer
+          minimum: 1
+          description: versionNo hiện tại của nghĩa vụ; lệch trả 409 VERSION_CONFLICT kèm currentVersion
+        decisionType: {$ref: '#/components/schemas/ObligationDecisionType'}
+        reason: {type: string, minLength: 3, maxLength: 2000}
+        evidenceRefs:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: {type: string, maxLength: 500}
+          description: FR-040 — không có fulfilment hay waiver nào thiếu bằng chứng
+      additionalProperties: false
+    CreateBudgetVersionRequest:
+      type: object
+      required: [currency, totalAmount]
+      properties:
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        totalAmount:
+          type: string
+          pattern: '^\d{1,15}(\.\d{1,4})?$'
+          description: Tiền không âm dạng chuỗi đi nguyên văn vào Postgres numeric(19,4)
+        snapshot:
+          type: object
+          additionalProperties: true
+          description: Tùy chọn; được băm canonical vào snapshotHash khi có mặt
+      additionalProperties: false
+    CreateCommitmentRequest:
+      type: object
+      required: [contractId, costCodeId, amount, sourceType, sourceId, sourceVersion]
+      properties:
+        contractId:
+          type: string
+          format: uuid
+          description: Phải thuộc đúng dự án trong path, nếu không 422 CONTRACT_NOT_FOUND
+        costCodeId:
+          type: string
+          format: uuid
+          description: Phải tồn tại và ACTIVE, nếu không 422 COST_CODE_NOT_FOUND
+        amount:
+          type: string
+          pattern: '^-?\d{1,15}(\.\d{1,4})?$'
+          description: >-
+            Tiền có dấu dạng chuỗi; bản gốc phải dương, bản đảo phải âm và kèm
+            reversesCommitmentId — sai dấu trả 422 COMMITMENT_AMOUNT_SIGN_INVALID
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+          description: Mặc định theo hợp đồng; giá trị khác trả 422 CURRENCY_MISMATCH
+        sourceType: {$ref: '#/components/schemas/CommitmentSourceType'}
+        sourceId:
+          type: string
+          format: uuid
+          description: >-
+            Với CONTRACT phải trùng contractId (422 COMMITMENT_SOURCE_INVALID); với
+            CONTRACT_APPENDIX phải là phụ lục của hợp đồng đó (422 APPENDIX_NOT_FOUND)
+        sourceVersion:
+          type: integer
+          minimum: 1
+          description: Cùng (sourceType, sourceId, sourceVersion) chỉ ghi được một lần — 409 COMMITMENT_SOURCE_CONFLICT
+        reversesCommitmentId:
+          type: string
+          format: uuid
+          description: Bản gốc bị đảo; phải thuộc dự án, nếu không 422 COMMITMENT_NOT_FOUND
+      additionalProperties: false
+    PaymentInvoiceInput:
+      type: object
+      description: >-
+        Reuse-or-create trên khóa chống trùng (contract, pháp nhân cung cấp, invoiceNo): trùng
+        khóa với đúng facts thì dùng lại hóa đơn cũ, trùng khóa với facts khác trả 409
+        INVOICE_DUPLICATE; so khớp số học chạy bằng Postgres numeric.
+      required: [invoiceNo, invoiceDate, supplierCompanyId, supplierLegalEntityId, grossAmount, vatAmount, netAmount]
+      properties:
+        invoiceNo: {type: string, minLength: 1, maxLength: 80}
+        invoiceDate: {type: string, format: date}
+        supplierCompanyId: {type: string, format: uuid}
+        supplierLegalEntityId:
+          type: string
+          format: uuid
+          description: Phải thuộc đúng company trong cùng tenant, nếu không 422 SUPPLIER_NOT_FOUND
+        grossAmount: {type: string, pattern: '^\d{1,15}(\.\d{1,4})?$'}
+        vatAmount: {type: string, pattern: '^\d{1,15}(\.\d{1,4})?$'}
+        netAmount:
+          type: string
+          pattern: '^\d{1,15}(\.\d{1,4})?$'
+          description: >-
+            Lưu như khai báo; quan hệ gross/vat/net cố ý KHÔNG được kiểm hay tính lại vì quy tắc
+            thuế là TBD
+      additionalProperties: false
+    PaymentComponentInput:
+      type: object
+      required: [sequenceNo, componentType, amount, ruleVersion]
+      properties:
+        sequenceNo:
+          type: integer
+          minimum: 1
+          description: Trùng (componentType, sequenceNo) trong payment trả 409 COMPONENT_SEQUENCE_CONFLICT
+        componentType: {$ref: '#/components/schemas/PaymentComponentType'}
+        basisAmount: {type: string, pattern: '^-?\d{1,15}(\.\d{1,4})?$'}
+        rate:
+          type: string
+          pattern: '^-?\d{1,3}(\.\d{1,6})?$'
+          description: numeric(9,6) dạng chuỗi
+        amount:
+          type: string
+          pattern: '^-?\d{1,15}(\.\d{1,4})?$'
+          description: >-
+            Tiền có dấu dạng chuỗi; dấu bị ràng theo componentType (422 COMPONENT_SIGN_INVALID) và
+            tổng mọi component phải đúng bằng requestedAmount (422 COMPONENT_SUM_MISMATCH)
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+          description: Mặc định theo payment; giá trị khác trả 422 CURRENCY_MISMATCH
+        ruleVersion: {type: string, minLength: 1, maxLength: 40}
+      additionalProperties: false
+    PaymentFxSnapshotInput:
+      type: object
+      description: >-
+        Reuse-or-create trên khóa (source, rateDate, cặp tiền); cùng khóa với tỷ giá khác trả 409
+        FX_SNAPSHOT_CONFLICT — snapshot bất biến, chỉ ghi lại tỷ giá được payment tham chiếu,
+        server không quy đổi gì bằng nó.
+      required: [baseCurrency, quoteCurrency, rate, rateDate, source]
+      properties:
+        baseCurrency: {type: string, pattern: '^[A-Z]{3}$'}
+        quoteCurrency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+          description: Phải khác baseCurrency, nếu không 422 FX_CURRENCY_INVALID
+        rate:
+          type: string
+          pattern: '^\d{1,16}(\.\d{1,12})?$'
+          description: numeric(28,12) dạng chuỗi; phải lớn hơn 0 theo check của DB (422 FX_RATE_INVALID)
+        rateDate: {type: string, format: date}
+        source: {type: string, minLength: 1, maxLength: 80}
+      additionalProperties: false
+    CreatePaymentRequest:
+      type: object
+      required: [payerCompanyId, payerLegalEntityId, payeeCompanyId, payeeLegalEntityId, requestedAmount]
+      properties:
+        invoice: {$ref: '#/components/schemas/PaymentInvoiceInput'}
+        payerCompanyId: {type: string, format: uuid}
+        payerLegalEntityId:
+          type: string
+          format: uuid
+          description: Phải thuộc đúng company, nếu không 422 PAYER_NOT_FOUND
+        payeeCompanyId: {type: string, format: uuid}
+        payeeLegalEntityId:
+          type: string
+          format: uuid
+          description: >-
+            Phải thuộc đúng company (422 PAYEE_NOT_FOUND) và khác payerLegalEntityId (422
+            PAYER_PAYEE_SAME)
+        requestedAmount:
+          type: string
+          pattern: '^\d{1,15}(\.\d{1,4})?$'
+          description: Tiền dạng chuỗi; phải lớn hơn 0 theo check của DB (422 PAYMENT_AMOUNT_INVALID)
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+          description: Mặc định theo hợp đồng cha
+        milestoneRef: {type: string, minLength: 1, maxLength: 200}
+        evidenceRefs:
+          type: array
+          maxItems: 50
+          items: {type: string, maxLength: 500}
+        components:
+          type: array
+          maxItems: 50
+          items: {$ref: '#/components/schemas/PaymentComponentInput'}
+          description: >-
+            Nếu có, tổng amount phải đúng bằng requestedAmount — trigger DEFERRABLE của DB kiểm
+            ngay trong transaction, lệch trả 422 COMPONENT_SUM_MISMATCH và cả lát ghi rollback
+        fxSnapshot: {$ref: '#/components/schemas/PaymentFxSnapshotInput'}
+      additionalProperties: false
+    ContractListResponse:
+      type: object
+      required: [data, meta, correlationId]
+      properties:
+        data:
+          type: array
+          maxItems: 100
+          items: {$ref: '#/components/schemas/Contract'}
+        meta: {$ref: '#/components/schemas/ContractCostPageMeta'}
+        correlationId: {type: string}
+      additionalProperties: false
+    ContractCommandResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/Contract'}
+        correlationId: {type: string}
+      additionalProperties: false
+    ContractDetailResponse:
+      type: object
+      required: [data, parties, appendices, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/ContractConsolidatedView'}
+        parties:
+          type: array
+          items: {$ref: '#/components/schemas/ContractParty'}
+          description: Toàn bộ parties của hợp đồng theo thứ tự tạo, không phân trang
+        appendices:
+          type: array
+          items: {$ref: '#/components/schemas/ContractAppendix'}
+          description: Toàn bộ appendices ở mọi trạng thái theo thứ tự tạo, không phân trang
+        correlationId: {type: string}
+      additionalProperties: false
+    ContractPartyCommandResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/ContractParty'}
+        correlationId: {type: string}
+      additionalProperties: false
+    ContractAppendixCommandResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/ContractAppendix'}
+        correlationId: {type: string}
+      additionalProperties: false
+    ObligationListResponse:
+      type: object
+      required: [data, meta, correlationId]
+      properties:
+        data:
+          type: array
+          maxItems: 100
+          items: {$ref: '#/components/schemas/ObligationRegisterRow'}
+        meta: {$ref: '#/components/schemas/ContractCostPageMeta'}
+        correlationId: {type: string}
+      additionalProperties: false
+    ObligationCommandResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/Obligation'}
+        correlationId: {type: string}
+      additionalProperties: false
+    CostSummaryResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/CostSummary'}
+        correlationId: {type: string}
+      additionalProperties: false
+    BudgetVersionCommandResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/BudgetVersion'}
+        correlationId: {type: string}
+      additionalProperties: false
+    CommitmentCommandResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/Commitment'}
+        correlationId: {type: string}
+      additionalProperties: false
+    PaymentResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/PaymentWithComponents'}
         correlationId: {type: string}
       additionalProperties: false
     GenericCommand:

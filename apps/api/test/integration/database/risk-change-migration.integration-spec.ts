@@ -225,7 +225,7 @@ describe('Risk/Issue/Change migrations — DB-065/066/067/105/112/113', () => {
       expect(upgraded.get(`${tenantA}:EXECUTIVE`)?.permissions).toEqual([
         'custom.executive', 'riskChange.read', 'notification.read', 'notification.acknowledge',
         'workflowDefinition.read', 'workflow.read', 'approvalTask.read',
-        'document.read', 'documentRevision.read'
+        'document.read', 'documentRevision.read', 'contract.read', 'cost.read'
       ]);
       // TENANT_ADMIN is outside the RiskChange grant but inside the notification and workflow ones,
       // and is the only role that may publish a workflow version.

@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { EntityManager } from 'typeorm';
 import {
-  AssignmentScopeType, CompanyEntity, LegalEntityEntity, MasterRecordStatus,
+  AssignmentScopeType, CompanyEntity, CostCodeClass, CostCodeEntity, CostCodeStatus,
+  LegalEntityEntity, MasterRecordStatus,
   OrganizationType, PortfolioEntity, ProjectEntity, ProjectPhase, ProjectRecordStatus,
   ProjectType, RoleAssignmentEntity, RoleEntity, SiteEntity, TenantEntity, UserAccountEntity
 } from '../entities';
@@ -11,7 +12,7 @@ import {
  * every catalog role on each run and would otherwise downgrade roles the migrations already raised.
  * Bump together with the next `*RoleGrants`/`Grant*Permissions` migration.
  */
-const rolePolicyVersion = 6;
+const rolePolicyVersion = 7;
 
 const roleCatalog = [
   {
@@ -30,7 +31,10 @@ const roleCatalog = [
       'document.read', 'document.create', 'documentRevision.read', 'documentRevision.upload',
       'documentRevision.submitReview', 'documentRevision.approve', 'documentRevision.issue',
       'documentComment.create', 'transmittal.issue', 'transmittal.respond',
-      'documentShare.create', 'documentSignature.start'
+      'documentShare.create', 'documentSignature.start',
+      'contract.read', 'contract.create', 'contract.update', 'contractParty.create',
+      'contractAppendix.create', 'obligation.read', 'obligation.create', 'obligation.fulfill',
+      'cost.read', 'budget.submit', 'commitment.create', 'payment.create', 'payment.read'
     ]
   },
   {
@@ -48,7 +52,10 @@ const roleCatalog = [
       'document.read', 'document.create', 'documentRevision.read', 'documentRevision.upload',
       'documentRevision.submitReview', 'documentRevision.approve', 'documentRevision.issue',
       'documentComment.create', 'transmittal.issue', 'transmittal.respond',
-      'documentShare.create', 'documentSignature.start'
+      'documentShare.create', 'documentSignature.start',
+      'contract.read', 'contract.create', 'contract.update', 'contractParty.create',
+      'contractAppendix.create', 'obligation.read', 'obligation.create', 'obligation.fulfill',
+      'cost.read', 'payment.create', 'payment.read'
     ]
   },
   {
@@ -56,7 +63,8 @@ const roleCatalog = [
     permissions: [
       'portfolio.read', 'project.read', 'package.read', 'schedule.read', 'riskChange.read',
       'notification.read', 'notification.acknowledge', 'workflowDefinition.read',
-      'workflow.read', 'approvalTask.read', 'document.read', 'documentRevision.read'
+      'workflow.read', 'approvalTask.read', 'document.read', 'documentRevision.read',
+      'contract.read', 'cost.read'
     ]
   },
   {
@@ -67,7 +75,9 @@ const roleCatalog = [
       'riskChange.requestClosure', 'notification.read', 'notification.acknowledge',
       'workflowDefinition.read', 'workflow.start', 'workflow.read', 'approvalTask.read',
       'document.read', 'document.create', 'documentRevision.read', 'documentRevision.upload',
-      'documentRevision.submitReview', 'documentComment.create', 'transmittal.respond'
+      'documentRevision.submitReview', 'documentComment.create', 'transmittal.respond',
+      'contract.read', 'obligation.read', 'cost.read', 'budget.submit', 'commitment.create',
+      'payment.read'
     ]
   },
   {
@@ -165,4 +175,23 @@ export async function seedProjectMaster(
     timezone: 'Asia/Ho_Chi_Minh', isPrimary: true, status: MasterRecordStatus.ACTIVE,
     idempotencyKey: primarySite?.idempotencyKey ?? 'seed-demo-primary-site'
   });
+
+  // DB-034 has no CRUD operation in the API catalog (recorded spec gap), so a small demo cost code
+  // set is seeded here to make the cost domain (API-062/API-064) usable and testable.
+  const costCodeRepository = manager.getRepository(CostCodeEntity);
+  const demoCostCodes = [
+    { code: 'CAPEX-EQUIP', name: 'Demo Equipment Purchase', capexOpexClass: CostCodeClass.CAPEX },
+    { code: 'CAPEX-CONST', name: 'Demo Construction Works', capexOpexClass: CostCodeClass.CAPEX },
+    { code: 'OPEX-OM', name: 'Demo Operations & Maintenance', capexOpexClass: CostCodeClass.OPEX }
+  ] as const;
+  for (const definition of demoCostCodes) {
+    const costCode = await costCodeRepository.findOneBy({ tenantId: tenant.id, code: definition.code });
+    await costCodeRepository.save({
+      ...(costCode ?? { id: randomUUID(), tenantId: tenant.id, createdBy: user.id }),
+      parentCostCodeId: null, code: definition.code, name: definition.name,
+      capexOpexClass: definition.capexOpexClass, status: CostCodeStatus.ACTIVE,
+      effectiveFrom: costCode?.effectiveFrom ?? '2026-01-01', effectiveTo: null,
+      updatedBy: user.id
+    });
+  }
 }

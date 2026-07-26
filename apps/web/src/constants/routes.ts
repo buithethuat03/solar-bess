@@ -7,6 +7,7 @@ export const RouteName = {
   projectSchedule: 'project-schedule',
   projectRiskChange: 'project-risk-change',
   projectDocuments: 'project-documents',
+  projectContracts: 'project-contracts',
   notifications: 'notifications',
   approvals: 'approvals'
 } as const;
@@ -20,6 +21,7 @@ export const RoutePath = {
   projectSchedule: '/projects/:projectId/schedule',
   projectRiskChange: '/projects/:projectId/risk-change',
   projectDocuments: '/projects/:projectId/documents',
+  projectContracts: '/projects/:projectId/contracts',
   notifications: '/notifications',
   approvals: '/approvals'
 } as const;

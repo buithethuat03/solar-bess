@@ -31,6 +31,7 @@ import {
   RiskChangeSummaryQueryDto, RiskListQueryDto, SubmitChangeDto, UpdateActionDto,
   UpdateChangeDto, UpdateIssueDto, UpdateRiskDto
 } from './dto/risk-change.dto';
+import { canonicalHash } from './domain/canonical-hash';
 import {
   decodeCursor, encodeCursor, isClosureCursor, isHistoryCursor, isTimeCursor
 } from './domain/cursor';
@@ -1021,9 +1022,9 @@ export class RiskChangeService {
           impact
         };
         row.impactSnapshot = impact;
-        row.impactSnapshotHash = this.canonicalHash(impact);
+        row.impactSnapshotHash = canonicalHash(impact);
         row.approvalSnapshot = approvalSnapshot;
-        row.approvalSnapshotHash = this.canonicalHash(approvalSnapshot);
+        row.approvalSnapshotHash = canonicalHash(approvalSnapshot);
         row.status = ChangeRequestStatus.SUBMITTED;
         row.submittedBy = context.userId;
         row.submittedAt = new Date();
@@ -2147,19 +2148,6 @@ export class RiskChangeService {
       });
     }
     return JSON.parse(JSON.stringify(candidate)) as CompleteChangeImpact;
-  }
-
-  private canonicalHash(value: unknown): string {
-    return createHash('sha256').update(this.stableSerialize(value)).digest('hex');
-  }
-
-  private stableSerialize(value: unknown): string {
-    if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null';
-    if (Array.isArray(value)) return `[${value.map((item) => this.stableSerialize(item)).join(',')}]`;
-    const record = value as Record<string, unknown>;
-    return `{${Object.keys(record).sort().map((key) => (
-      `${JSON.stringify(key)}:${this.stableSerialize(record[key])}`
-    )).join(',')}}`;
   }
 
   private async assertBaselineReference(

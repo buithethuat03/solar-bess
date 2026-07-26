@@ -33,6 +33,13 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, permission: 'document.read' }
   },
   {
+    // Đăng ký trước projectDetail để '/projects/:projectId/contracts' không bị nuốt bởi ':projectId'.
+    path: RoutePath.projectContracts,
+    name: RouteName.projectContracts,
+    component: () => import('@/views/contracts/ProjectContractsView.vue'),
+    meta: { requiresAuth: true, permission: 'contract.read' }
+  },
+  {
     path: RoutePath.projectDetail,
     name: RouteName.projectDetail,
     component: () => import('@/views/projects/ProjectDetailView.vue'),

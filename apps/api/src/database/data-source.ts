@@ -17,6 +17,8 @@ import { CreateWorkflowEngine1783738000000 } from './migrations/1783738000000-Cr
 import { GrantWorkflowPermissions1783739000000 } from './migrations/1783739000000-GrantWorkflowPermissions';
 import { CreateDocumentControl1783740000000 } from './migrations/1783740000000-CreateDocumentControl';
 import { GrantDocumentPermissions1783741000000 } from './migrations/1783741000000-GrantDocumentPermissions';
+import { CreateContractCost1783742000000 } from './migrations/1783742000000-CreateContractCost';
+import { GrantContractCostPermissions1783743000000 } from './migrations/1783743000000-GrantContractCostPermissions';
 
 export function typeOrmOptions(databaseUrl = loadDatabaseConfig().url): DataSourceOptions {
   return {
@@ -36,7 +38,9 @@ export function typeOrmOptions(databaseUrl = loadDatabaseConfig().url): DataSour
       CreateWorkflowEngine1783738000000,
       GrantWorkflowPermissions1783739000000,
       CreateDocumentControl1783740000000,
-      GrantDocumentPermissions1783741000000
+      GrantDocumentPermissions1783741000000,
+      CreateContractCost1783742000000,
+      GrantContractCostPermissions1783743000000
     ],
     synchronize: false, logging: false
   };

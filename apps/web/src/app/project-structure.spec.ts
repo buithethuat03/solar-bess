@@ -4,7 +4,8 @@ import { join } from 'node:path';
 describe('frontend project structure — ADR-001/ADR-003', () => {
   it.each(['app', 'api', 'components/common', 'components/projects', 'components/schedule', 'components/risk-change', 'layouts', 'router', 'stores', 'styles', 'types', 'views/projects', 'views/schedule', 'views/risk-change',
     'components/notification', 'views/notification', 'components/auth',
-    'components/workflow', 'views/workflow', 'components/documents', 'views/documents'])(
+    'components/workflow', 'views/workflow', 'components/documents', 'views/documents',
+    'components/contracts', 'views/contracts'])(
     'contains src/%s',
     (directory) => expect(existsSync(join(process.cwd(), 'src', directory))).toBe(true)
   );
@@ -26,6 +27,11 @@ describe('frontend project structure — ADR-001/ADR-003', () => {
       'src/views/documents/ProjectDocumentsView.vue',
       'src/components/documents/DocumentRegisterTable.vue',
       'src/components/documents/DocumentUploadPanel.vue',
+      'src/views/contracts/ProjectContractsView.vue',
+      'src/components/contracts/ContractRegisterTable.vue',
+      'src/components/contracts/ContractDetailPanel.vue',
+      'src/components/contracts/ObligationPanel.vue',
+      'src/components/contracts/CostSummaryPanel.vue',
       'src/components/projects/ProjectForm.vue',
       'src/components/schedule/ScheduleGantt.vue',
       'src/components/risk-change/RiskHeatmap.vue',
@@ -44,5 +50,6 @@ describe('frontend project structure — ADR-001/ADR-003', () => {
     expect(existsSync(join(process.cwd(), 'src/api/notification.api.ts'))).toBe(true);
     expect(existsSync(join(process.cwd(), 'src/api/workflow.api.ts'))).toBe(true);
     expect(existsSync(join(process.cwd(), 'src/api/document.api.ts'))).toBe(true);
+    expect(existsSync(join(process.cwd(), 'src/api/contract.api.ts'))).toBe(true);
   });
 });
