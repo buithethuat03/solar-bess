@@ -30,7 +30,7 @@ function submit(): void {
   <form class="closure-decision risk-change-form desktop-decision" @submit.prevent="submit">
     <div class="form-wide"><h3>Independent {{ kind }} closure decision</h3><p>Server kiểm tra full-project scope, SoD, exposure/severity và mọi Action terminal.</p></div>
     <el-alert v-if="error" class="form-wide" type="error" :title="error" show-icon />
-    <label>Decision<select v-model="form.decision"><option value="APPROVE">APPROVE</option><option value="RETURN">RETURN</option><option value="REJECT">REJECT</option></select></label>
+    <label>Decision<select v-model="form.decision" aria-label="Decision"><option value="APPROVE">APPROVE</option><option value="RETURN">RETURN</option><option value="REJECT">REJECT</option></select></label>
     <label class="form-wide">Comment<textarea v-model.trim="form.comment" required minlength="3" rows="2" /></label>
     <EvidenceReferenceEditor v-model="evidenceRefs" class="form-wide" required />
     <div class="form-actions form-wide"><el-button native-type="submit" type="primary" :loading="busy">Ghi closure decision</el-button></div>

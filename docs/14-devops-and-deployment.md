@@ -275,6 +275,27 @@ Rollback record includes trigger/time/decision maker/artifact/config/schema vers
 - Break-glass has monitored account/path, reason and post-review.
 - Database/object/backup/audit keys/roles separated as required; exact hierarchy TBD.
 
+### 12.1 Runtime secret materialisation on the EC2 test host
+
+Compose bind-mounts Docker secrets from `RUNTIME_SECRETS_DIR` (default `/tmp/solar-bess-secrets`), and the worker
+integration profile from `WORKER_TEST_SECRETS_DIR` (default `/tmp/solar-bess-worker-test-secrets`). Both live under
+`/tmp`, which the host clears on reboot. After any host restart the stack therefore cannot come up on its own:
+
+| Symptom | Actual cause |
+|---|---|
+| `postgres`/`redis` fail with `invalid mount config … bind source path does not exist` | secret files were removed with `/tmp` |
+| `api` restart loop logging `Error during migration run: getaddrinfo ENOTFOUND postgres` | the API is healthy; its database dependency never started |
+
+Recovery order — materialise first, diagnose only if it still fails:
+
+1. `npm run secrets:materialize` — regenerates PostgreSQL/Redis secret files from the `enc:v1` values in `.env`.
+2. `sudo -n env RELEASE_SHA="$(git rev-parse --short=12 HEAD)" docker compose --env-file .env up -d --wait`.
+3. For the disposable integration stack, `npm run worker:test:secrets` before `docker compose -f docker-compose.test.yml up -d`.
+
+`scripts/deploy-ec2.sh` already fails fast when these files are missing, so a deployment never runs against a
+half-provisioned host. Moving `RUNTIME_SECRETS_DIR` to a reboot-persistent path with restricted ownership, or adding a
+`systemd` unit that materialises secrets before `docker compose`, is an open DevOps follow-up (see Open Questions).
+
 ## 13. Observability, logging and alerting
 
 | Signal | Dimensions | Alert/runbook |
@@ -365,6 +386,8 @@ Security incident response owns containment/evidence; SRE owns service recovery;
 | Disaster/incident exercise cadence and notification policy? | Security/BCM/Legal | Compliance |
 | Production Redis HA/persistence/eviction, BullMQ retention/concurrency/capacity và worker scaling? | SRE/Architecture/Security | Production acceptance; không chặn EC2 test |
 | Current US-004 GitHub self-hosted run/deploy and branch protection? Registry, SBOM/signing/provenance and IaC production rollout? | Platform/Security | Historical runner/first run and current isolated CI-like preflight Pass; actual US-004 GitHub Actions/EC2 deploy/public smoke and branch protection Pending; production supply chain Planned |
+| Should `RUNTIME_SECRETS_DIR`/`WORKER_TEST_SECRETS_DIR` move off `/tmp` to a reboot-persistent path, or should a `systemd` unit materialise secrets before Compose starts? | Platform/Security | Stack does not self-heal after an EC2 reboot (see §12.1); manual recovery only. Does not block EC2 test, blocks unattended production restart |
+| Should Playwright E2E become a CI job? It is currently a manual gate outside `main-cicd.yml` and needs a seeded fixture user plus a running stack. | QA/Platform | E2E evidence is produced manually per release; regression risk between releases |
 
 ## 19. Changelog
 

@@ -126,16 +126,16 @@ function submit(): void {
     <el-alert v-if="error" type="error" :title="error" show-icon />
     <form @submit.prevent="submit">
       <fieldset class="risk-change-form form-fieldset" :disabled="!editable">
-        <label>Package<select v-model="form.packageId" :disabled="Boolean(issue)"><option value="" :disabled="!fullProject">Project-level</option><option v-for="item in packageOptions" :key="item.id" :value="item.id">{{ item.code }} · {{ item.name }}</option></select></label>
+        <label>Package<select v-model="form.packageId" aria-label="Package" :disabled="Boolean(issue)"><option value="" :disabled="!fullProject">Project-level</option><option v-for="item in packageOptions" :key="item.id" :value="item.id">{{ item.code }} · {{ item.name }}</option></select></label>
         <label>Code<input v-model.trim="form.code" required :disabled="Boolean(issue)" /></label>
         <label class="form-wide">Title<input v-model.trim="form.title" required maxlength="250" /></label>
         <label class="form-wide">Description<textarea v-model.trim="form.description" required rows="2" /></label>
         <label>Occurred at<input v-model="form.occurredAt" type="datetime-local" required /></label>
-        <label>Severity<select v-model="form.severity"><option v-for="item in ['LOW','MEDIUM','HIGH','CRITICAL']" :key="item" :value="item">{{ item }}</option></select></label>
+        <label>Severity<select v-model="form.severity" aria-label="Severity"><option v-for="item in ['LOW','MEDIUM','HIGH','CRITICAL']" :key="item" :value="item">{{ item }}</option></select></label>
         <label class="form-wide">Root cause<textarea v-model.trim="form.rootCause" required rows="2" /></label>
         <label class="form-wide">Actual impact<textarea v-model.trim="form.actualImpact" required rows="2" /></label>
         <label>Target date<input v-model="form.targetDate" type="date" required /></label>
-        <label>Status<select v-model="form.status" :disabled="!issue"><option v-for="item in ['REPORTED','TRIAGED','IN_PROGRESS','RESOLVED','CLOSURE_PENDING','REOPENED']" :key="item" :value="item" :disabled="item === 'CLOSURE_PENDING' && !canRequestClosure">{{ item }}</option></select></label>
+        <label>Status<select v-model="form.status" aria-label="Status" :disabled="!issue"><option v-for="item in ['REPORTED','TRIAGED','IN_PROGRESS','RESOLVED','CLOSURE_PENDING','REOPENED']" :key="item" :value="item" :disabled="item === 'CLOSURE_PENDING' && !canRequestClosure">{{ item }}</option></select></label>
         <label class="form-wide">Owner<AssigneePicker v-model="form.ownerId" :project-id="projectId" :package-id="form.packageId || undefined" required-permission="riskChange.manage" /></label>
         <label v-if="!issue" class="form-wide">Source Risk ID<input v-model.trim="form.sourceRiskId" placeholder="Optional same-scope Risk UUID" /></label>
         <label v-if="!issue && form.sourceRiskId" class="check-label"><input v-model="form.markSourceRiskOccurred" type="checkbox" /> Mark source Risk OCCURRED atomically</label>

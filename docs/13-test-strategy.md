@@ -1,12 +1,12 @@
 # Test Strategy — Nền tảng Solar & BESS
 
 > **Purpose:** Định nghĩa test levels, environments, data, automation, entry/exit, defects và 233 high-level test scenarios truy tới 177 AC, 24 NFR và 32 SEC.
-> **Scope:** Test design toàn platform; execution evidence cho base/auth, US-001, operational foundation/US-003 và US-004. US-004 lint/type/unit/full isolated-port integration/migration/OpenAPI/build pre-push evidence đã Pass; remaining TEST-014…017 matrix, full E2E và actual GitHub Actions/EC2 deployment Pending. Production verification vẫn Proposed.
+> **Scope:** Test design toàn platform; execution evidence cho base/auth, US-001, operational foundation/US-003 và US-004. US-004 lint/type/unit/full isolated-port integration/migration/OpenAPI/build pre-push evidence đã Pass. Ngày 2026-07-26 toàn bộ 5 Playwright spec Pass lần đầu trên EC2 test, đóng phần UI journey của `TEST-001…004`, `TEST-010`, `TEST-014…017` và `TEST-230…233`; remaining TEST-014…017 API-level matrix và actual GitHub Actions/EC2 deployment cho US-004 vẫn Pending. Production verification vẫn Proposed.
 > **Source:** [SRS](./04-SRS.md), [Data Model](./07-data-model.md), [API/OpenAPI](./08-api-specification.md), [Security](./09-security-and-permissions.md), [UX](./10-ux-information-architecture.md), [Workflows](./11-workflows-and-state-machines.md), [Backlog](./12-product-backlog.md), [Operational Foundation ExecPlan](../.agent/execplans/2026-07-11-operational-foundation.md), [US-003 ExecPlan](../.agent/execplans/2026-07-11-project-controls-us003.md).
-> **Version:** 1.8
-> **Status:** Draft toàn platform; Swagger current/design separation TEST-197 EC2 test deployed/verified; TEST-014…017 Partial, full E2E và production acceptance chưa Pass
+> **Version:** 1.9
+> **Status:** Draft toàn platform; Swagger current/design separation TEST-197 EC2 test deployed/verified; E2E UI journey Pass 5/5, TEST-014…017 API matrix Partial, production acceptance chưa Pass
 > **Owner:** QA/Test Architecture (cá nhân: TBD)
-> **Updated:** 2026-07-18
+> **Updated:** 2026-07-26
 > **Approval:** Operational foundation EC2 test và US-003/US-004 test design/local implementation Approved — Product Owner delegated; full acceptance/deployment/toàn platform/production TBD/Pending — QA Lead, Security, Architecture, Process Owners và OT Owner
 
 ## 1. Quality objectives
@@ -77,6 +77,28 @@ Approved requirement/version; environment/build/config identifiable; dependencie
 ## 7. Regression and automation
 
 Automate unit/property, policy, API contract, state transitions, idempotency/concurrency, file pipeline, cross-tenant matrix, calculations and critical E2E. Use contract tests/provider simulators, deterministic clocks/currency/FX/timezone and seeded random/property tests. Visual tests do not replace accessibility/manual. OT/control negative search runs on OpenAPI, routes, schemas, UI/config and network evidence. Flaky tests are defects, quarantined only with owner/due.
+
+### 7.1 Executing the Playwright E2E gate
+
+`.github/workflows/main-cicd.yml` runs lint, type-check, unit, integration, `openapi:lint` and build only. The
+Playwright suite in `tests/e2e/` is a **manual gate outside CI** and needs a seeded fixture actor, so a green CI run is
+not E2E evidence. Procedure against a healthy stack:
+
+1. Write a password of at least 16 characters to a file readable only by the operator.
+2. `cat <file> | npx ts-node --project apps/api/tsconfig.json apps/api/src/database/seeds/e2e-user.ts create` — creates
+   `e2e-runner@example.test` and the independent `e2e-approver@example.test` with a tenant-scoped PMO role assignment.
+   The seed refuses to run unless exactly one ACTIVE tenant exists, so it cannot touch a multi-tenant environment.
+3. `E2E_PASSWORD_FILE=<file> npx playwright test`.
+4. Remove the fixture with the same script's `delete` action; it also clears sessions, credentials and role assignments.
+
+The suite exercises the UI journey of `TEST-001…004` (Project Master), `TEST-010` (schedule/progress/baseline),
+`TEST-014…017` (Risk → Issue/Action → Change with deep-link, SoD and mobile guards) and `TEST-230…233` (auth).
+
+Selector rule for authors: every form in `apps/web/src` wraps its control in the `<label>`, so a `<select>`'s accessible
+name includes the currently selected option text and `getByLabel(..., { exact: true })` can never match it. Give each
+`<select>` an explicit `aria-label` (distinct when the same visible label appears twice in one panel, e.g. residual
+reassessment fields) and select it with an exact matcher. Substring matchers are unsafe because labels such as
+`Assignee` also match the `Tìm assignee` search input.
 
 ## 8. Functional acceptance tests — TEST-001…TEST-173
 

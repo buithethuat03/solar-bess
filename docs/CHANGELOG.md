@@ -18,6 +18,20 @@ File này ghi lịch sử thay đổi phạm vi, tài liệu và governance củ
 - **Trạng thái:** Proposed | Approved | Rejected | Implemented
 ```
 
+## 2026-07-26 — Đóng E2E gate US-004 và chuẩn hóa accessible name cho select
+
+- **Loại:** Frontend accessibility; Test; DevOps evidence; không thay đổi phạm vi nghiệp vụ baseline.
+- **Người yêu cầu/phê duyệt:** Người dùng/Product Owner yêu cầu kiểm tra tiến độ và hoàn thiện sản phẩm chuẩn production ngày 2026-07-26.
+- **Mã bị ảnh hưởng:** `TEST-001…004`, `TEST-010`, `TEST-014…017`, `TEST-230…233`, `NFR-024`; không cấp requirement/API/DB ID mới.
+- **Trước thay đổi:** Playwright E2E chưa từng chạy xanh: `tests/e2e/risk-change.spec.ts` timeout tại `getByLabel('Probability', { exact: true })`. Mọi form trong `apps/web/src` dùng label bọc control, nên accessible name của `<select>` gồm cả text option đang chọn (`"Probability 1"`), khiến exact matcher không bao giờ khớp. Helper `selectAssignee` lại dùng substring matcher nên khớp cả input tìm kiếm `"Tìm assignee"` lẫn `<select aria-label="Assignee">`.
+- **Sau thay đổi:** 25 `<select>` trong slice Risk/Issue/Action/Change nhận `aria-label` tường minh; bốn control residual dùng tên phân biệt (`Residual probability/cost/schedule/HSE`) để không đụng độ strict mode khi fieldset residual hiển thị. Helper E2E đổi sang exact matcher. Toàn bộ 5 spec E2E Pass lần đầu tiên.
+- **Lý do:** Accessible name tường minh là yêu cầu a11y đúng đắn, đồng thời làm selector E2E xác định; đây là điều kiện để đóng bằng chứng acceptance UI của `TEST-014…017` mà changelog 2026-07-18 còn ghi Pending.
+- **Artefact bị ảnh hưởng:** `apps/web/src/components/risk-change/{RiskForm,IssueForm,RiskIssueActionPanel,ChangeRequestPanel,ClosureDecisionPanel}.vue`; `tests/e2e/risk-change.spec.ts`; changelog này. Không đổi API, schema, migration hay logic nghiệp vụ.
+- **Migration/tương thích:** Không có migration. `aria-label` chỉ bổ sung accessible name, giữ nguyên nhãn hiển thị nên không phá vỡ WCAG 2.5.3 Label in Name và không đổi hành vi người dùng.
+- **Validation:** Root lint Pass sau `eslint --fix` cho `vue/attributes-order`; Web unit 20 files/55 tests Pass; unit toàn workspace API 56 + Web 55 + Worker 61 = 172 Pass; integration API 50 + Worker 11 = 61 Pass; Playwright 5/5 Pass trên stack EC2 test đã build lại image web.
+- **Phát hiện vận hành:** Stack Compose không tự phục hồi sau reboot vì Docker secret bind-mount từ `/tmp/solar-bess-secrets` bị xóa; postgres/redis không khởi động và API lặp `getaddrinfo ENOTFOUND postgres`. Khôi phục bằng `npm run secrets:materialize` trước khi `docker compose up`. Cần đưa vào runbook DevOps như follow-up.
+- **Trạng thái:** Implemented trên EC2 test; commit/GitHub Actions release ghi nhận riêng.
+
 ## 2026-07-18 — Deploy current/design Swagger lên EC2 test
 
 - **Loại:** DevOps; Test; Documentation; không thay đổi phạm vi nghiệp vụ baseline.

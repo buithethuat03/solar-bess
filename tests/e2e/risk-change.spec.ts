@@ -61,7 +61,7 @@ async function submitWithoutNativeValidation(panel: Locator): Promise<void> {
 }
 
 async function selectAssignee(panel: Locator, userId: string): Promise<void> {
-  const select = panel.getByLabel('Assignee');
+  const select = panel.getByLabel('Assignee', { exact: true });
   await select.focus();
   await expect(select.locator(`option[value="${userId}"]`)).toHaveCount(1);
   await select.selectOption(userId);

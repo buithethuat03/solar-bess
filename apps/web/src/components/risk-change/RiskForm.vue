@@ -142,20 +142,20 @@ function submit(): void {
     <el-alert v-if="error" type="error" :title="error" show-icon />
     <form @submit.prevent="submit">
       <fieldset class="risk-change-form form-fieldset" :disabled="!editable">
-        <label>Package<select v-model="form.packageId" :disabled="Boolean(risk)"><option value="" :disabled="!fullProject">Project-level</option><option v-for="item in packageOptions" :key="item.id" :value="item.id">{{ item.code }} · {{ item.name }}</option></select></label>
+        <label>Package<select v-model="form.packageId" aria-label="Package" :disabled="Boolean(risk)"><option value="" :disabled="!fullProject">Project-level</option><option v-for="item in packageOptions" :key="item.id" :value="item.id">{{ item.code }} · {{ item.name }}</option></select></label>
         <label>Code<input v-model.trim="form.code" required :disabled="Boolean(risk)" /></label>
         <label>Category<input v-model.trim="form.category" required maxlength="100" /></label>
         <label class="form-wide">Cause<textarea v-model.trim="form.cause" required rows="2" /></label>
         <label class="form-wide">Event<textarea v-model.trim="form.event" required rows="2" /></label>
         <label class="form-wide">Impact<textarea v-model.trim="form.impact" required rows="2" /></label>
-        <label>Probability<select v-model.number="form.probability"><option v-for="value in 5" :key="value" :value="value">{{ value }}</option></select></label>
-        <label>Cost impact<select v-model.number="form.costImpactRating"><option v-for="value in 5" :key="value" :value="value">{{ value }}</option></select></label>
-        <label>Schedule impact<select v-model.number="form.scheduleImpactRating"><option v-for="value in 5" :key="value" :value="value">{{ value }}</option></select></label>
-        <label>HSE impact<select v-model.number="form.hseImpactRating"><option v-for="value in 5" :key="value" :value="value">{{ value }}</option></select></label>
+        <label>Probability<select v-model.number="form.probability" aria-label="Probability"><option v-for="value in 5" :key="value" :value="value">{{ value }}</option></select></label>
+        <label>Cost impact<select v-model.number="form.costImpactRating" aria-label="Cost impact"><option v-for="value in 5" :key="value" :value="value">{{ value }}</option></select></label>
+        <label>Schedule impact<select v-model.number="form.scheduleImpactRating" aria-label="Schedule impact"><option v-for="value in 5" :key="value" :value="value">{{ value }}</option></select></label>
+        <label>HSE impact<select v-model.number="form.hseImpactRating" aria-label="HSE impact"><option v-for="value in 5" :key="value" :value="value">{{ value }}</option></select></label>
         <label>Review date<input v-model="form.reviewDate" type="date" required /></label>
-        <label>Status<select v-model="form.status" :disabled="!risk"><option v-for="item in ['IDENTIFIED','ASSESSED','TREATING','MONITORING','CLOSURE_PENDING','OCCURRED']" :key="item" :value="item" :disabled="item === 'CLOSURE_PENDING' && !canRequestClosure">{{ item }}</option></select></label>
+        <label>Status<select v-model="form.status" aria-label="Status" :disabled="!risk"><option v-for="item in ['IDENTIFIED','ASSESSED','TREATING','MONITORING','CLOSURE_PENDING','OCCURRED']" :key="item" :value="item" :disabled="item === 'CLOSURE_PENDING' && !canRequestClosure">{{ item }}</option></select></label>
         <label class="form-wide">Owner<AssigneePicker v-model="form.ownerId" :project-id="projectId" :package-id="form.packageId || undefined" required-permission="riskChange.manage" /></label>
-        <label>Response strategy<select v-model="form.responseStrategy"><option value="">Chưa chọn</option><option v-for="item in ['AVOID','MITIGATE','TRANSFER','ACCEPT']" :key="item" :value="item">{{ item }}</option></select></label>
+        <label>Response strategy<select v-model="form.responseStrategy" aria-label="Response strategy"><option value="">Chưa chọn</option><option v-for="item in ['AVOID','MITIGATE','TRANSFER','ACCEPT']" :key="item" :value="item">{{ item }}</option></select></label>
         <label class="form-wide">Response plan<textarea v-model.trim="form.responsePlan" rows="2" /></label>
         <label class="form-wide">Trigger<textarea v-model.trim="form.trigger" rows="2" /></label>
         <label class="form-wide">Contingency plan<textarea v-model.trim="form.contingencyPlan" rows="2" /></label>
@@ -168,10 +168,10 @@ function submit(): void {
         <fieldset v-if="risk && fullProject" class="form-wide residual-panel">
           <legend><label><input v-model="residualEnabled" type="checkbox" /> Authoritative residual reassessment</label></legend>
           <div v-if="residualEnabled" class="risk-change-form">
-            <label>Probability<select v-model.number="form.residualProbability"><option v-for="value in 5" :key="value" :value="value">{{ value }}</option></select></label>
-            <label>Cost<select v-model.number="form.residualCostImpactRating"><option v-for="value in 5" :key="value" :value="value">{{ value }}</option></select></label>
-            <label>Schedule<select v-model.number="form.residualScheduleImpactRating"><option v-for="value in 5" :key="value" :value="value">{{ value }}</option></select></label>
-            <label>HSE<select v-model.number="form.residualHseImpactRating"><option v-for="value in 5" :key="value" :value="value">{{ value }}</option></select></label>
+            <label>Probability<select v-model.number="form.residualProbability" aria-label="Residual probability"><option v-for="value in 5" :key="value" :value="value">{{ value }}</option></select></label>
+            <label>Cost<select v-model.number="form.residualCostImpactRating" aria-label="Residual cost"><option v-for="value in 5" :key="value" :value="value">{{ value }}</option></select></label>
+            <label>Schedule<select v-model.number="form.residualScheduleImpactRating" aria-label="Residual schedule"><option v-for="value in 5" :key="value" :value="value">{{ value }}</option></select></label>
+            <label>HSE<select v-model.number="form.residualHseImpactRating" aria-label="Residual HSE"><option v-for="value in 5" :key="value" :value="value">{{ value }}</option></select></label>
             <label class="form-wide">Rationale<textarea v-model.trim="form.residualRationale" rows="2" /></label>
             <label class="form-wide">Reason<textarea v-model.trim="form.residualReason" required rows="2" /></label>
           </div>
