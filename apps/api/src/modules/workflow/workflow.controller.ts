@@ -7,8 +7,9 @@ import type { ContextRequest } from '../identity-access/context-request';
 import { RequirePermission } from '../identity-access/permission.decorator';
 import { PermissionGuard } from '../identity-access/permission.guard';
 import {
-  ApprovalTaskListQueryDto, CancelWorkflowInstanceDto, PublishWorkflowVersionDto,
-  RecordApprovalDecisionDto, StartWorkflowInstanceDto, WorkflowDefinitionListQueryDto
+  ApprovalTaskListQueryDto, CancelWorkflowInstanceDto, EscalateWorkflowInstanceDto,
+  PublishWorkflowVersionDto, RecordApprovalDecisionDto, StartWorkflowInstanceDto,
+  WorkflowDefinitionListQueryDto
 } from './dto/workflow.dto';
 import { WorkflowService } from './workflow.service';
 
@@ -92,6 +93,20 @@ export class WorkflowController {
     @Body() input: RecordApprovalDecisionDto
   ) {
     return this.resource(await this.service.recordDecision(
+      this.context(request), workflowInstanceId, input, this.idempotencyKey(key)
+    ), request);
+  }
+
+  @Post('workflow-instances/:workflowInstanceId\\:escalate')
+  @HttpCode(200)
+  @RequirePermission('workflow.escalate')
+  async escalateInstance(
+    @Req() request: ContextRequest,
+    @Param('workflowInstanceId', new ParseUUIDPipe()) workflowInstanceId: string,
+    @Headers('idempotency-key') key: string | undefined,
+    @Body() input: EscalateWorkflowInstanceDto
+  ) {
+    return this.resource(await this.service.escalateInstance(
       this.context(request), workflowInstanceId, input, this.idempotencyKey(key)
     ), request);
   }

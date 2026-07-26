@@ -17,6 +17,21 @@ describe('Contract & Cost keyset cursor — API-053/API-059', () => {
     expect(decodeContractCostCursor('')).toBeNull();
   });
 
+  it('cannot carry sub-millisecond precision, so the page predicate reads the boundary row', () => {
+    // Postgres keeps `contracts.created_at` to the microsecond; the JS Date the driver hydrates and
+    // `pageMeta` re-serialises only holds milliseconds.
+    const stored = '2026-07-26T08:30:00.123456Z';
+    const id = randomUUID();
+    const decoded = decodeContractCostCursor(
+      encodeContractCostCursor({ createdAt: new Date(stored).toISOString(), id })
+    );
+    expect(decoded).toEqual({ createdAt: '2026-07-26T08:30:00.123Z', id });
+    // So neither `created_at < cursor` nor `created_at = cursor` holds for the row the cursor names.
+    // `ContractCostService.applyCursor` therefore compares against the boundary row read back out of
+    // `contracts` rather than against this string; the string is only the stale-cursor fallback.
+    expect(decoded?.createdAt).not.toBe(stored);
+  });
+
   it.each([
     ['not base64url json', 'not-a-cursor'],
     ['json but wrong shape', Buffer.from(JSON.stringify({ page: 2 })).toString('base64url')],

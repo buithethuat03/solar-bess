@@ -226,7 +226,11 @@ describe('Risk/Issue/Change migrations — DB-065/066/067/105/112/113', () => {
         'custom.executive', 'riskChange.read', 'notification.read', 'notification.acknowledge',
         'workflowDefinition.read', 'workflow.read', 'approvalTask.read',
         'document.read', 'documentRevision.read', 'contract.read', 'cost.read',
-        'equipmentModel.read', 'bom.read', 'solarPlant.read', 'bessPlant.read'
+        'equipmentModel.read', 'bom.read', 'solarPlant.read', 'bessPlant.read',
+        'workfront.read', 'hseIncident.report', 'stopWork.issue',
+        'supplier.read', 'opportunity.read',
+        'permission.read.self', 'search.execute', 'savedView.read', 'savedView.create',
+        'report.create', 'report.read'
       ]);
       // TENANT_ADMIN is outside the RiskChange grant but inside the notification and workflow ones,
       // and is the only role that may publish a workflow version. The engineering grant adds only
@@ -234,7 +238,10 @@ describe('Risk/Issue/Change migrations — DB-065/066/067/105/112/113', () => {
       expect(upgraded.get(`${tenantA}:TENANT_ADMIN`)?.permissions).toEqual([
         'custom.admin', 'notification.read', 'notification.acknowledge',
         'workflowDefinition.read', 'workflowDefinition.publish', 'workflow.read',
-        'document.read', 'documentRevision.read', 'equipmentModel.read'
+        'document.read', 'documentRevision.read', 'equipmentModel.read',
+        'workfront.read', 'hseIncident.report', 'stopWork.issue', 'supplier.read',
+        'permission.read.self', 'tenant.read', 'roleAssignment.grant', 'roleAssignment.revoke',
+        'audit.read', 'delegation.revoke'
       ]);
       expect(upgraded.get(`${tenantA}:CUSTOM_ROLE`)).toEqual({
         permissions: ['custom.only'], policyVersion: 7
@@ -245,13 +252,13 @@ describe('Risk/Issue/Change migrations — DB-065/066/067/105/112/113', () => {
       // match no migration's target so the assertion stays valid as more grant migrations land.
       await AppDataSource.query(`UPDATE roles SET
         permissions = permissions || '["postMigration.custom"]'::jsonb,
-        policy_version = 9 WHERE id = $1`, [roleFixtures[0].id]);
+        policy_version = 99 WHERE id = $1`, [roleFixtures[0].id]);
       await revertThroughMigration('ReconcileRiskChangeRoleGrants1783736000000');
       const restored = await readRoleCatalog();
       // Each down() removes only the codes it added and leaves the manual version untouched.
       expect(restored.get(`${tenantA}:PMO`)).toEqual({
         permissions: ['custom.audit', 'riskChange.read', 'postMigration.custom'],
-        policyVersion: 9
+        policyVersion: 99
       });
       expect(restored.get(`${tenantA}:PROJECT_MANAGER`)).toEqual({
         permissions: ['custom.manager'], policyVersion: 2

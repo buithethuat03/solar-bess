@@ -50,3 +50,8 @@ export class CancelWorkflowInstanceDto {
   @Type(() => Number) @IsInt() @Min(1) expectedVersion!: number;
   @IsString() @Length(3, 2000) reason!: string;
 }
+
+/** API-113: escalation is a justified reminder, never a transition, so no expectedVersion. */
+export class EscalateWorkflowInstanceDto {
+  @IsString() @Length(3, 2000) reason!: string;
+}

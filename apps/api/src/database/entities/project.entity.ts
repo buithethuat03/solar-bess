@@ -11,6 +11,9 @@ import { UserAccountEntity } from './user-account.entity';
 @Unique('uq_project_tenant_code', ['tenantId', 'code'])
 @Index('idx_project_filters', ['tenantId', 'portfolioId', 'phase', 'recordStatus'])
 @Index('uq_project_tenant_idempotency', ['tenantId', 'idempotencyKey'], { unique: true, where: 'idempotency_key IS NOT NULL' })
+// DB-010 amendment (US-025): one project per source opportunity — the DB-level idempotency anchor
+// for API-033 convert. Partial so hand-created projects (no source opportunity) stay unconstrained.
+@Index('uq_project_source_opportunity', ['tenantId', 'sourceOpportunityId'], { unique: true, where: 'source_opportunity_id IS NOT NULL' })
 export class ProjectEntity {
   @PrimaryColumn('uuid') id!: string;
   @Column('uuid', { name: 'tenant_id' }) tenantId!: string;
@@ -37,6 +40,11 @@ export class ProjectEntity {
   @Column({ length: 3 }) currency!: string;
   @Column({ name: 'planned_cod', type: 'date' }) plannedCod!: string;
   @Column({ name: 'forecast_cod', type: 'date', nullable: true }) forecastCod!: string | null;
+  /**
+   * DB-010 amendment (US-025/API-033): the opportunity this project was converted from.
+   * Relation-less on purpose (composite DDL FK to opportunities(tenant_id, id)).
+   */
+  @Column('uuid', { name: 'source_opportunity_id', nullable: true }) sourceOpportunityId!: string | null;
   @VersionColumn({ name: 'version_no', type: 'integer' }) versionNo!: number;
   @Column({ name: 'idempotency_key', type: 'varchar', length: 200, nullable: true, select: false }) idempotencyKey!: string | null;
   @OneToMany(() => SiteEntity, (site) => site.project) sites!: SiteEntity[];

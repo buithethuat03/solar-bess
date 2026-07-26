@@ -6,7 +6,8 @@ export type NotificationSourceType =
   | 'Risk'
   | 'Issue'
   | 'RiskIssueAction'
-  | 'ChangeRequest';
+  | 'ChangeRequest'
+  | 'WorkflowInstance';
 
 export type NotificationAlertType =
   | 'OVERDUE'
@@ -14,7 +15,8 @@ export type NotificationAlertType =
   | 'RISK_REVIEW_DUE'
   | 'ISSUE_TARGET_DUE'
   | 'ACTION_OVERDUE'
-  | 'CHANGE_DECISION_PENDING';
+  | 'CHANGE_DECISION_PENDING'
+  | 'APPROVAL_ESCALATED';
 
 export interface NotificationProjection {
   tenantId: string;

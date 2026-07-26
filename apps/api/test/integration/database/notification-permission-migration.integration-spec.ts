@@ -81,7 +81,11 @@ describe('Notification permission grant migration — US-022 role policy', () =>
     const rows = await AppDataSource.query<Array<{ code: string }>>(
       'SELECT code FROM roles WHERE tenant_id = $1', [tenantId]
     );
-    expect(rows.map((row) => row.code)).toEqual(['PMO']);
+    // GrantFieldHseQualityPermissions1783747000000 creates the four unassigned safety roles for
+    // every tenant, so this tenant carries them alongside the role this suite seeded.
+    expect(rows.map((row) => row.code).sort()).toEqual(
+      ['CONTRACTOR', 'HSE_MANAGER', 'PERMIT_ISSUER', 'PMO', 'QAQC_MANAGER'].sort()
+    );
   });
 
   /**

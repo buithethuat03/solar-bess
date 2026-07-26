@@ -95,13 +95,7 @@ export class RiskChangeService {
     if (query.reviewBefore) {
       builder.andWhere('risk.reviewDate <= :reviewBefore', { reviewBefore: query.reviewBefore });
     }
-    if (cursor) {
-      builder.andWhere(new Brackets((where) => where
-        .where('risk.createdAt < :cursorTime', { cursorTime: cursor.createdAt })
-        .orWhere('risk.createdAt = :cursorTime AND risk.id < :cursorId', {
-          cursorTime: cursor.createdAt, cursorId: cursor.id
-        })));
-    }
+    if (cursor) this.applyTimeCursor(builder, 'risk', cursor.createdAt, cursor.id, 'risks', context.tenantId);
     const rows = await builder.orderBy('risk.createdAt', 'DESC').addOrderBy('risk.id', 'DESC')
       .take(query.limit + 1).getMany();
     return this.page(rows, query.limit, (row) => this.riskSummary(row));
@@ -324,13 +318,7 @@ export class RiskChangeService {
     if (query.sourceRiskId) {
       builder.andWhere('issue.sourceRiskId = :sourceRiskId', { sourceRiskId: query.sourceRiskId });
     }
-    if (cursor) {
-      builder.andWhere(new Brackets((where) => where
-        .where('issue.createdAt < :cursorTime', { cursorTime: cursor.createdAt })
-        .orWhere('issue.createdAt = :cursorTime AND issue.id < :cursorId', {
-          cursorTime: cursor.createdAt, cursorId: cursor.id
-        })));
-    }
+    if (cursor) this.applyTimeCursor(builder, 'issue', cursor.createdAt, cursor.id, 'issues', context.tenantId);
     const rows = await builder.orderBy('issue.createdAt', 'DESC').addOrderBy('issue.id', 'DESC')
       .take(query.limit + 1).getMany();
     return this.page(rows, query.limit, (row) => this.issueSummary(row));
@@ -535,11 +523,7 @@ export class RiskChangeService {
     if (query.ownerId) builder.andWhere('action.ownerId = :ownerId', { ownerId: query.ownerId });
     if (query.dueBefore) builder.andWhere('action.dueDate <= :dueBefore', { dueBefore: query.dueBefore });
     if (cursor) {
-      builder.andWhere(new Brackets((where) => where
-        .where('action.createdAt < :cursorTime', { cursorTime: cursor.createdAt })
-        .orWhere('action.createdAt = :cursorTime AND action.id < :cursorId', {
-          cursorTime: cursor.createdAt, cursorId: cursor.id
-        })));
+      this.applyTimeCursor(builder, 'action', cursor.createdAt, cursor.id, 'risk_issue_actions', context.tenantId);
     }
     const rows = await builder.orderBy('action.createdAt', 'DESC').addOrderBy('action.id', 'DESC')
       .take(query.limit + 1).getMany();
@@ -792,11 +776,7 @@ export class RiskChangeService {
       });
     }
     if (cursor) {
-      builder.andWhere(new Brackets((where) => where
-        .where('change.createdAt < :cursorTime', { cursorTime: cursor.createdAt })
-        .orWhere('change.createdAt = :cursorTime AND change.id < :cursorId', {
-          cursorTime: cursor.createdAt, cursorId: cursor.id
-        })));
+      this.applyTimeCursor(builder, 'change', cursor.createdAt, cursor.id, 'change_requests', context.tenantId);
     }
     const rows = await builder.orderBy('change.createdAt', 'DESC')
       .addOrderBy('change.id', 'DESC').take(query.limit + 1).getMany();
@@ -1409,13 +1389,12 @@ export class RiskChangeService {
     if (query.actorId) builder.andWhere('audit.actorId = :historyActorId', {
       historyActorId: query.actorId
     });
-    if (cursor) builder.andWhere(new Brackets((where) => where
-      .where('audit.occurredAt < :historyCursorTime', {
-        historyCursorTime: cursor.occurredAt
-      })
-      .orWhere('audit.occurredAt = :historyCursorTime AND audit.id < :historyCursorId', {
-        historyCursorTime: cursor.occurredAt, historyCursorId: cursor.id
-      })));
+    if (cursor) {
+      this.applyTimeCursor(
+        builder, 'audit', cursor.occurredAt, cursor.id, 'audit_events',
+        context.tenantId, 'occurredAt'
+      );
+    }
     const rows = await builder.orderBy('audit.occurredAt', 'DESC')
       .addOrderBy('audit.id', 'DESC').take(query.limit + 1).getMany();
     return this.page(rows, query.limit, (row) => ({
@@ -1667,6 +1646,46 @@ export class RiskChangeService {
       });
     }
     return cycle;
+  }
+
+  /**
+   * Keyset predicate compared row-wise against the cursor row's stored values.
+   *
+   * The naive form — `<time> < :cursorTime OR (<time> = :cursorTime AND id < :cursorId)` — silently
+   * loses rows. Postgres keeps `timestamptz` at microsecond precision while a JS `Date` (and so the
+   * ISO string carried in the cursor) only holds milliseconds, so any row whose stored timestamp has
+   * sub-millisecond digits matches neither branch and disappears from the next page. Risk/Issue/
+   * Action/Change writes and the audit trail all timestamp from `now()`, which is constant inside a
+   * transaction, so a bulk import or one multi-write command lands a whole group on a page boundary.
+   * Reading the boundary back out of `table` compares the real stored values, and
+   * `(<time>, id) < (…)` stays a row-wise comparison the `(<time> DESC, id DESC)` ordering can drive.
+   *
+   * When the cursor row itself has gone the old millisecond comparison is used as a fallback — a
+   * marginally conservative page beats failing a request that carries a stale cursor.
+   *
+   * The closure-cycle cursor is deliberately not routed through here: it keys on the integer
+   * `sequence_no`, which has no precision to lose.
+   */
+  private applyTimeCursor<T extends { id: string }>(
+    builder: SelectQueryBuilder<T>, alias: string, cursorTime: string, cursorId: string,
+    table: string, tenantId: string, property: 'createdAt' | 'occurredAt' = 'createdAt'
+  ): void {
+    const column = property === 'occurredAt' ? 'occurred_at' : 'created_at';
+    builder.andWhere(new Brackets((where) => where
+      .where(
+        `(${alias}.${property}, ${alias}.id) < (
+           SELECT boundary.${column}, boundary.id FROM ${table} boundary
+           WHERE boundary.id = :cursorId AND boundary.tenant_id = :cursorTenantId
+         )`,
+        { cursorId }
+      )
+      .orWhere(new Brackets((fallback) => fallback
+        .where(`NOT EXISTS (SELECT 1 FROM ${table} missing WHERE missing.id = :cursorId AND missing.tenant_id = :cursorTenantId)`)
+        .andWhere(new Brackets((legacy) => legacy
+          .where(`${alias}.${property} < :cursorTime`, { cursorTime })
+          .orWhere(`${alias}.${property} = :cursorTime AND ${alias}.id < :cursorId`, {
+            cursorTime, cursorId
+          })))))));
   }
 
   private page<T extends { id: string }, R>(

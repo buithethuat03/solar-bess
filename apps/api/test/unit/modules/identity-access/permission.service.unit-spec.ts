@@ -19,7 +19,7 @@ describe('PermissionService — SEC-106/SEC-107', () => {
   it('resolves package scope only inside its owning project', async () => {
     jest.spyOn(service, 'effectiveAssignments').mockResolvedValue([{
       roleCode: 'PACKAGE_OWNER', permissions: ['schedule.read'],
-      scopeType: AssignmentScopeType.PACKAGE, scopeId: 'package-1'
+      scopeType: AssignmentScopeType.PACKAGE, scopeId: 'package-1', policyVersion: 11
     }]);
     packages.existsBy.mockResolvedValueOnce(true);
     await expect(service.has(context, 'schedule.read', 'PROJECT', 'project-1')).resolves.toBe(true);
@@ -33,7 +33,7 @@ describe('PermissionService — SEC-106/SEC-107', () => {
   it('allows tenant assignment for project resources', async () => {
     jest.spyOn(service, 'effectiveAssignments').mockResolvedValue([{
       roleCode: 'PMO', permissions: ['project.read'],
-      scopeType: AssignmentScopeType.TENANT, scopeId: null
+      scopeType: AssignmentScopeType.TENANT, scopeId: null, policyVersion: 11
     }]);
     await expect(service.has(context, 'project.read', 'PROJECT', 'project-1')).resolves.toBe(true);
   });
@@ -41,7 +41,7 @@ describe('PermissionService — SEC-106/SEC-107', () => {
   it('does not widen a project-scoped assignment', async () => {
     jest.spyOn(service, 'effectiveAssignments').mockResolvedValue([{
       roleCode: 'PROJECT_MANAGER', permissions: ['project.read'],
-      scopeType: AssignmentScopeType.PROJECT, scopeId: 'project-1'
+      scopeType: AssignmentScopeType.PROJECT, scopeId: 'project-1', policyVersion: 11
     }]);
     await expect(service.has(context, 'project.read', 'PROJECT', 'project-2')).resolves.toBe(false);
   });
@@ -49,7 +49,7 @@ describe('PermissionService — SEC-106/SEC-107', () => {
   it('requires tenant scope for create permissions', async () => {
     jest.spyOn(service, 'effectiveAssignments').mockResolvedValue([{
       roleCode: 'PROJECT_MANAGER', permissions: ['project.create'],
-      scopeType: AssignmentScopeType.PROJECT, scopeId: 'project-1'
+      scopeType: AssignmentScopeType.PROJECT, scopeId: 'project-1', policyVersion: 11
     }]);
     await expect(service.has(context, 'project.create', 'TENANT')).resolves.toBe(false);
   });
@@ -58,11 +58,11 @@ describe('PermissionService — SEC-106/SEC-107', () => {
     jest.spyOn(service, 'effectiveAssignments').mockResolvedValue([
       {
         roleCode: 'PROJECT_MANAGER', permissions: ['project.read'],
-        scopeType: AssignmentScopeType.PROJECT, scopeId: 'project-1'
+        scopeType: AssignmentScopeType.PROJECT, scopeId: 'project-1', policyVersion: 11
       },
       {
         roleCode: 'PROJECT_MANAGER', permissions: ['project.read'],
-        scopeType: AssignmentScopeType.PROJECT, scopeId: 'project-2'
+        scopeType: AssignmentScopeType.PROJECT, scopeId: 'project-2', policyVersion: 11
       }
     ]);
     await expect(service.projectScopeIds(context, 'project.read')).resolves.toEqual(['project-1', 'project-2']);
@@ -71,7 +71,7 @@ describe('PermissionService — SEC-106/SEC-107', () => {
   it('resolves portfolio scope without widening to another portfolio', async () => {
     jest.spyOn(service, 'effectiveAssignments').mockResolvedValue([{
       roleCode: 'PMO', permissions: ['project.read'],
-      scopeType: AssignmentScopeType.PORTFOLIO, scopeId: 'portfolio-1'
+      scopeType: AssignmentScopeType.PORTFOLIO, scopeId: 'portfolio-1', policyVersion: 11
     }]);
     projects.existsBy.mockResolvedValueOnce(true);
     await expect(service.has(context, 'project.read', 'PROJECT', 'project-1')).resolves.toBe(true);
@@ -86,11 +86,11 @@ describe('PermissionService — SEC-106/SEC-107', () => {
     jest.spyOn(service, 'effectiveAssignments').mockResolvedValue([
       {
         roleCode: 'READER', permissions: ['riskChange.read'],
-        scopeType: AssignmentScopeType.TENANT, scopeId: null
+        scopeType: AssignmentScopeType.TENANT, scopeId: null, policyVersion: 7
       },
       {
         roleCode: 'APPROVER', permissions: ['riskChange.approve'],
-        scopeType: AssignmentScopeType.PROJECT, scopeId: 'project-2'
+        scopeType: AssignmentScopeType.PROJECT, scopeId: 'project-2', policyVersion: 11
       }
     ]);
     await expect(service.identityPermissions(context)).resolves.toEqual({
@@ -105,7 +105,8 @@ describe('PermissionService — SEC-106/SEC-107', () => {
           roleCode: 'APPROVER', permissions: ['riskChange.approve'],
           scopeType: AssignmentScopeType.PROJECT, scopeId: 'project-2'
         }
-      ]
+      ],
+      policyVersion: 11
     });
   });
 });

@@ -50,7 +50,7 @@ export interface RiskChangeAlertSnapshot {
 }
 
 export interface RiskChangeAlertCandidate {
-  sourceType: Exclude<NotificationSourceType, 'ScheduleActivity'>;
+  sourceType: Exclude<NotificationSourceType, 'ScheduleActivity' | 'WorkflowInstance'>;
   sourceId: string;
   packageId: string | null;
   alertType: Exclude<NotificationAlertType, 'OVERDUE' | 'NEAR_CRITICAL'>;

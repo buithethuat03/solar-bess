@@ -5,11 +5,17 @@ export enum WorkflowDefinitionStatus {
 }
 
 /**
- * The MVP engine routes exactly one aggregate family. FR-139 needs deterministic routing by object
- * type, so the binding is an explicit column with a closed CHECK rather than an implicit convention.
+ * FR-139 needs deterministic routing by object type, so the binding is an explicit column with a
+ * closed CHECK rather than an implicit convention.
+ *
+ * INVESTMENT_SCENARIO is in the vocabulary (and in `ck_workflow_instance_object_type`, widened by
+ * migration 1783752000000) but no resolver serves it yet: `workflow_instances.project_id` is
+ * NOT NULL while investment scenarios (DB-016) are pre-project, so API-032 records submission on
+ * the aggregate itself until the engine accepts project-less targets (recorded honest stop).
  */
 export enum WorkflowObjectType {
-  CHANGE_REQUEST = 'ChangeRequest'
+  CHANGE_REQUEST = 'ChangeRequest',
+  INVESTMENT_SCENARIO = 'InvestmentScenario'
 }
 
 export enum WorkflowVersionStatus {

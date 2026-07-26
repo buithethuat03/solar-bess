@@ -893,16 +893,20 @@ export class ProjectControlsService {
       .andWhere('progress.projectId = :projectId', { projectId })
       .andWhere('progress.activityId = :activityId', { activityId: activity.id });
     if (cursor) {
-      builder.andWhere(`(
-        progress.dataDate < :cursorDate
-        OR (progress.dataDate = :cursorDate AND progress.recordedAt < :cursorRecordedAt)
-        OR (progress.dataDate = :cursorDate AND progress.recordedAt = :cursorRecordedAt
-          AND progress.id < :cursorId)
-      )`, {
-        cursorDate: cursor.dataDate,
-        cursorRecordedAt: cursor.recordedAt,
-        cursorId: cursor.id
-      });
+      // Compared row-wise against what `progress_updates` actually stores. Spelling the boundary out
+      // as `:cursorRecordedAt` would lose rows: Postgres keeps `recorded_at` at microsecond
+      // precision, but the value TypeORM hydrated into `cursor.recordedAt` is a JS `Date` and only
+      // carries milliseconds. A row recorded in the same millisecond as the cursor row — a bulk
+      // import writes a whole batch under one `now()` — would then satisfy neither the `<` nor the
+      // `=` branch and silently vanish from the next page. The cursor row is loaded and validated
+      // above, so the subselect always has a row and no millisecond fallback is needed here.
+      builder.andWhere(
+        `(progress.dataDate, progress.recordedAt, progress.id) < (
+           SELECT boundary.data_date, boundary.recorded_at, boundary.id
+           FROM progress_updates boundary WHERE boundary.id = :cursorId AND boundary.tenant_id = :cursorTenantId
+         )`,
+        { cursorId: cursor.id, cursorTenantId: context.tenantId }
+      );
     }
     const rows = await builder
       .orderBy('progress.dataDate', 'DESC')

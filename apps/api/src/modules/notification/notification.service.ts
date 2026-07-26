@@ -1,7 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash, randomUUID } from 'node:crypto';
-import { Brackets, Repository, type EntityManager } from 'typeorm';
+import {
+  Brackets, Repository, type EntityManager, type SelectQueryBuilder
+} from 'typeorm';
 import {
   AuditEventEntity, NotificationEntity, NotificationStatus
 } from '../../database/entities';
@@ -52,13 +54,7 @@ export class NotificationService {
     if (query.projectId) {
       builder.andWhere('notification.projectId = :projectId', { projectId: query.projectId });
     }
-    if (cursor) {
-      builder.andWhere(new Brackets((where) => where
-        .where('notification.createdAt < :cursorTime', { cursorTime: cursor.createdAt })
-        .orWhere('notification.createdAt = :cursorTime AND notification.id < :cursorId', {
-          cursorTime: cursor.createdAt, cursorId: cursor.id
-        })));
-    }
+    if (cursor) this.applyCursor(builder, cursor, context.tenantId);
     const rows = await builder
       .orderBy('notification.createdAt', 'DESC')
       .addOrderBy('notification.id', 'DESC')
@@ -145,6 +141,41 @@ export class NotificationService {
     // SEC-107: authorization is re-evaluated at read time against the current role assignments, not
     // against whatever scope the recipient held when the worker wrote the projection row.
     return this.permissions.accessScopeSets(context, 'notification.read');
+  }
+
+  /**
+   * Keyset predicate compared row-wise against the cursor row's stored values.
+   *
+   * The naive form — `created_at < :cursorTime OR (created_at = :cursorTime AND id < :cursorId)` —
+   * silently loses rows. Postgres keeps `timestamptz` at microsecond precision while a JS `Date`
+   * (and so the ISO string inside the cursor) only carries milliseconds, so any row whose stored
+   * timestamp has sub-millisecond digits matches neither branch and disappears from the next page.
+   * The projection is the worst offender: one worker transaction fans a single event out to every
+   * recipient under one `now()`, so a whole fan-out sits on a page boundary. Reading the boundary
+   * back out of `notifications` compares the real stored values, and `(created_at, id) < (…)` stays
+   * a row-wise comparison the `(created_at DESC, id DESC)` ordering index can drive.
+   *
+   * When the cursor row itself has gone the old millisecond comparison is used as a fallback — a
+   * marginally conservative page beats failing a request that carries a stale cursor.
+   */
+  private applyCursor(
+    builder: SelectQueryBuilder<NotificationEntity>, cursor: { createdAt: string; id: string }, tenantId: string
+  ): void {
+    builder.andWhere(new Brackets((where) => where
+      .where(
+        `(notification.createdAt, notification.id) < (
+           SELECT boundary.created_at, boundary.id FROM notifications boundary
+           WHERE boundary.id = :cursorId AND boundary.tenant_id = :cursorTenantId
+         )`,
+        { cursorId: cursor.id, cursorTenantId: tenantId }
+      )
+      .orWhere(new Brackets((fallback) => fallback
+        .where('NOT EXISTS (SELECT 1 FROM notifications missing WHERE missing.id = :cursorId AND missing.tenant_id = :cursorTenantId)')
+        .andWhere(new Brackets((legacy) => legacy
+          .where('notification.createdAt < :cursorTime', { cursorTime: cursor.createdAt })
+          .orWhere('notification.createdAt = :cursorTime AND notification.id < :cursorId', {
+            cursorTime: cursor.createdAt, cursorId: cursor.id, cursorTenantId: tenantId
+          })))))));
   }
 
   private applyScope(

@@ -6,10 +6,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { createHash, randomUUID } from 'node:crypto';
 import { Brackets, Repository, type EntityManager, type SelectQueryBuilder } from 'typeorm';
 import {
-  ApprovalDecisionEntity, AuditEventEntity, TERMINAL_WORKFLOW_STATES, WorkflowDecision,
+  ApprovalDecisionEntity, AuditEventEntity, DelegationEntity, DelegationStatus,
+  TERMINAL_WORKFLOW_STATES, WorkflowDecision,
   WorkflowDefinitionEntity, WorkflowDefinitionStatus, WorkflowInstanceEntity,
   WorkflowInstanceState, WorkflowVersionEntity, WorkflowVersionStatus,
-  type WorkflowRoutingRules
+  type WorkflowRoutingRules, type WorkflowRoutingStep
 } from '../../database/entities';
 import type { AuthContext } from '../identity-access/auth.types';
 import type { AccessScopeSets } from '../identity-access/permission.service';
@@ -17,12 +18,14 @@ import { PermissionService } from '../identity-access/permission.service';
 import { CommandReceiptService } from '../operational-foundation/command-receipt.service';
 import { OutboxService } from '../operational-foundation/outbox.service';
 import { decodeWorkflowCursor, encodeWorkflowCursor } from './domain/cursor';
+import { matchDelegations } from './domain/delegation-match';
 import {
   findStep, firstStepKey, nextStepKey, requiredApprovals, validateRoutingRules
 } from './domain/routing-rules';
 import type {
-  ApprovalTaskListQueryDto, CancelWorkflowInstanceDto, PublishWorkflowVersionDto,
-  RecordApprovalDecisionDto, StartWorkflowInstanceDto, WorkflowDefinitionListQueryDto
+  ApprovalTaskListQueryDto, CancelWorkflowInstanceDto, EscalateWorkflowInstanceDto,
+  PublishWorkflowVersionDto, RecordApprovalDecisionDto, StartWorkflowInstanceDto,
+  WorkflowDefinitionListQueryDto
 } from './dto/workflow.dto';
 import {
   WORKFLOW_TARGET_RESOLVER, type WorkflowTargetResolver
@@ -74,7 +77,7 @@ export class WorkflowService {
     if (query.status) {
       builder.andWhere('definition.status = :status', { status: query.status });
     }
-    if (cursor) this.applyCursor(builder, 'definition', cursor);
+    if (cursor) this.applyCursor(builder, 'definition', cursor, 'workflow_definitions', context.tenantId);
     const rows = await builder
       .orderBy('definition.createdAt', 'DESC').addOrderBy('definition.id', 'DESC')
       .take(query.limit + 1).getMany();
@@ -282,7 +285,7 @@ export class WorkflowService {
     if (query.projectId) {
       builder.andWhere('instance.projectId = :projectId', { projectId: query.projectId });
     }
-    if (cursor) this.applyCursor(builder, 'instance', cursor);
+    if (cursor) this.applyCursor(builder, 'instance', cursor, 'workflow_instances', context.tenantId);
     const rows = await builder
       .orderBy('instance.createdAt', 'DESC').addOrderBy('instance.id', 'DESC')
       .take(query.limit + 1).getMany();
@@ -323,10 +326,9 @@ export class WorkflowService {
         if (instance.versionNo !== input.expectedVersion) {
           throw this.versionConflict(instance.versionNo);
         }
-        // SEC-110/BR-034: the requester can never approve their own submission. `effectiveActorId`
-        // is a separate concept from `actorId` so US-018 delegation slots in without a rewrite.
-        const effectiveActorId = context.userId;
-        if (instance.requestedBy === effectiveActorId) {
+        // SEC-110/BR-034: the signed-in actor can never decide on their own submission — no
+        // delegation can launder that, because delegation never expands or transfers SoD immunity.
+        if (instance.requestedBy === context.userId) {
           throw new ForbiddenException({
             code: 'SOD_CONFLICT',
             message: 'Người yêu cầu không được tự quyết định',
@@ -339,9 +341,36 @@ export class WorkflowService {
         if (!step) {
           throw this.unprocessable('WORKFLOW_CONFIGURATION_ERROR', 'Step không có trong route snapshot');
         }
-        await this.assertApproverEligible(context, step.approverSelector.roleCodes, step.fallbackRoleCodes);
+        // US-018 delegation consumption: when the caller does not personally hold a step role, an
+        // ACTIVE in-window, scope-matching delegation whose DELEGATOR is eligible lets the caller
+        // act. `actor_id` stays the caller; `effective_actor_id` becomes the delegator, so the
+        // ledger shows both identities of the decision.
+        const effectiveActorId = await this.resolveEffectiveActor(manager, context, instance, step);
+        // SoD against BOTH identities: the requester may be neither the one who clicks nor the one
+        // whose authority is consumed (requester-as-delegator would be self-approval by proxy).
+        if (instance.requestedBy === effectiveActorId) {
+          throw new ForbiddenException({
+            code: 'SOD_CONFLICT',
+            message: 'Người yêu cầu không được tự quyết định (kể cả qua ủy quyền)',
+            retryable: false
+          });
+        }
 
         const decisions = manager.getRepository(ApprovalDecisionEntity);
+        // `uq_approval_decision_actor_attempt` guards the signed-in actor; the same rule must hold
+        // for the effective identity, or one person's authority could decide twice in a step
+        // (once directly, once through a delegate).
+        const effectiveDuplicate = await decisions.existsBy({
+          tenantId: context.tenantId, workflowInstanceId: instance.id,
+          stepKey: input.stepKey, attemptNo: instance.currentAttemptNo, effectiveActorId
+        });
+        if (effectiveDuplicate) {
+          throw new ConflictException({
+            code: 'DECISION_ALREADY_RECORDED',
+            message: 'Danh tính hiệu lực này đã quyết định ở bước hiện tại',
+            retryable: false
+          });
+        }
         const sequenceNo = await decisions.countBy({
           tenantId: context.tenantId, workflowInstanceId: instance.id
         }) + 1;
@@ -363,9 +392,9 @@ export class WorkflowService {
         await this.emit(manager, context, 'WorkflowInstance', updated.id, updated.versionNo,
           `WorkflowInstance.${transition}`, {
             ...this.instanceEvent(updated), decision: input.decision,
-            stepKey: input.stepKey, sequenceNo
-          });
-        return { ...this.instanceView(updated), sequenceNo };
+            stepKey: input.stepKey, sequenceNo, actorId: context.userId
+          }, effectiveActorId);
+        return { ...this.instanceView(updated), sequenceNo, effectiveActorId };
       }
     });
   }
@@ -403,6 +432,57 @@ export class WorkflowService {
           'WorkflowInstance.Cancelled',
           { ...this.instanceEvent(updated), reason: input.reason });
         return this.instanceView(updated);
+      }
+    });
+  }
+
+  /**
+   * API-113 — escalate/remind the pending step. Deliberately NOT a state transition: the instance
+   * keeps its state, step and `version_no` (a raw UPDATE bypasses the optimistic column so an open
+   * decision's `expectedVersion` stays valid). Only the escalation facts move, and the outbox event
+   * uses the new `escalation_count` as its aggregateVersion — `version_no` does not advance here,
+   * so reusing it would collide with the start/decision event of the same version under
+   * `uq_outbox_aggregate_event`, while the count is unique per escalation by construction.
+   */
+  async escalateInstance(
+    context: RequestContext, instanceId: string,
+    input: EscalateWorkflowInstanceDto, idempotencyKey: string
+  ) {
+    await this.assertPermission(context, 'workflow.escalate');
+    const scope = await this.permissions.accessScopeSets(context, 'workflow.escalate');
+    return this.commands.execute({
+      context, operation: 'API-113:escalate-workflow-instance', idempotencyKey,
+      request: { instanceId, input }, responseStatus: 200,
+      resourceType: 'WorkflowInstance', resourceId: instanceId,
+      execute: async (manager) => {
+        const instance = await this.lockInstance(manager, context, instanceId, scope);
+        if (TERMINAL_WORKFLOW_STATES.includes(instance.state)) {
+          throw this.unprocessable('INVALID_STATE_TRANSITION', 'Workflow instance đã kết thúc');
+        }
+        // TypeORM answers raw UPDATE queries as [rows, affectedCount].
+        const [escalatedRows] = await manager.query<[
+          Array<{ escalationCount: number; lastEscalatedAt: Date }>, number
+        ]>(
+          `UPDATE workflow_instances
+           SET escalation_count = escalation_count + 1, last_escalated_at = now(), updated_at = now()
+           WHERE tenant_id = $1 AND id = $2
+           RETURNING escalation_count AS "escalationCount", last_escalated_at AS "lastEscalatedAt"`,
+          [context.tenantId, instance.id]
+        );
+        const escalated = escalatedRows[0];
+        await this.emit(manager, context, 'WorkflowInstance', instance.id,
+          escalated.escalationCount, 'WorkflowInstance.EscalationRequested', {
+            ...this.instanceEvent(instance), reason: input.reason,
+            escalationCount: escalated.escalationCount,
+            escalatedAt: escalated.lastEscalatedAt.toISOString(),
+            requestedBy: instance.requestedBy,
+            summary: `Workflow instance escalation ${escalated.escalationCount} requested`
+          });
+        return {
+          ...this.instanceView(instance),
+          escalationCount: escalated.escalationCount,
+          lastEscalatedAt: escalated.lastEscalatedAt.toISOString()
+        };
       }
     });
   }
@@ -489,19 +569,62 @@ export class WorkflowService {
   }
 
   /**
-   * The actor must currently hold one of the roles the step (or its fallback) names. Role grants are
-   * re-read per decision rather than trusted from the snapshot, so a revoked approver cannot decide.
+   * US-018: who does this decision count for?
+   *
+   * 1. Personally eligible (holds a step/fallback role right now) → the caller themself.
+   * 2. Otherwise, walk the caller's ACTIVE delegations in deterministic (created_at, id) order and
+   *    return the first delegator who (a) still holds a step role — re-read live, a revoked
+   *    delegator confers nothing — and (b) whose delegation scope covers this instance
+   *    (workflowDefinitionCodes empty-or-contains, projectIds empty-or-contains).
+   * 3. Nobody → the same APPROVER_NOT_FOUND the engine always answered; a delegation must never
+   *    make ineligibility more observable than it already is.
    */
-  private async assertApproverEligible(
-    context: RequestContext, roleCodes: string[], fallbackRoleCodes: string[]
-  ): Promise<void> {
-    const assignments = await this.permissions.effectiveAssignments(context);
-    const held = new Set(assignments.map((assignment) => assignment.roleCode));
-    if (roleCodes.some((code) => held.has(code))) return;
-    if (fallbackRoleCodes.some((code) => held.has(code))) return;
+  private async resolveEffectiveActor(
+    manager: EntityManager, context: RequestContext,
+    instance: WorkflowInstanceEntity, step: WorkflowRoutingStep
+  ): Promise<string> {
+    const roleCodes = step.approverSelector.roleCodes;
+    const fallbackRoleCodes = step.fallbackRoleCodes;
+    if (await this.holdsStepRole(context, context.userId, roleCodes, fallbackRoleCodes)) {
+      return context.userId;
+    }
+    // The definition code anchors delegation scope; the definition row always outlives its
+    // instances (RESTRICT FK), so a missing row can only mean a foreign-tenant id.
+    const definition = await manager.getRepository(WorkflowDefinitionEntity).findOneBy({
+      id: instance.workflowDefinitionId, tenantId: context.tenantId
+    });
+    const rows = await manager.getRepository(DelegationEntity).find({
+      where: {
+        tenantId: context.tenantId, delegateId: context.userId, status: DelegationStatus.ACTIVE
+      },
+      order: { createdAt: 'ASC', id: 'ASC' }
+    });
+    const candidates = matchDelegations(rows, {
+      definitionCode: definition?.code ?? null,
+      projectId: instance.projectId,
+      at: new Date()
+    });
+    for (const candidate of candidates) {
+      if (await this.holdsStepRole(context, candidate.delegatorId, roleCodes, fallbackRoleCodes)) {
+        return candidate.delegatorId;
+      }
+    }
     throw this.unprocessable(
       'APPROVER_NOT_FOUND', 'Người dùng không giữ vai trò được phép phê duyệt bước này'
     );
+  }
+
+  /**
+   * Live role check for one identity. Grants are re-read per decision rather than trusted from any
+   * snapshot, so a revoked approver — or a revoked delegator — cannot decide.
+   */
+  private async holdsStepRole(
+    context: RequestContext, userId: string, roleCodes: string[], fallbackRoleCodes: string[]
+  ): Promise<boolean> {
+    const assignments = await this.permissions.effectiveAssignments({ ...context, userId });
+    const held = new Set(assignments.map((assignment) => assignment.roleCode));
+    return roleCodes.some((code) => held.has(code))
+      || fallbackRoleCodes.some((code) => held.has(code));
   }
 
   private async assertPermission(context: RequestContext, action: string): Promise<void> {
@@ -550,14 +673,40 @@ export class WorkflowService {
     }));
   }
 
+  /**
+   * Keyset predicate compared row-wise against the cursor row's stored values.
+   *
+   * The naive form — `created_at < :cursorTime OR (created_at = :cursorTime AND id < :cursorId)` —
+   * silently loses rows. Postgres keeps `timestamptz` at microsecond precision while a JS `Date`
+   * (and so the ISO string inside the cursor) only carries milliseconds, so any row whose stored
+   * timestamp has sub-millisecond digits matches neither branch and vanishes from the next page.
+   * An inbox is exactly where that shows: a fan-out starts many instances under one `now()`.
+   * Reading the boundary straight out of `table` compares the real stored values, and
+   * `(created_at, id) < (…)` stays a row-wise comparison the `(created_at DESC, id DESC)` ordering
+   * index can drive.
+   *
+   * When the cursor row itself has gone the old millisecond comparison is used as a fallback — a
+   * marginally conservative page beats failing a request that carries a stale cursor.
+   */
   private applyCursor<T extends { createdAt: Date; id: string }>(
-    builder: SelectQueryBuilder<T>, alias: string, cursor: { createdAt: string; id: string }
+    builder: SelectQueryBuilder<T>, alias: string, cursor: { createdAt: string; id: string },
+    table: string, tenantId: string
   ): void {
     builder.andWhere(new Brackets((where) => where
-      .where(`${alias}.createdAt < :cursorTime`, { cursorTime: cursor.createdAt })
-      .orWhere(`${alias}.createdAt = :cursorTime AND ${alias}.id < :cursorId`, {
-        cursorTime: cursor.createdAt, cursorId: cursor.id
-      })));
+      .where(
+        `(${alias}.createdAt, ${alias}.id) < (
+           SELECT boundary.created_at, boundary.id FROM ${table} boundary
+           WHERE boundary.id = :cursorId AND boundary.tenant_id = :cursorTenantId
+         )`,
+        { cursorId: cursor.id, cursorTenantId: tenantId }
+      )
+      .orWhere(new Brackets((fallback) => fallback
+        .where(`NOT EXISTS (SELECT 1 FROM ${table} missing WHERE missing.id = :cursorId AND missing.tenant_id = :cursorTenantId)`)
+        .andWhere(new Brackets((legacy) => legacy
+          .where(`${alias}.createdAt < :cursorTime`, { cursorTime: cursor.createdAt })
+          .orWhere(`${alias}.createdAt = :cursorTime AND ${alias}.id < :cursorId`, {
+            cursorTime: cursor.createdAt, cursorId: cursor.id, cursorTenantId: tenantId
+          })))))));
   }
 
   private pageMeta<T extends { createdAt: Date; id: string }>(
@@ -606,6 +755,8 @@ export class WorkflowService {
       projectId: row.projectId, packageId: row.packageId, state: row.state,
       currentStepKey: row.currentStepKey, currentAttemptNo: row.currentAttemptNo,
       routeHash: row.routeHash, requestedBy: row.requestedBy,
+      escalationCount: row.escalationCount,
+      lastEscalatedAt: row.lastEscalatedAt === null ? null : row.lastEscalatedAt.toISOString(),
       closedBy: row.closedBy, closedAt: row.closedAt === null ? null : row.closedAt.toISOString(),
       closureReason: row.closureReason, versionNo: row.versionNo,
       createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString()
@@ -632,9 +783,12 @@ export class WorkflowService {
   private async emit(
     manager: EntityManager, context: RequestContext, aggregateType: string,
     aggregateId: string, aggregateVersion: number, eventType: string,
-    payload: Record<string, unknown>
+    payload: Record<string, unknown>,
+    // Defaults to the caller; a delegated decision passes the delegator so audit and outbox carry
+    // the identity the decision counts for, alongside `actorId` (who signed in).
+    effectiveActorId: string = context.userId
   ): Promise<void> {
-    const safePayload = { ...payload, versionNo: aggregateVersion, effectiveActorId: context.userId };
+    const safePayload = { ...payload, versionNo: aggregateVersion, effectiveActorId };
     await manager.getRepository(AuditEventEntity).insert({
       id: randomUUID(), tenantId: context.tenantId, actorId: context.userId,
       action: eventType, result: 'SUCCEEDED', reasonCode: null,

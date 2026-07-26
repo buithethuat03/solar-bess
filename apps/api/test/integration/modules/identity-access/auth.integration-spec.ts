@@ -105,10 +105,13 @@ describe('Auth API integration — TEST-230…233', () => {
     const implemented = load(specification.text) as OpenAPIObject;
     expect(implemented.openapi).toBe('3.1.0');
     expect(implemented.paths['/v1/auth/login']).toBeDefined();
-    expect(implemented.paths['/v1/me/permissions']).toBeUndefined();
+    // API-002 is implemented now; API-079 (supplier bid submit) is the deferred operation that
+    // must stay pruned from the runtime view — no supplier principal exists to call it.
+    expect(implemented.paths['/v1/me/permissions']).toBeDefined();
+    expect(implemented.paths['/v1/rfqs/{rfqId}/bids']).toBeUndefined();
     // US-022 promoted API-135/API-136 into the implemented view.
     expect(implemented.paths['/v1/notifications']).toBeDefined();
-    expect(countOpenApiOperations(implemented)).toBe(96);
+    expect(countOpenApiOperations(implemented)).toBe(138);
 
     const designPage = await request(app.getHttpServer()).get('/api/design-docs/').expect(200)
       .expect('Content-Type', /text\/html/);

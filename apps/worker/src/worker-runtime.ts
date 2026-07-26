@@ -15,6 +15,9 @@ import {
 import {
   RiskChangeAlertProcessor, RiskChangeAlertScanner
 } from './risk-change-alert.processor';
+import { WorkflowEscalationProcessor } from './workflow-escalation.processor';
+import { ReportJobProcessor } from './report-job.processor';
+import { MinioReportStorage } from './report-storage';
 
 export class WorkerRuntime {
   private readonly pool: Pool;
@@ -63,8 +66,13 @@ export class WorkerRuntime {
     );
     const scheduleAlertProcessor = new ScheduleAlertProcessor(config, logger);
     const riskChangeAlertProcessor = new RiskChangeAlertProcessor(config, logger);
+    const workflowEscalationProcessor = new WorkflowEscalationProcessor(logger);
+    // Storage config loads lazily on the first report, so a worker without MINIO_* wiring still
+    // boots; report events then fail per job instead of blocking the consumer.
+    const reportJobProcessor = new ReportJobProcessor(new MinioReportStorage(), logger);
     this.consumer = new FoundationConsumer(store, config, logger, [
-      scheduleAlertProcessor, riskChangeAlertProcessor
+      scheduleAlertProcessor, riskChangeAlertProcessor,
+      workflowEscalationProcessor, reportJobProcessor
     ]);
     this.scheduleAlertScanner = new ScheduleAlertScanner(
       this.pool, scheduleAlertProcessor, config, logger

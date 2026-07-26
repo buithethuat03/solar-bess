@@ -16,11 +16,13 @@ describe('canonical Swagger contract — TEST-197/NFR-024', () => {
 
   it('derives a runtime view containing every and only implemented operation', () => {
     const implemented = createImplementedOpenApi(loadCanonicalOpenApi());
-    expect(countOpenApiOperations(implemented)).toBe(96);
+    expect(countOpenApiOperations(implemented)).toBe(138);
     const loginOperation = implemented.paths['/v1/auth/login']?.post as unknown as Record<string, unknown>;
     expect(loginOperation['x-implementation-status']).toBe('implemented');
     expect(implemented.paths['/v1/projects/{projectId}/risks']?.post).toBeDefined();
-    expect(implemented.paths['/v1/me/permissions']).toBeUndefined();
+    // API-079 (supplier bid submission) stays design-only while no external supplier principal
+    // exists, so the whole path item is pruned from the runtime view.
+    expect(implemented.paths['/v1/rfqs/{rfqId}/bids']).toBeUndefined();
     expect(implemented.webhooks).toBeUndefined();
 
     for (const pathItem of Object.values(implemented.paths)) {

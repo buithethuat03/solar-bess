@@ -51,6 +51,29 @@ import {
   AssetEntity, BessPlantEntity, EquipmentEntity, SolarPlantEntity
 } from './plant-asset.entity';
 
+import {
+  BidEntity, EvaluationEntity, RequisitionEntity, RfqEntity, SupplierProfileEntity
+} from './procurement.entity';
+import { PurchaseOrderEntity, PurchaseOrderLineEntity } from './purchase-order.entity';
+import {
+  GoodsReceiptEntity, InventoryTransactionEntity, SerialNumberEntity, ShipmentEntity,
+  ShipmentMilestoneEntity
+} from './logistics.entity';
+import { OpportunityEntity } from './opportunity.entity';
+import { SurveyPackageEntity } from './survey-package.entity';
+import { InvestmentScenarioEntity } from './investment-scenario.entity';
+import {
+  DailyLogEntity, HseIncidentEntity, PermitToWorkEntity, QuantityProgressRecordEntity,
+  StopWorkActionEntity, WorkfrontEntity
+} from './field-operations.entity';
+import {
+  CapaActionEntity, InspectionEntity, InspectionTestPlanEntity, NcrDispositionCycleEntity,
+  NcrEntity, PunchClosureCycleEntity, PunchItemEntity
+} from './quality-control.entity';
+import { DelegationEntity } from './delegation.entity';
+import { SavedViewEntity } from './saved-view.entity';
+import { ReportJobEntity } from './report-job.entity';
+
 export {
   AuditEventEntity, AuthenticationSessionEntity, LocalCredentialEntity,
   CommandReceiptEntity, CompanyEntity, EventConsumptionEntity,
@@ -69,7 +92,15 @@ export {
   CostCodeEntity, BudgetVersionEntity, CommitmentEntity, InvoiceEntity,
   PaymentEntity, PaymentComponentEntity, FxSnapshotEntity,
   EquipmentModelEntity, BillOfMaterialsEntity, BomLineEntity,
-  EquipmentEntity, AssetEntity, SolarPlantEntity, BessPlantEntity
+  EquipmentEntity, AssetEntity, SolarPlantEntity, BessPlantEntity,
+  SupplierProfileEntity, RequisitionEntity, RfqEntity, BidEntity, EvaluationEntity,
+  PurchaseOrderEntity, PurchaseOrderLineEntity, ShipmentEntity, ShipmentMilestoneEntity,
+  GoodsReceiptEntity, InventoryTransactionEntity, SerialNumberEntity,
+  OpportunityEntity, SurveyPackageEntity, InvestmentScenarioEntity,
+  WorkfrontEntity, DailyLogEntity, QuantityProgressRecordEntity, PermitToWorkEntity,
+  HseIncidentEntity, StopWorkActionEntity, InspectionTestPlanEntity, InspectionEntity,
+  NcrEntity, NcrDispositionCycleEntity, PunchItemEntity, PunchClosureCycleEntity,
+  CapaActionEntity, DelegationEntity, SavedViewEntity, ReportJobEntity
 };
 export * from './operational.enums';
 export * from './project-controls.enums';
@@ -78,6 +109,11 @@ export * from './risk-change.enums';
 export * from './workflow.enums';
 export * from './document-control.enums';
 export * from './contract-cost.enums';
+export * from './procurement-logistics.enums';
+export * from './opportunity.enums';
+export * from './field-hse-quality.enums';
+export * from './cross-cutting.enums';
+export type { DelegationScopeSnapshot } from './delegation.entity';
 export * from './engineering-plants.enums';
 export type {
   WorkflowApproverSelector, WorkflowRoutingCondition, WorkflowRoutingRules, WorkflowRoutingStep
@@ -100,5 +136,13 @@ export const databaseEntities = [
   ContractAppendixEntity, ObligationEntity, CostCodeEntity, BudgetVersionEntity,
   CommitmentEntity, InvoiceEntity, PaymentEntity, PaymentComponentEntity,
   FxSnapshotEntity, EquipmentModelEntity, BillOfMaterialsEntity, BomLineEntity,
-  EquipmentEntity, AssetEntity, SolarPlantEntity, BessPlantEntity
+  EquipmentEntity, AssetEntity, SolarPlantEntity, BessPlantEntity,
+  SupplierProfileEntity, RequisitionEntity, RfqEntity, BidEntity, EvaluationEntity,
+  PurchaseOrderEntity, PurchaseOrderLineEntity, ShipmentEntity, ShipmentMilestoneEntity,
+  GoodsReceiptEntity, InventoryTransactionEntity, SerialNumberEntity,
+  OpportunityEntity, SurveyPackageEntity, InvestmentScenarioEntity,
+  WorkfrontEntity, DailyLogEntity, QuantityProgressRecordEntity, PermitToWorkEntity,
+  HseIncidentEntity, StopWorkActionEntity, InspectionTestPlanEntity, InspectionEntity,
+  NcrEntity, NcrDispositionCycleEntity, PunchItemEntity, PunchClosureCycleEntity,
+  CapaActionEntity, DelegationEntity, SavedViewEntity, ReportJobEntity
 ];

@@ -295,7 +295,9 @@ function sourceTable(aggregateType: string): string {
 export function riskChangeObjectLink(
   projectId: string,
   source: {
-    sourceType: Exclude<NotificationSourceType, 'ScheduleActivity'>;
+    // Only the risk/change family deep-links here; schedule and workflow sources have their own
+    // projectors with their own links.
+    sourceType: Exclude<NotificationSourceType, 'ScheduleActivity' | 'WorkflowInstance'>;
     sourceId: string;
     actionParentType: 'RISK' | 'ISSUE' | null;
   }
@@ -316,7 +318,7 @@ export function riskChangeObjectLink(
   }
 }
 
-function alertReason(sourceType: NotificationSourceType): string {
+function alertReason(sourceType: Exclude<NotificationSourceType, 'WorkflowInstance'>): string {
   switch (sourceType) {
     case 'Risk': return 'Risk đã đến ngày review';
     case 'Issue': return 'Issue đã đến ngày mục tiêu';

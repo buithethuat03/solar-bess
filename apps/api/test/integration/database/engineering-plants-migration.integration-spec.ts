@@ -72,7 +72,9 @@ describe('Engineering & Plants migration — DB-041…DB-043, DB-079…DB-082', 
     const [role] = await AppDataSource.query<Array<{ policyVersion: number }>>(
       'SELECT policy_version AS "policyVersion" FROM roles WHERE id = $1', [roleId]
     );
-    expect(role.policyVersion).toBe(8);
+    // Floor, not equality: the full migration chain runs later grant slices that raise the same
+    // role's policy version, so an exact match would break every time a slice lands.
+    expect(role.policyVersion).toBeGreaterThanOrEqual(8);
 
     await revertThroughMigration(grantMigrationName);
     const reverted = await permissionsOf(roleId);

@@ -210,9 +210,19 @@ services:
       RISK_CHANGE_THRESHOLD_VERSION: ${RISK_CHANGE_THRESHOLD_VERSION:-RISK_CHANGE_THRESHOLDS_V1}
       WORKER_HEALTH_PORT: ${WORKER_HEALTH_PORT:-3001}
       WORKER_SHUTDOWN_TIMEOUT_MS: ${WORKER_SHUTDOWN_TIMEOUT_MS:-30000}
+      # API-133 report generation writes the CSV server-side. The credential is the same one the
+      # API decrypts from MINIO_ACCESS_KEY/MINIO_SECRET_KEY — `secrets:materialize` writes it to
+      # these two files — so the worker reads the files rather than carrying a second copy in env.
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_REGION: ${MINIO_REGION:-us-east-1}
+      MINIO_RELEASE_BUCKET: ${MINIO_RELEASE_BUCKET:-solar-bess-documents}
+      MINIO_ACCESS_KEY_FILE: /run/secrets/minio_root_user
+      MINIO_SECRET_KEY_FILE: /run/secrets/minio_root_password
     secrets:
       - database_url
       - redis_password
+      - minio_root_user
+      - minio_root_password
     depends_on:
       postgres:
         condition: service_healthy

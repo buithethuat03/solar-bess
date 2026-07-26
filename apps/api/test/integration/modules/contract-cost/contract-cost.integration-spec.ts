@@ -8,7 +8,8 @@ import type { DataSource } from 'typeorm';
 import { AppModule } from 'src/app.module';
 import {
   AssignmentScopeType, BudgetVersionEntity, CommitmentEntity, CompanyEntity,
-  ContractAppendixEntity, ContractEntity, ContractPartyEntity, CostCodeClass, CostCodeEntity,
+  ContractAppendixEntity, ContractEntity, ContractPartyEntity, ContractStatus, ContractType,
+  CostCodeClass, CostCodeEntity,
   CostCodeStatus, FxSnapshotEntity, InvoiceEntity, LegalEntityEntity, LocalCredentialEntity,
   MasterRecordStatus, ObligationEntity, OrganizationType, PackageEntity, PackageStatus,
   PaymentComponentEntity, PaymentEntity, PortfolioEntity, ProjectEntity, ProjectPhase,
@@ -100,6 +101,52 @@ describe('Contract & Cost HTTP integration — API-053…API-066', () => {
       .get(`/v1/projects/${projectId}/contracts?limit=1&cursor=${paged.body.meta.nextCursor}`)
       .expect(200);
     expect(next.body.data[0].id).not.toBe(paged.body.data[0].id);
+  });
+
+  it('API-053: pages contracts stored under one now() without losing the boundary row', async () => {
+    // One save() call is one transaction, and `created_at` defaults to now(), which Postgres holds
+    // constant for the whole transaction — so all three rows land on the same microsecond timestamp.
+    // The keyset cursor only carries millisecond precision, so a predicate that compares against the
+    // cursor's ISO string instead of the stored boundary drops every row whose created_at has
+    // sub-millisecond digits: page 2 would come back empty and the third contract would be lost.
+    const ids = [randomUUID(), randomUUID(), randomUUID()];
+    await dataSource.getRepository(ContractEntity).save(ids.map((id, index) => ({
+      id, tenantId, projectId,
+      contractNo: `CT-SAME-MS-${index + 1}`,
+      title: 'Hợp đồng ghi cùng một mốc thời gian',
+      type: ContractType.EPC, status: ContractStatus.DRAFT,
+      effectiveFrom: null, effectiveTo: null, value: '1000.0000', currency: 'VND',
+      rootDocumentId: null, legalHold: false, signedAt: null, signedBy: null,
+      createdBy: managerId, updatedBy: managerId
+    })));
+
+    const stored = await dataSource.query<Array<{ distinctTimes: string; subMs: boolean }>>(
+      `SELECT count(DISTINCT created_at)::text AS "distinctTimes",
+              bool_or(date_trunc('milliseconds', created_at) <> created_at) AS "subMs"
+       FROM contracts WHERE tenant_id = $1`,
+      [tenantId]
+    );
+    // The regression only exists when the stored timestamp is finer than a millisecond.
+    expect(stored[0].distinctTimes).toBe('1');
+    expect(stored[0].subMs).toBe(true);
+
+    const first = await api(managerToken)
+      .get(`/v1/projects/${projectId}/contracts?limit=2`).expect(200);
+    expect(first.body.data).toHaveLength(2);
+    expect(first.body.meta.nextCursor).toEqual(expect.any(String));
+
+    const second = await api(managerToken)
+      .get(`/v1/projects/${projectId}/contracts?limit=2&cursor=${first.body.meta.nextCursor}`)
+      .expect(200);
+    expect(second.body.data).toHaveLength(1);
+    expect(second.body.meta.nextCursor).toBeNull();
+
+    // Every row appears exactly once across the two pages: nothing fell through the boundary.
+    const paged = [...first.body.data, ...second.body.data]
+      .map((row: { id: string }) => row.id);
+    expect([...paged].sort()).toEqual([...ids].sort());
+    const expectedThird = [...ids].sort().reverse().at(-1);
+    expect(second.body.data[0].id).toBe(expectedThird);
   });
 
   it('API-055: embeds parties, appendices and the SQL-consolidated value', async () => {

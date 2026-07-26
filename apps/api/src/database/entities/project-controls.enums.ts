@@ -65,7 +65,8 @@ export enum AlertType {
   RISK_REVIEW_DUE = 'RISK_REVIEW_DUE',
   ISSUE_TARGET_DUE = 'ISSUE_TARGET_DUE',
   ACTION_OVERDUE = 'ACTION_OVERDUE',
-  CHANGE_DECISION_PENDING = 'CHANGE_DECISION_PENDING'
+  CHANGE_DECISION_PENDING = 'CHANGE_DECISION_PENDING',
+  APPROVAL_ESCALATED = 'APPROVAL_ESCALATED'
 }
 
 export enum NotificationSourceType {
@@ -73,7 +74,8 @@ export enum NotificationSourceType {
   RISK = 'Risk',
   ISSUE = 'Issue',
   RISK_ISSUE_ACTION = 'RiskIssueAction',
-  CHANGE_REQUEST = 'ChangeRequest'
+  CHANGE_REQUEST = 'ChangeRequest',
+  WORKFLOW_INSTANCE = 'WorkflowInstance'
 }
 
 export enum NotificationPriority {

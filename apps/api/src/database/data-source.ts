@@ -21,6 +21,16 @@ import { CreateContractCost1783742000000 } from './migrations/1783742000000-Crea
 import { GrantContractCostPermissions1783743000000 } from './migrations/1783743000000-GrantContractCostPermissions';
 import { CreateEngineeringPlants1783744000000 } from './migrations/1783744000000-CreateEngineeringPlants';
 import { GrantEngineeringPermissions1783745000000 } from './migrations/1783745000000-GrantEngineeringPermissions';
+import { CreateFieldHseQuality1783746000000 } from './migrations/1783746000000-CreateFieldHseQuality';
+import { GrantFieldHseQualityPermissions1783747000000 } from './migrations/1783747000000-GrantFieldHseQualityPermissions';
+import { CreateProcurementLogistics1783748000000 } from './migrations/1783748000000-CreateProcurementLogistics';
+import { GrantProcurementPermissions1783749000000 } from './migrations/1783749000000-GrantProcurementPermissions';
+import { CreateDelegations1783754000000 } from './migrations/1783754000000-CreateDelegations';
+import { CreateSavedViewsAndReportJobs1783755000000 } from './migrations/1783755000000-CreateSavedViewsAndReportJobs';
+import { ExtendWorkflowEscalationNotificationSource1783756000000 } from './migrations/1783756000000-ExtendWorkflowEscalationNotificationSource';
+import { GrantCrossCuttingPermissions1783757000000 } from './migrations/1783757000000-GrantCrossCuttingPermissions';
+import { CreateOpportunity1783752000000 } from './migrations/1783752000000-CreateOpportunity';
+import { GrantOpportunityPermissions1783753000000 } from './migrations/1783753000000-GrantOpportunityPermissions';
 
 export function typeOrmOptions(databaseUrl = loadDatabaseConfig().url): DataSourceOptions {
   return {
@@ -44,7 +54,17 @@ export function typeOrmOptions(databaseUrl = loadDatabaseConfig().url): DataSour
       CreateContractCost1783742000000,
       GrantContractCostPermissions1783743000000,
       CreateEngineeringPlants1783744000000,
-      GrantEngineeringPermissions1783745000000
+      GrantEngineeringPermissions1783745000000,
+      CreateFieldHseQuality1783746000000,
+      GrantFieldHseQualityPermissions1783747000000,
+      CreateProcurementLogistics1783748000000,
+      GrantProcurementPermissions1783749000000,
+      CreateOpportunity1783752000000,
+      GrantOpportunityPermissions1783753000000,
+      CreateDelegations1783754000000,
+      CreateSavedViewsAndReportJobs1783755000000,
+      ExtendWorkflowEscalationNotificationSource1783756000000,
+      GrantCrossCuttingPermissions1783757000000
     ],
     synchronize: false, logging: false
   };

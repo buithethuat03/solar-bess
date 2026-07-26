@@ -94,10 +94,15 @@ export enum CommitmentStatus {
   CLOSED = 'CLOSED'
 }
 
-/** Procurement purchase orders are deferred; only contract-family sources exist in V1. */
+/**
+ * Commitment sources. PURCHASE_ORDER joined the family with the Procurement & Logistics slice
+ * (API-082 writes the commitment in the same transaction as the ISSUED purchase order); a
+ * PURCHASE_ORDER source carries `purchase_order_id` instead of `contract_id`.
+ */
 export enum CommitmentSourceType {
   CONTRACT = 'CONTRACT',
-  CONTRACT_APPENDIX = 'CONTRACT_APPENDIX'
+  CONTRACT_APPENDIX = 'CONTRACT_APPENDIX',
+  PURCHASE_ORDER = 'PURCHASE_ORDER'
 }
 
 export enum InvoiceStatus {

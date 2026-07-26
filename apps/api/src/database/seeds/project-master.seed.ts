@@ -6,6 +6,7 @@ import {
   CostCodeClass, CostCodeEntity, CostCodeStatus, EquipmentEntity, EquipmentLifecycleStatus,
   EquipmentModelEntity, EquipmentModelStatus, LegalEntityEntity, MasterRecordStatus,
   OrganizationType, PlantStatus, PortfolioEntity, ProjectEntity, ProjectPhase,
+  SupplierProfileEntity, SupplierQualificationStatus,
   ProjectRecordStatus, ProjectType, RoleAssignmentEntity, RoleEntity, SiteEntity,
   SolarPlantEntity, TenantEntity, UserAccountEntity
 } from '../entities';
@@ -39,7 +40,16 @@ const roleCatalog = [
       'contractAppendix.create', 'obligation.read', 'obligation.create', 'obligation.fulfill',
       'cost.read', 'budget.submit', 'commitment.create', 'payment.create', 'payment.read',
       'equipmentModel.read', 'equipmentModel.create', 'bom.read', 'bom.release',
-      'solarPlant.read', 'solarPlant.configure', 'bessPlant.read', 'bessSimulation.run'
+      'solarPlant.read', 'solarPlant.configure', 'bessPlant.read', 'bessSimulation.run',
+      'supplier.read', 'requisition.create', 'rfq.issue', 'bid.evaluate',
+      'award.submit', 'purchaseOrder.issue', 'shipment.create', 'shipment.updateMilestone',
+      'goodsReceipt.create', 'opportunity.read', 'opportunity.create', 'opportunity.update',
+      'opportunity.convert', 'survey.create', 'scenario.create', 'scenario.submit',
+      'workfront.read', 'workfront.release', 'dailyLog.create', 'dailyLog.submit',
+      'permitToWork.request', 'hseIncident.report', 'stopWork.issue',
+      'inspection.manage', 'ncr.manage', 'punch.manage',
+      'permission.read.self', 'delegation.create', 'delegation.revoke', 'workflow.escalate',
+      'search.execute', 'savedView.read', 'savedView.create', 'report.create', 'report.read'
     ]
   },
   {
@@ -62,7 +72,16 @@ const roleCatalog = [
       'contractAppendix.create', 'obligation.read', 'obligation.create', 'obligation.fulfill',
       'cost.read', 'payment.create', 'payment.read',
       'equipmentModel.read', 'equipmentModel.create', 'bom.read', 'bom.release',
-      'solarPlant.read', 'solarPlant.configure', 'bessPlant.read', 'bessSimulation.run'
+      'solarPlant.read', 'solarPlant.configure', 'bessPlant.read', 'bessSimulation.run',
+      'supplier.read', 'requisition.create', 'rfq.issue', 'bid.evaluate',
+      'award.submit', 'purchaseOrder.issue', 'shipment.create', 'shipment.updateMilestone',
+      'goodsReceipt.create', 'opportunity.read', 'survey.create', 'scenario.create',
+      'scenario.submit',
+      'workfront.read', 'workfront.release', 'dailyLog.create', 'dailyLog.submit',
+      'permitToWork.request', 'hseIncident.report', 'stopWork.issue',
+      'inspection.manage', 'ncr.manage', 'punch.manage',
+      'permission.read.self', 'delegation.create', 'delegation.revoke', 'workflow.escalate',
+      'search.execute', 'savedView.read', 'savedView.create', 'report.create', 'report.read'
     ]
   },
   {
@@ -72,7 +91,11 @@ const roleCatalog = [
       'notification.read', 'notification.acknowledge', 'workflowDefinition.read',
       'workflow.read', 'approvalTask.read', 'document.read', 'documentRevision.read',
       'contract.read', 'cost.read',
-      'equipmentModel.read', 'bom.read', 'solarPlant.read', 'bessPlant.read'
+      'equipmentModel.read', 'bom.read', 'solarPlant.read', 'bessPlant.read',
+      'supplier.read', 'opportunity.read',
+      'workfront.read', 'hseIncident.report', 'stopWork.issue',
+      'permission.read.self', 'search.execute', 'savedView.read', 'savedView.create',
+      'report.create', 'report.read'
     ]
   },
   {
@@ -87,7 +110,12 @@ const roleCatalog = [
       'contract.read', 'obligation.read', 'cost.read', 'budget.submit', 'commitment.create',
       'payment.read',
       'equipmentModel.read', 'equipmentModel.create', 'bom.read',
-      'solarPlant.read', 'bessPlant.read', 'bessSimulation.run'
+      'solarPlant.read', 'bessPlant.read', 'bessSimulation.run',
+      'supplier.read', 'requisition.create', 'bid.evaluate', 'shipment.create',
+      'shipment.updateMilestone', 'goodsReceipt.create',
+      'workfront.read', 'dailyLog.create', 'hseIncident.report', 'stopWork.issue',
+      'permission.read.self', 'search.execute', 'savedView.read', 'savedView.create',
+      'report.create', 'report.read'
     ]
   },
   {
@@ -97,7 +125,11 @@ const roleCatalog = [
       'riskChange.requestClosure', 'notification.read', 'notification.acknowledge',
       'workflow.read', 'approvalTask.read',
       'document.read', 'documentRevision.read', 'documentComment.create',
-      'equipmentModel.read', 'bom.read'
+      'equipmentModel.read', 'bom.read',
+      'goodsReceipt.create',
+      'workfront.read', 'dailyLog.create', 'permitToWork.request',
+      'hseIncident.report', 'stopWork.issue',
+      'permission.read.self', 'search.execute', 'savedView.read', 'savedView.create'
     ]
   },
   {
@@ -106,7 +138,38 @@ const roleCatalog = [
       'legalEntity.create', 'roleAssignment.manage', 'systemStatus.read',
       'notification.read', 'notification.acknowledge', 'workflowDefinition.read',
       'workflowDefinition.publish', 'workflow.read', 'document.read', 'documentRevision.read',
-      'equipmentModel.read'
+      'equipmentModel.read',
+      'supplier.read',
+      'workfront.read', 'hseIncident.report', 'stopWork.issue',
+      'permission.read.self', 'tenant.read', 'roleAssignment.grant', 'roleAssignment.revoke',
+      'audit.read', 'delegation.revoke'
+    ]
+  },
+  {
+    code: 'HSE_MANAGER', name: 'HSE Manager', permissions: [
+      'workfront.read', 'permitToWork.issue', 'hseIncident.report',
+      'stopWork.issue', 'stopWork.lift',
+      'permission.read.self'
+    ]
+  },
+  {
+    code: 'QAQC_MANAGER', name: 'QA/QC Manager', permissions: [
+      'workfront.read', 'hseIncident.report', 'stopWork.issue',
+      'inspection.manage', 'ncr.manage', 'punch.manage',
+      'permission.read.self'
+    ]
+  },
+  {
+    code: 'PERMIT_ISSUER', name: 'Permit Issuer', permissions: [
+      'workfront.read', 'permitToWork.issue', 'hseIncident.report', 'stopWork.issue',
+      'permission.read.self'
+    ]
+  },
+  {
+    code: 'CONTRACTOR', name: 'Contractor', permissions: [
+      'workfront.read', 'dailyLog.create', 'permitToWork.request',
+      'hseIncident.report', 'stopWork.issue',
+      'permission.read.self'
     ]
   }
 ] as const;
@@ -245,6 +308,41 @@ export async function seedMasterCatalog(
       model: definition.model, ratings: { ...definition.ratings },
       specVersion: definition.specVersion, status: definition.status, supersededById: null,
       createdBy: attributionUser.id, updatedBy: attributionUser.id
+    });
+  }
+
+  // DB-044 has no create operation either (API-076 is read-only — same recorded spec gap as the
+  // cost codes above), so a small QUALIFIED demo supplier set is seeded idempotently on its natural
+  // key (company, category) to make API-076…API-082 usable.
+  const companyRepository = manager.getRepository(CompanyEntity);
+  let supplierCompany = await companyRepository.findOneBy({ tenantId: tenant.id, code: 'DEMO_SUPPLIER' });
+  supplierCompany = await companyRepository.save({
+    ...(supplierCompany ?? { id: randomUUID(), tenantId: tenant.id }),
+    code: 'DEMO_SUPPLIER', name: 'Demo Supplier Company', organizationType: OrganizationType.VENDOR,
+    status: MasterRecordStatus.ACTIVE,
+    idempotencyKey: supplierCompany?.idempotencyKey ?? 'seed-demo-supplier-company'
+  });
+  const legalEntityRepository = manager.getRepository(LegalEntityEntity);
+  let supplierLegalEntity = await legalEntityRepository.findOneBy({
+    tenantId: tenant.id, country: 'VN', registrationNo: 'DEMO-REG-SUP-001'
+  });
+  supplierLegalEntity = await legalEntityRepository.save({
+    ...(supplierLegalEntity ?? { id: randomUUID(), tenantId: tenant.id }),
+    companyId: supplierCompany.id, legalName: 'Demo Supplier Legal Entity', country: 'VN',
+    registrationNo: 'DEMO-REG-SUP-001', taxId: null, status: MasterRecordStatus.ACTIVE,
+    idempotencyKey: supplierLegalEntity?.idempotencyKey ?? 'seed-demo-supplier-legal-entity'
+  });
+  const supplierProfileRepository = manager.getRepository(SupplierProfileEntity);
+  for (const category of ['PV_MODULE', 'BESS', 'INVERTER'] as const) {
+    const profile = await supplierProfileRepository.findOneBy({
+      tenantId: tenant.id, companyId: supplierCompany.id, category
+    });
+    await supplierProfileRepository.save({
+      ...(profile ?? { id: randomUUID(), tenantId: tenant.id, createdBy: attributionUser.id }),
+      companyId: supplierCompany.id, legalEntityId: supplierLegalEntity.id, category,
+      qualificationStatus: SupplierQualificationStatus.QUALIFIED,
+      validFrom: profile?.validFrom ?? '2026-01-01', validTo: '2030-12-31',
+      updatedBy: attributionUser.id
     });
   }
 }

@@ -182,6 +182,54 @@ describe('Document control HTTP integration — US-005/US-019 (API-039…API-052
     expect(next.body.data[0].id).not.toBe(paged.body.data[0].id);
   });
 
+  it('API-041: pages revisions stored under one now() without losing the boundary row', async () => {
+    const document = await createDocument({ documentCode: 'CIV-DWG-001' });
+    // One save() call is one transaction, and `created_at` defaults to now(), which Postgres holds
+    // constant for the whole transaction — so all three revisions share the same microsecond
+    // timestamp. The keyset cursor only carries millisecond precision, so a predicate that compares
+    // against the cursor's ISO string instead of the stored boundary drops every row whose
+    // created_at has sub-millisecond digits: page 2 came back empty and revision 3 was lost.
+    const ids = [randomUUID(), randomUUID(), randomUUID()];
+    await dataSource.getRepository(DocumentRevisionEntity).save(ids.map((id, index) => ({
+      id, tenantId, documentId: document.id, projectId,
+      revisionCode: `SAMEMS${index + 1}`, workingVersion: 1,
+      status: DocumentRevisionStatus.DRAFT, purpose: 'Ghi cùng một mốc thời gian',
+      fileName: 'mat-bang.pdf', mimeType: 'application/pdf',
+      quarantineObjectKey: null, releasedObjectKey: null, contentHash: null, sizeBytes: null,
+      scanStatus: DocumentScanStatus.QUARANTINED, scanSignature: null, scannedAt: null,
+      scannerVersion: null, lockState: DocumentLockState.UNLOCKED, reviewCycleNo: 0,
+      approvedBy: null, approvedAt: null, issuedBy: null, issuedAt: null, uploadedBy: uploaderId
+    })));
+
+    const stored = await dataSource.query<Array<{ distinctTimes: string; subMs: boolean }>>(
+      `SELECT count(DISTINCT created_at)::text AS "distinctTimes",
+              bool_or(date_trunc('milliseconds', created_at) <> created_at) AS "subMs"
+       FROM document_revisions WHERE document_id = $1`,
+      [document.id]
+    );
+    // The regression only exists when the stored timestamp is finer than a millisecond.
+    expect(stored[0].distinctTimes).toBe('1');
+    expect(stored[0].subMs).toBe(true);
+
+    const first = await api(controllerToken)
+      .get(`/v1/documents/${document.id}?limit=2`).expect(200);
+    expect(first.body.revisions).toHaveLength(2);
+    expect(first.body.meta.nextCursor).toEqual(expect.any(String));
+
+    const second = await api(controllerToken)
+      .get(`/v1/documents/${document.id}?limit=2&cursor=${first.body.meta.nextCursor}`)
+      .expect(200);
+    expect(second.body.revisions).toHaveLength(1);
+    expect(second.body.meta.nextCursor).toBeNull();
+
+    // Every revision appears exactly once across the two pages: nothing fell through the boundary.
+    const paged = [...first.body.revisions, ...second.body.revisions]
+      .map((row: { id: string }) => row.id);
+    expect([...paged].sort()).toEqual([...ids].sort());
+    const expectedThird = [...ids].sort().reverse().at(-1);
+    expect(second.body.revisions[0].id).toBe(expectedThird);
+  });
+
   it('API-039: the register embeds both revision summaries without a per-row read', async () => {
     const document = await createDocument({ documentCode: 'CIV-DWG-001' });
     const issued = await issuedRevision(document.id, 'A');

@@ -2,12 +2,14 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
-  AuditEventEntity, AuthenticationSessionEntity, LocalCredentialEntity,
-  PackageEntity, ProjectEntity, RoleAssignmentEntity, TenantEntity, UserAccountEntity
+  AuditEventEntity, AuthenticationSessionEntity, DelegationEntity, LocalCredentialEntity,
+  PackageEntity, ProjectEntity, RoleAssignmentEntity, RoleEntity, TenantEntity, UserAccountEntity
 } from '../../database/entities';
 import { AccessGuard } from './access.guard';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { IdentityAdminController } from './identity-admin.controller';
+import { IdentityAdminService } from './identity-admin.service';
 import { LoginRateLimitService } from './login-rate-limit.service';
 import { PasswordService } from './password.service';
 import { TokenService } from './token.service';
@@ -23,13 +25,14 @@ import { UserDirectoryService } from './user-directory.service';
     OperationalFoundationModule,
     TypeOrmModule.forFeature([
       TenantEntity, UserAccountEntity, LocalCredentialEntity,
-      AuthenticationSessionEntity, AuditEventEntity, RoleAssignmentEntity, ProjectEntity, PackageEntity
+      AuthenticationSessionEntity, AuditEventEntity, RoleAssignmentEntity, RoleEntity,
+      ProjectEntity, PackageEntity, DelegationEntity
     ])
   ],
-  controllers: [AuthController, UserDirectoryController],
+  controllers: [AuthController, UserDirectoryController, IdentityAdminController],
   providers: [
     AuthService, TokenService, PasswordService, LoginRateLimitService,
-    AccessGuard, PermissionService, PermissionGuard, UserDirectoryService
+    AccessGuard, PermissionService, PermissionGuard, UserDirectoryService, IdentityAdminService
   ],
   exports: [AuthService, AccessGuard, PermissionService, PermissionGuard]
 })

@@ -13,6 +13,8 @@ export interface EffectiveAssignment {
   permissions: string[];
   scopeType: AssignmentScopeType;
   scopeId: string | null;
+  /** The role's catalog policy version, so API-002 can report max() without a second evaluator. */
+  policyVersion: number;
 }
 
 /**
@@ -52,7 +54,8 @@ export class PermissionService {
       roleCode: row.role.code,
       permissions: row.role.permissions,
       scopeType: row.scopeType,
-      scopeId: row.scopeId
+      scopeId: row.scopeId,
+      policyVersion: row.role.policyVersion
     }));
   }
 
@@ -199,7 +202,12 @@ export class PermissionService {
         permissions: [...permissions].sort(),
         scopeType,
         scopeId
-      }))
+      })),
+      // The highest policy version among the caller's ACTIVE roles: an explainability anchor for
+      // API-002 so a client can tell which catalog release produced this answer. 0 = no roles.
+      policyVersion: assignments.reduce(
+        (highest, assignment) => Math.max(highest, assignment.policyVersion), 0
+      )
     };
   }
 }

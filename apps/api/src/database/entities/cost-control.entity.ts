@@ -97,8 +97,9 @@ export class BudgetVersionEntity {
  * DB-036 — a committed amount against a cost code (FR-054). `uq_commitment_source` on
  * (tenant, source_type, source_id, source_version) is the anti-duplicate control: recording the
  * same contract version twice conflicts instead of double-counting. Reversals are new negative
- * rows referencing the original — the ledger is append-only. No `purchase_order_id`: Procurement
- * is deferred.
+ * rows referencing the original — the ledger is append-only. `purchase_order_id` was added by the
+ * Procurement & Logistics slice (migration 1783748…): a PURCHASE_ORDER source carries it instead
+ * of `contract_id`.
  */
 @Entity({ name: 'commitments' })
 @Unique('uq_commitments_tenant_id', ['tenantId', 'id'])
@@ -107,9 +108,11 @@ export class BudgetVersionEntity {
 @Index('idx_commitment_summary', ['tenantId', 'projectId', 'currency', 'status'])
 @Index('idx_commitment_cost_code', ['tenantId', 'costCodeId'])
 @Check('ck_commitment_status', "status IN ('ACTIVE','REVERSED','CLOSED')")
-@Check('ck_commitment_source_type', "source_type IN ('CONTRACT','CONTRACT_APPENDIX')")
-@Check('ck_commitment_contract_presence', `(source_type IN ('CONTRACT','CONTRACT_APPENDIX'))
-  = (contract_id IS NOT NULL)`)
+@Check('ck_commitment_source_type',
+  "source_type IN ('CONTRACT','CONTRACT_APPENDIX','PURCHASE_ORDER')")
+@Check('ck_commitment_contract_presence', `((source_type IN ('CONTRACT','CONTRACT_APPENDIX'))
+  = (contract_id IS NOT NULL))
+  AND ((source_type = 'PURCHASE_ORDER') = (purchase_order_id IS NOT NULL))`)
 @Check('ck_commitment_amount_sign', `(reverses_commitment_id IS NULL AND amount > 0)
   OR (reverses_commitment_id IS NOT NULL AND amount < 0)`)
 @Check('ck_commitment_source_version', 'source_version >= 1')
@@ -120,6 +123,7 @@ export class CommitmentEntity {
   @Column('uuid', { name: 'tenant_id' }) tenantId!: string;
   @Column('uuid', { name: 'project_id' }) projectId!: string;
   @Column('uuid', { name: 'contract_id', nullable: true }) contractId!: string | null;
+  @Column('uuid', { name: 'purchase_order_id', nullable: true }) purchaseOrderId!: string | null;
   @Column('uuid', { name: 'cost_code_id' }) costCodeId!: string;
   /** Signed numeric(19,4) money as string: originals positive, reversals negative. */
   @Column({ type: 'numeric', precision: 19, scale: 4 }) amount!: string;

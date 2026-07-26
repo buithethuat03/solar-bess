@@ -84,7 +84,7 @@ export class EngineeringPlantsService {
         manufacturer: query.manufacturer
       });
     }
-    if (cursor) this.applyCursor(builder, 'model', cursor);
+    if (cursor) this.applyCursor(builder, 'model', cursor, 'equipment_models', context.tenantId);
     const rows = await builder
       .orderBy('model.createdAt', 'DESC').addOrderBy('model.id', 'DESC')
       .take(query.limit + 1).getMany();
@@ -155,7 +155,7 @@ export class EngineeringPlantsService {
       .where('bom.tenantId = :tenantId AND bom.projectId = :projectId', {
         tenantId: context.tenantId, projectId
       });
-    if (cursor) this.applyCursor(builder, 'bom', cursor);
+    if (cursor) this.applyCursor(builder, 'bom', cursor, 'bill_of_materials', context.tenantId);
     const rows = await builder
       .orderBy('bom.createdAt', 'DESC').addOrderBy('bom.id', 'DESC')
       .take(query.limit + 1).getMany();
@@ -599,14 +599,40 @@ export class EngineeringPlantsService {
     }
   }
 
+  /**
+   * Keyset predicate compared row-wise against the cursor row's stored values.
+   *
+   * The naive form — `created_at < :cursorTime OR (created_at = :cursorTime AND id < :cursorId)` —
+   * silently loses rows. Postgres keeps `timestamptz` at microsecond precision while a JS `Date`
+   * (and so the ISO string inside the cursor) only carries milliseconds, so any row whose stored
+   * timestamp has sub-millisecond digits matches neither branch and disappears from the next page.
+   * Catalog and BOM rows arrive in bulk imports that share a single `now()`, which puts a whole
+   * batch on one page boundary. Reading the boundary straight out of `table` compares the real
+   * stored values, and `(created_at, id) < (…)` stays a row-wise comparison the
+   * `(created_at DESC, id DESC)` ordering index can drive.
+   *
+   * When the cursor row itself has gone the old millisecond comparison is used as a fallback — a
+   * marginally conservative page beats failing a request that carries a stale cursor.
+   */
   private applyCursor<T extends { createdAt: Date; id: string }>(
-    builder: SelectQueryBuilder<T>, alias: string, cursor: { createdAt: string; id: string }
+    builder: SelectQueryBuilder<T>, alias: string, cursor: { createdAt: string; id: string },
+    table: string, tenantId: string
   ): void {
     builder.andWhere(new Brackets((where) => where
-      .where(`${alias}.createdAt < :cursorTime`, { cursorTime: cursor.createdAt })
-      .orWhere(`${alias}.createdAt = :cursorTime AND ${alias}.id < :cursorId`, {
-        cursorTime: cursor.createdAt, cursorId: cursor.id
-      })));
+      .where(
+        `(${alias}.createdAt, ${alias}.id) < (
+           SELECT boundary.created_at, boundary.id FROM ${table} boundary
+           WHERE boundary.id = :cursorId AND boundary.tenant_id = :cursorTenantId
+         )`,
+        { cursorId: cursor.id, cursorTenantId: tenantId }
+      )
+      .orWhere(new Brackets((fallback) => fallback
+        .where(`NOT EXISTS (SELECT 1 FROM ${table} missing WHERE missing.id = :cursorId AND missing.tenant_id = :cursorTenantId)`)
+        .andWhere(new Brackets((legacy) => legacy
+          .where(`${alias}.createdAt < :cursorTime`, { cursorTime: cursor.createdAt })
+          .orWhere(`${alias}.createdAt = :cursorTime AND ${alias}.id < :cursorId`, {
+            cursorTime: cursor.createdAt, cursorId: cursor.id, cursorTenantId: tenantId
+          })))))));
   }
 
   private pageMeta<T extends { createdAt: Date; id: string }>(

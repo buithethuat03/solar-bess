@@ -42,15 +42,19 @@ describe('Project Master seed — master-catalog reconciliation vs demo-project 
     expect(outcome.demoProjectSeeded).toBe(false);
     expect(outcome.skippedReason).toContain('found 2');
 
-    // Phase 1 reconciled the full master catalog…
-    expect(await count('roles')).toBe(6);
+    // Phase 1 reconciled the full master catalog. Ten roles: the six operating roles plus the four
+    // unassigned safety roles the field-hse grant introduced (HSE_MANAGER, QAQC_MANAGER,
+    // PERMIT_ISSUER, CONTRACTOR).
+    expect(await count('roles')).toBe(10);
     const [pmo] = await AppDataSource.query<Array<{
       permissions: string[]; policyVersion: number;
     }>>(
       `SELECT permissions, policy_version AS "policyVersion" FROM roles
        WHERE tenant_id = $1 AND code = 'PMO'`, [tenantId]
     );
-    expect(pmo.policyVersion).toBe(8);
+    // Floor, not equality: the full migration chain runs later grant slices that raise the same
+    // role's policy version, so an exact match would break every time a slice lands.
+    expect(pmo.policyVersion).toBeGreaterThanOrEqual(8);
     expect(pmo.permissions).toEqual(expect.arrayContaining([
       'equipmentModel.read', 'bom.release', 'solarPlant.configure', 'bessSimulation.run'
     ]));
@@ -118,7 +122,7 @@ describe('Project Master seed — master-catalog reconciliation vs demo-project 
       async (manager) => runProjectMasterSeed(manager)
     );
     expect(outcome.demoProjectSeeded).toBe(false);
-    expect(await count('roles')).toBe(6);
+    expect(await count('roles')).toBe(10);
     // Attributed catalog rows need an author and are skipped without one.
     expect(await count('cost_codes')).toBe(0);
     expect(await count('equipment_models')).toBe(0);

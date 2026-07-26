@@ -96,7 +96,7 @@ export class ContractCostService {
       });
     if (query.type) builder.andWhere('contract.type = :type', { type: query.type });
     if (query.status) builder.andWhere('contract.status = :status', { status: query.status });
-    if (cursor) this.applyCursor(builder, 'contract', cursor);
+    if (cursor) this.applyCursor(builder, 'contract', cursor, 'contracts', context.tenantId);
     const rows = await builder
       .orderBy('contract.createdAt', 'DESC').addOrderBy('contract.id', 'DESC')
       .take(query.limit + 1).getMany();
@@ -395,10 +395,19 @@ export class ContractCostService {
       `obligation.contract_id = ${bind(contract.id)}::uuid`
     ];
     if (cursor) {
+      // Same row-wise keyset as `applyCursor`, spelled out because this list is raw SQL: the cursor
+      // ISO string only carries milliseconds, so the boundary has to be read back from `obligations`
+      // or rows with sub-millisecond `created_at` digits fall between the two comparison branches.
       const at = `${bind(cursor.createdAt)}::timestamptz`;
       const id = `${bind(cursor.id)}::uuid`;
       predicates.push(
-        `(obligation.created_at < ${at} OR (obligation.created_at = ${at} AND obligation.id < ${id}))`
+        `((obligation.created_at, obligation.id) < (
+            SELECT boundary.created_at, boundary.id FROM obligations boundary WHERE boundary.id = ${id}
+          ) OR (
+            NOT EXISTS (SELECT 1 FROM obligations missing WHERE missing.id = ${id})
+            AND (obligation.created_at < ${at}
+              OR (obligation.created_at = ${at} AND obligation.id < ${id}))
+          ))`
       );
     }
     const rows: ObligationPageRecord[] = await this.contracts.manager.query(
@@ -1152,14 +1161,40 @@ export class ContractCostService {
     }
   }
 
+  /**
+   * Keyset predicate compared row-wise against the cursor row's stored values.
+   *
+   * The naive form — `created_at < :cursorTime OR (created_at = :cursorTime AND id < :cursorId)` —
+   * silently loses rows. Postgres keeps `timestamptz` at microsecond precision while a JS `Date`
+   * (and so the ISO string inside the cursor) only carries milliseconds, so any row whose stored
+   * timestamp has sub-millisecond digits matches neither branch and disappears from the next page.
+   * Reading the boundary straight out of `table` compares the real stored values instead, and
+   * `(created_at, id) < (…)` stays a row-wise comparison the `(created_at DESC, id DESC)` ordering
+   * index can drive.
+   *
+   * When the cursor row itself has gone (deleted, or filtered out of scope) the old millisecond
+   * comparison is used as a fallback — a marginally conservative page is better than failing a
+   * request that carries a stale cursor.
+   */
   private applyCursor<T extends { createdAt: Date; id: string }>(
-    builder: SelectQueryBuilder<T>, alias: string, cursor: { createdAt: string; id: string }
+    builder: SelectQueryBuilder<T>, alias: string, cursor: { createdAt: string; id: string },
+    table: string, tenantId: string
   ): void {
     builder.andWhere(new Brackets((where) => where
-      .where(`${alias}.createdAt < :cursorTime`, { cursorTime: cursor.createdAt })
-      .orWhere(`${alias}.createdAt = :cursorTime AND ${alias}.id < :cursorId`, {
-        cursorTime: cursor.createdAt, cursorId: cursor.id
-      })));
+      .where(
+        `(${alias}.createdAt, ${alias}.id) < (
+           SELECT boundary.created_at, boundary.id FROM ${table} boundary
+           WHERE boundary.id = :cursorId AND boundary.tenant_id = :cursorTenantId
+         )`,
+        { cursorId: cursor.id, cursorTenantId: tenantId }
+      )
+      .orWhere(new Brackets((fallback) => fallback
+        .where(`NOT EXISTS (SELECT 1 FROM ${table} missing WHERE missing.id = :cursorId AND missing.tenant_id = :cursorTenantId)`)
+        .andWhere(new Brackets((legacy) => legacy
+          .where(`${alias}.createdAt < :cursorTime`, { cursorTime: cursor.createdAt })
+          .orWhere(`${alias}.createdAt = :cursorTime AND ${alias}.id < :cursorId`, {
+            cursorTime: cursor.createdAt, cursorId: cursor.id, cursorTenantId: tenantId
+          })))))));
   }
 
   private pageMeta<T extends { createdAt: Date; id: string }>(

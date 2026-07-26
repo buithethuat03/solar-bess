@@ -15,7 +15,7 @@ import {
 @Index('idx_notification_schedule_activity', [
   'tenantId', 'projectId', 'activityId', 'dataDate'
 ], { where: "source_type = 'ScheduleActivity'" })
-@Check('ck_notification_source_type', "source_type IN ('ScheduleActivity','Risk','Issue','RiskIssueAction','ChangeRequest')")
+@Check('ck_notification_source_type', "source_type IN ('ScheduleActivity','Risk','Issue','RiskIssueAction','ChangeRequest','WorkflowInstance')")
 @Check('ck_notification_source_activity', `
   (source_type = 'ScheduleActivity' AND activity_id = source_id)
   OR (source_type <> 'ScheduleActivity' AND activity_id IS NULL)`)
@@ -24,7 +24,8 @@ import {
   OR (source_type = 'Risk' AND alert_type = 'RISK_REVIEW_DUE')
   OR (source_type = 'Issue' AND alert_type = 'ISSUE_TARGET_DUE')
   OR (source_type = 'RiskIssueAction' AND alert_type = 'ACTION_OVERDUE')
-  OR (source_type = 'ChangeRequest' AND alert_type = 'CHANGE_DECISION_PENDING')`)
+  OR (source_type = 'ChangeRequest' AND alert_type = 'CHANGE_DECISION_PENDING')
+  OR (source_type = 'WorkflowInstance' AND alert_type = 'APPROVAL_ESCALATED')`)
 @Check('ck_notification_priority', "priority IN ('NORMAL','HIGH')")
 @Check('ck_notification_status', "status IN ('UNREAD','READ')")
 @Check('ck_notification_read', "status <> 'READ' OR read_at IS NOT NULL")

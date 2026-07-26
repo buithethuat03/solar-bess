@@ -21,7 +21,7 @@ import type { WorkflowRoutingRules } from './workflow-version.entity';
 @Check('ck_workflow_instance_state', `state IN (
   'SUBMITTED','IN_REVIEW','RETURNED','REJECTED','CONDITIONALLY_APPROVED',
   'APPROVED','CANCELLED','CONFIGURATION_ERROR','EXPIRED')`)
-@Check('ck_workflow_instance_object_type', "object_type IN ('ChangeRequest')")
+@Check('ck_workflow_instance_object_type', "object_type IN ('ChangeRequest','InvestmentScenario')")
 @Check('ck_workflow_instance_route_object', "jsonb_typeof(route_snapshot) = 'object'")
 @Check('ck_workflow_instance_attempt', 'current_attempt_no >= 1')
 @Check('ck_workflow_instance_version', 'version_no >= 1')
@@ -36,6 +36,9 @@ import type { WorkflowRoutingRules } from './workflow-version.entity';
 )`)
 @Check('ck_workflow_instance_current_step', `state IN ('APPROVED','REJECTED','CANCELLED','EXPIRED','CONFIGURATION_ERROR')
   OR current_step_key IS NOT NULL`)
+@Check('ck_workflow_instance_escalation', 'escalation_count >= 0')
+// The counter and the timestamp move together: 0 escalations means never escalated.
+@Check('ck_workflow_instance_escalation_pair', '(escalation_count = 0) = (last_escalated_at IS NULL)')
 export class WorkflowInstanceEntity {
   @PrimaryColumn('uuid') id!: string;
   @Column('uuid', { name: 'tenant_id' }) tenantId!: string;
@@ -53,6 +56,14 @@ export class WorkflowInstanceEntity {
   @Column({ name: 'route_hash', type: 'varchar', length: 64 }) routeHash!: string;
   /** Reserved for the deferred SLA scheduler; always NULL until that slice lands. */
   @Column({ name: 'sla_due_at', type: 'timestamptz', nullable: true }) slaDueAt!: Date | null;
+  /**
+   * API-113 escalation facts. The counter never resets and doubles as the outbox aggregateVersion
+   * of `WorkflowInstance.EscalationRequested`, because escalation deliberately does not bump
+   * `version_no` (it is a reminder, not a transition) and each event still needs a unique
+   * (aggregate, version, type) tuple under `uq_outbox_aggregate_event`.
+   */
+  @Column({ name: 'escalation_count', type: 'integer', default: 0 }) escalationCount!: number;
+  @Column({ name: 'last_escalated_at', type: 'timestamptz', nullable: true }) lastEscalatedAt!: Date | null;
   @Column('uuid', { name: 'requested_by' }) requestedBy!: string;
   @Column('uuid', { name: 'closed_by', nullable: true }) closedBy!: string | null;
   @Column({ name: 'closed_at', type: 'timestamptz', nullable: true }) closedAt!: Date | null;
