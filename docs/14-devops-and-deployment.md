@@ -182,7 +182,7 @@ Migration là source-controlled class tại `apps/api/src/database/migrations`; 
 - DB URL/user/password, JWT access/refresh secret và bootstrap login credential bắt buộc dùng AES-256-GCM envelope `enc:v1:<iv>:<tag>:<ciphertext>`.
 - `npm run env:encrypt` tạo key nếu thiếu và migrate plaintext credential hiện hữu mà không log giá trị.
 - `npm run cipher:encrypt` nhận plaintext qua hidden TTY/stdin và chỉ xuất envelope.
-- `npm run secrets:materialize` giải mã PostgreSQL user/password thành `/tmp/solar-bess-secrets` với directory mode `0700`, file mode `0600`; Compose mount bằng `POSTGRES_*_FILE`.
+- `npm run secrets:materialize` giải mã PostgreSQL user/password thành `/var/lib/solar-bess/secrets` (đường dẫn bền vững qua reboot) với directory mode `0700`, file mode `0600`; Compose mount bằng `POSTGRES_*_FILE`.
 - Trình tự test deploy: `npm run secrets:materialize` rồi `docker compose up -d --build --wait`.
 - API nhận ciphertext + `CIPHER_KEY`, tự giải mã trong process và fail trước HTTP startup nếu plaintext, version, key hoặc authentication tag sai.
 - Password người dùng không đi qua cipher: seed/bootstrap tạo Argon2id salted hash; login dùng `argon2.verify`; raw password và hash không được log.
@@ -310,29 +310,33 @@ Rollback record includes trigger/time/decision maker/artifact/config/schema vers
 - Break-glass has monitored account/path, reason and post-review.
 - Database/object/backup/audit keys/roles separated as required; exact hierarchy TBD.
 
-### 12.1 Runtime secret materialisation on the EC2 test host
+### 12.1 Runtime secret materialisation and reboot self-healing on the EC2 test host
 
-Compose bind-mounts Docker secrets from `RUNTIME_SECRETS_DIR` (default `/tmp/solar-bess-secrets`), and the worker
-integration profile from `WORKER_TEST_SECRETS_DIR` (default `/tmp/solar-bess-worker-test-secrets`). Both live under
-`/tmp`, which the host clears on reboot. After any host restart the stack therefore cannot come up on its own:
+Compose bind-mounts Docker secrets from `RUNTIME_SECRETS_DIR` (default `/var/lib/solar-bess/secrets`, a
+reboot-persistent path owned by the deploy user with mode `0700`). Because the secret files survive a reboot and every
+production service carries `restart: unless-stopped`, the stack now self-heals after a host restart with no manual
+step: dockerd restores `postgres`/`redis`/`minio`/`clamav`, and `worker`/`api`/`web` crash-retry with backoff until
+their dependencies are healthy. On a new host, create the directory once before the first materialisation:
 
-| Symptom | Actual cause |
-|---|---|
-| `postgres`/`redis` fail with `invalid mount config … bind source path does not exist` | secret files were removed with `/tmp` |
-| `api` restart loop logging `Error during migration run: getaddrinfo ENOTFOUND postgres` | the API is healthy; its database dependency never started |
+```bash
+sudo install -d -o ec2-user -g ec2-user -m 0700 /var/lib/solar-bess /var/lib/solar-bess/secrets
+```
 
-Recovery order — materialise first, diagnose only if it still fails:
+The worker integration profile still uses `WORKER_TEST_SECRETS_DIR` (default `/tmp/solar-bess-worker-test-secrets`)
+on purpose: CI rematerialises it every run and the disposable test stack must *not* come back after reboot.
+
+Manual recovery (fallback only — e.g. after the secrets directory was deleted or on a half-provisioned host):
 
 1. `npm run secrets:materialize` — regenerates all six secret files (`postgres_user`, `postgres_password`,
    `database_url`, `redis_password`, `minio_root_user`, `minio_root_password`) from the `enc:v1` values in `.env`.
    The two MinIO files are the *same* credential the API decrypts from `MINIO_ACCESS_KEY`/`MINIO_SECRET_KEY`, so the
    object store and its only client can never drift apart.
-2. `sudo -n env RELEASE_SHA="$(git rev-parse --short=12 HEAD)" docker compose --env-file .env up -d --wait`.
+2. `sudo -n env RELEASE_SHA="$(cat .deploy/current-release)" docker compose --env-file .env up -d --no-build --wait`
+   — use the recorded release, never `git rev-parse`, so the running images match the last deployed configuration.
 3. For the disposable integration stack, `npm run worker:test:secrets` before `docker compose -f docker-compose.test.yml up -d`.
 
-`scripts/deploy-ec2.sh` already fails fast when these files are missing, so a deployment never runs against a
-half-provisioned host. Moving `RUNTIME_SECRETS_DIR` to a reboot-persistent path with restricted ownership, or adding a
-`systemd` unit that materialises secrets before `docker compose`, is an open DevOps follow-up (see Open Questions).
+`scripts/deploy-ec2.sh` fails fast (inside its deploy lock) when any secret file is missing, empty or not a regular
+file, so a deployment never runs against a half-provisioned host.
 
 ## 13. Observability, logging and alerting
 
@@ -424,7 +428,7 @@ Security incident response owns containment/evidence; SRE owns service recovery;
 | Disaster/incident exercise cadence and notification policy? | Security/BCM/Legal | Compliance |
 | Production Redis HA/persistence/eviction, BullMQ retention/concurrency/capacity và worker scaling? | SRE/Architecture/Security | Production acceptance; không chặn EC2 test |
 | Current US-004 GitHub self-hosted run/deploy and branch protection? Registry, SBOM/signing/provenance and IaC production rollout? | Platform/Security | Historical runner/first run and current isolated CI-like preflight Pass; actual US-004 GitHub Actions/EC2 deploy/public smoke and branch protection Pending; production supply chain Planned |
-| Should `RUNTIME_SECRETS_DIR`/`WORKER_TEST_SECRETS_DIR` move off `/tmp` to a reboot-persistent path, or should a `systemd` unit materialise secrets before Compose starts? | Platform/Security | Stack does not self-heal after an EC2 reboot (see §12.1); manual recovery only. Does not block EC2 test, blocks unattended production restart |
+| ~~Should `RUNTIME_SECRETS_DIR` move off `/tmp`?~~ Resolved 2026-07-26: `RUNTIME_SECRETS_DIR=/var/lib/solar-bess/secrets` (reboot-persistent, `0700`); stack self-heals after reboot via restart policies (see §12.1). `WORKER_TEST_SECRETS_DIR` stays on `/tmp` by design (disposable CI stack) | Platform/Security | EC2 test unattended restart works; production key management remains TBD |
 | Should Playwright E2E become a CI job? It is currently a manual gate outside `main-cicd.yml` and needs a seeded fixture user plus a running stack. | QA/Platform | E2E evidence is produced manually per release; regression risk between releases |
 
 ## 19. Changelog
@@ -443,3 +447,4 @@ Security incident response owns containment/evidence; SRE owns service recovery;
 | 1.0 | 2026-07-18 | Codex | Thêm canonical Swagger/OpenAPI runtime publication, env gate, Nginx proxy, image asset và deploy smoke | Không đổi business/API operation scope; local TEST-197 Pass, commit deploy/public smoke Pending tại thời điểm ghi |
 | 1.1 | 2026-07-18 | Codex | Tách `/api/docs` current 51-operation view khỏi `/api/design-docs` complete 164-API view; mở rộng Nginx/deploy smoke | Không đổi business scope/schema; production expose vẫn cần HTTPS và access policy |
 | 1.2 | 2026-07-18 | Codex | Ghi immutable SHA release, GitHub Actions 29633937535 và post-deploy dual-Swagger public verification | EC2 test deployed/healthy; production expose vẫn cần HTTPS và access policy |
+| 1.3 | 2026-07-26 | Claude | Chuyển `RUNTIME_SECRETS_DIR` sang `/var/lib/solar-bess/secrets` (bền vững qua reboot); stack tự hồi phục sau reboot nhờ restart policy; hardening preflight `deploy-ec2.sh` (sau lock, check `-f && -s`) | Đóng open question reboot self-heal cho EC2 test; không đổi schema/API; production key management vẫn TBD |

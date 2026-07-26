@@ -18,6 +18,18 @@ File này ghi lịch sử thay đổi phạm vi, tài liệu và governance củ
 - **Trạng thái:** Proposed | Approved | Rejected | Implemented
 ```
 
+## 2026-07-26 — Stack tự hồi phục sau reboot: chuyển RUNTIME_SECRETS_DIR khỏi tmpfs
+
+- **Loại:** DevOps; Security; Documentation
+- **Người yêu cầu/phê duyệt:** Người dùng yêu cầu stack tự khởi động toàn bộ khi mở máy ảo, phê duyệt phương án 2026-07-26.
+- **Mã bị ảnh hưởng:** Không cấp ID mới; liên quan vận hành `docs/14` §12.1 và runbook `docs/17`.
+- **Trước thay đổi:** `RUNTIME_SECRETS_DIR=/tmp/solar-bess-secrets` nằm trên tmpfs; sau reboot 6 file Docker secret biến mất, dockerd fail mount khi restore (`failed to fulfil mount request … no such file or directory`, không retry vì start-fail không kích restart policy) nên postgres/redis/minio/worker nằm chết, api/web crash-loop; phải chạy tay `npm run secrets:materialize` + `docker compose up` (bằng chứng: journal boot 13:25 UTC 2026-07-26).
+- **Sau thay đổi:** `RUNTIME_SECRETS_DIR=/var/lib/solar-bess/secrets` (ec2-user, `0700`, bền vững qua reboot); default fallback đổi đồng bộ ở `docker-compose.yml`, `scripts/deploy-ec2.sh`, `cipher.cli.ts`, `.env.example`. Stack tự hồi phục sau reboot chỉ nhờ `restart: unless-stopped` + healthcheck, không thêm systemd unit nào. Hardening kèm theo cho `deploy-ec2.sh`: preflight secrets chuyển vào sau `flock` (deploy trúng lúc secrets đang ghi lại sẽ đợi thay vì nổ đỏ oan) và check `-f && -s` (bắt trường hợp bind source bị tạo nhầm thành thư mục). `WORKER_TEST_SECRETS_DIR` giữ nguyên `/tmp` có chủ ý — stack test disposable không được sống qua reboot.
+- **Lý do:** Đóng open question "stack không tự hồi phục sau EC2 reboot" (docs/14 §18). Phương án systemd oneshot chạy `compose up` lúc boot bị loại: CI deploy từ checkout của runner nên `compose up` từ cây dev là đường deploy không kiểm soát, kèm race với runner service.
+- **Artefact bị ảnh hưởng:** `docker-compose.yml`, `scripts/deploy-ec2.sh`, `apps/api/src/modules/cipher/cipher.cli.ts`, `.env.example`, `docs/14-devops-and-deployment.md` (§9.1, §12.1, §18, §19), `docs/17-self-hosted-cicd-runbook.md` (§3, §5), host `.env` + thư mục `/var/lib/solar-bess/secrets`.
+- **Migration/tương thích:** Một lần trên host: `sudo install -d -o ec2-user -g ec2-user -m 0700 /var/lib/solar-bess /var/lib/solar-bess/secrets`, sửa `.env`, `npm run secrets:materialize`, recreate 4 service mount secrets bằng `docker compose up -d --no-build --wait` dưới deploy lock. Resolved compose config không đổi với host đã đặt biến trong `.env`, nên deploy CI kế tiếp không recreate thừa.
+- **Trạng thái:** Implemented
+
 ## 2026-07-26 — Document control US-005/US-019 (API-039…API-052, DB-022…DB-027 + DB-114)
 
 - **Loại:** Architecture; Data; API; Security; Frontend; DevOps; Test; Documentation; không thay đổi phạm vi nghiệp vụ baseline.

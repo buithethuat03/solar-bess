@@ -24,7 +24,7 @@ const GENERATED_SECRET_KEYS = [
 ];
 
 const DEFAULT_ENV_VALUES: Record<string, string> = {
-  RUNTIME_SECRETS_DIR: '/tmp/solar-bess-secrets',
+  RUNTIME_SECRETS_DIR: '/var/lib/solar-bess/secrets',
   JWT_ACCESS_TTL_SECONDS: '900',
   JWT_REFRESH_TTL_SECONDS: '604800',
   AUTH_RATE_LIMIT_MAX_ATTEMPTS: '5',
@@ -152,7 +152,7 @@ function migrateEnvironment(): void {
 }
 
 function materializeRuntimeSecrets(): void {
-  const directory = process.env.RUNTIME_SECRETS_DIR?.trim() || '/tmp/solar-bess-secrets';
+  const directory = process.env.RUNTIME_SECRETS_DIR?.trim() || '/var/lib/solar-bess/secrets';
   mkdirSync(directory, { recursive: true, mode: 0o700 });
   const secrets: ReadonlyArray<readonly [string, string]> = [
     ['postgres_user', encryptedEnvironmentValue('POSTGRES_USER')],

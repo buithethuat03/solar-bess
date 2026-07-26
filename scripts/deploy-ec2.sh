@@ -19,14 +19,18 @@ command -v curl >/dev/null || fail 'curl is required'
 command -v flock >/dev/null || fail 'flock is required'
 sudo -n docker info >/dev/null || fail 'runner requires passwordless sudo access to Docker'
 
-runtime_secrets_dir="$({ set -a; source "$ENV_FILE"; set +a; printf '%s' "${RUNTIME_SECRETS_DIR:-/tmp/solar-bess-secrets}"; })"
-for secret in postgres_user postgres_password database_url redis_password minio_root_user minio_root_password; do
-  [[ -s "$runtime_secrets_dir/$secret" ]] || fail "runtime secret is missing or empty: $runtime_secrets_dir/$secret"
-done
-
 mkdir -p "$STATE_DIR"
 exec 9>"$LOCK_FILE"
 flock -n 9 || fail 'another deployment is already running'
+
+# Preflight chạy sau khi giữ lock: secrets đang được ghi lại bởi tiến trình khác
+# không làm deploy nổ đỏ oan. Check -f loại trường hợp bind source bị Docker
+# tạo nhầm thành thư mục (khi đó -s vẫn true).
+runtime_secrets_dir="$({ set -a; source "$ENV_FILE"; set +a; printf '%s' "${RUNTIME_SECRETS_DIR:-/var/lib/solar-bess/secrets}"; })"
+for secret in postgres_user postgres_password database_url redis_password minio_root_user minio_root_password; do
+  [[ -f "$runtime_secrets_dir/$secret" && -s "$runtime_secrets_dir/$secret" ]] \
+    || fail "runtime secret is missing, empty or not a regular file: $runtime_secrets_dir/$secret"
+done
 
 previous_release=''
 rollback_ready=true

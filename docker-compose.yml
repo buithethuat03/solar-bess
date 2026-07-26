@@ -259,14 +259,14 @@ networks:
 
 secrets:
   postgres_user:
-    file: ${RUNTIME_SECRETS_DIR:-/tmp/solar-bess-secrets}/postgres_user
+    file: ${RUNTIME_SECRETS_DIR:-/var/lib/solar-bess/secrets}/postgres_user
   postgres_password:
-    file: ${RUNTIME_SECRETS_DIR:-/tmp/solar-bess-secrets}/postgres_password
+    file: ${RUNTIME_SECRETS_DIR:-/var/lib/solar-bess/secrets}/postgres_password
   database_url:
-    file: ${RUNTIME_SECRETS_DIR:-/tmp/solar-bess-secrets}/database_url
+    file: ${RUNTIME_SECRETS_DIR:-/var/lib/solar-bess/secrets}/database_url
   redis_password:
-    file: ${RUNTIME_SECRETS_DIR:-/tmp/solar-bess-secrets}/redis_password
+    file: ${RUNTIME_SECRETS_DIR:-/var/lib/solar-bess/secrets}/redis_password
   minio_root_user:
-    file: ${RUNTIME_SECRETS_DIR:-/tmp/solar-bess-secrets}/minio_root_user
+    file: ${RUNTIME_SECRETS_DIR:-/var/lib/solar-bess/secrets}/minio_root_user
   minio_root_password:
-    file: ${RUNTIME_SECRETS_DIR:-/tmp/solar-bess-secrets}/minio_root_password
+    file: ${RUNTIME_SECRETS_DIR:-/var/lib/solar-bess/secrets}/minio_root_password

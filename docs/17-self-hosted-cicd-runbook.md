@@ -38,16 +38,16 @@ Không commit/tokenize registration token. Token là one-time và do GitHub repo
 
 ```bash
 test -r /home/ec2-user/SOLAR_BESS_WEB/.env
-sudo test -s /tmp/solar-bess-secrets/postgres_user
-sudo test -s /tmp/solar-bess-secrets/postgres_password
-sudo test -s /tmp/solar-bess-secrets/database_url
-sudo test -s /tmp/solar-bess-secrets/redis_password
+sudo test -f /var/lib/solar-bess/secrets/postgres_user -a -s /var/lib/solar-bess/secrets/postgres_user
+sudo test -f /var/lib/solar-bess/secrets/postgres_password -a -s /var/lib/solar-bess/secrets/postgres_password
+sudo test -f /var/lib/solar-bess/secrets/database_url -a -s /var/lib/solar-bess/secrets/database_url
+sudo test -f /var/lib/solar-bess/secrets/redis_password -a -s /var/lib/solar-bess/secrets/redis_password
 sudo -n docker info
 curl --fail http://127.0.0.1/web-health
 curl --fail http://127.0.0.1/health
 ```
 
-Nếu `.env` đặt `RUNTIME_SECRETS_DIR` khác `/tmp/solar-bess-secrets`, kiểm tra đúng path đó. Không hiển thị nội dung file.
+Nếu `.env` đặt `RUNTIME_SECRETS_DIR` khác `/var/lib/solar-bess/secrets`, kiểm tra đúng path đó (check cả `-f`: bind source bị tạo nhầm thành thư mục vẫn pass `-s`). Không hiển thị nội dung file. Path này bền vững qua reboot; trên host mới tạo bằng `sudo install -d -o ec2-user -g ec2-user -m 0700 /var/lib/solar-bess /var/lib/solar-bess/secrets` rồi `npm run secrets:materialize`.
 
 ## 4. GitHub governance
 
@@ -67,6 +67,8 @@ curl --fail http://127.0.0.1/health
 ```
 
 Workflow dùng concurrency và `/tmp/solar-bess-deploy.lock`, nên không có hai rollout đồng thời. Khi automatic rollback cũng lỗi, dừng push, giữ volumes, xem `sudo docker compose ... logs --tail=200 api worker web` và thực hiện forward-fix/recovery. Không chạy `down --volumes` với project `solar_bess_web`.
+
+Sau khi reboot EC2, stack tự hồi phục không cần thao tác tay: secrets nằm ở `/var/lib/solar-bess/secrets` (bền vững) và mọi service production có `restart: unless-stopped`. Kiểm tra sau reboot chỉ gồm `docker ps` (7 container `solar_bess_web` healthy trong ~2–4 phút) và hai lệnh curl ở §3. Nếu không tự lên, xem `journalctl -b -u docker.service` tìm lỗi mount rồi làm theo mục recovery của `docs/14-devops-and-deployment.md` §12.1.
 
 ## 6. Assumption, TBD và Open Question
 
