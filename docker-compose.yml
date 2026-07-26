@@ -49,6 +49,49 @@ services:
       retries: 20
     networks: [app]
 
+  minio:
+    # ADR-005 object storage. Pinned to an immutable upstream release so a redeploy cannot silently
+    # move the storage engine underneath the released document bytes.
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER_FILE: /run/secrets/minio_root_user
+      MINIO_ROOT_PASSWORD_FILE: /run/secrets/minio_root_password
+    secrets:
+      - minio_root_user
+      - minio_root_password
+    volumes:
+      - minio_data:/data
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    networks: [app]
+
+  clamav:
+    # ADR-005 malware scanning. The `stable` tag ships a signature database inside the image, so the
+    # container is usable before freshclam finishes its first update.
+    image: clamav/clamav:stable
+    restart: unless-stopped
+    environment:
+      CLAMAV_NO_MILTERD: "true"
+    volumes:
+      - clamav_signatures:/var/lib/clamav
+    healthcheck:
+      # clamd loads roughly a gigabyte of signatures before it answers, hence the long start period.
+      test: ["CMD", "/usr/local/bin/clamdcheck.sh"]
+      interval: 15s
+      timeout: 10s
+      retries: 12
+      start_period: 180s
+    networks: [app]
+
   api:
     image: solar-bess-api:${RELEASE_SHA:-local}
     build:
@@ -94,11 +137,29 @@ services:
       COOKIE_NAME: ${COOKIE_NAME:-refresh_token}
       COOKIE_PATH: ${COOKIE_PATH:-/v1/auth}
       COOKIE_SAME_SITE: ${COOKIE_SAME_SITE:-lax}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_REGION: ${MINIO_REGION:-us-east-1}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_QUARANTINE_BUCKET: ${MINIO_QUARANTINE_BUCKET:-solar-bess-quarantine}
+      MINIO_RELEASE_BUCKET: ${MINIO_RELEASE_BUCKET:-solar-bess-documents}
+      MINIO_CONNECT_TIMEOUT_MS: ${MINIO_CONNECT_TIMEOUT_MS:-5000}
+      MINIO_REQUEST_TIMEOUT_MS: ${MINIO_REQUEST_TIMEOUT_MS:-30000}
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: ${CLAMAV_PORT:-3310}
+      CLAMAV_TIMEOUT_MS: ${CLAMAV_TIMEOUT_MS:-30000}
+      CLAMAV_CHUNK_SIZE_BYTES: ${CLAMAV_CHUNK_SIZE_BYTES:-65536}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      minio:
+        condition: service_healthy
+      clamav:
+        # Deliberately not service_healthy: clamd needs minutes to load its signatures, and the
+        # scanner already reports UNAVAILABLE while it is down, which keeps revisions quarantined.
+        condition: service_started
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:'+(process.env.APP_PORT||'3000')+'/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 10s
@@ -189,6 +250,8 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  minio_data:
+  clamav_signatures:
 
 networks:
   app:
@@ -203,3 +266,7 @@ secrets:
     file: ${RUNTIME_SECRETS_DIR:-/tmp/solar-bess-secrets}/database_url
   redis_password:
     file: ${RUNTIME_SECRETS_DIR:-/tmp/solar-bess-secrets}/redis_password
+  minio_root_user:
+    file: ${RUNTIME_SECRETS_DIR:-/tmp/solar-bess-secrets}/minio_root_user
+  minio_root_password:
+    file: ${RUNTIME_SECRETS_DIR:-/tmp/solar-bess-secrets}/minio_root_password

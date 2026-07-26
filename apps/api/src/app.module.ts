@@ -3,6 +3,7 @@ import { CorrelationMiddleware } from './common/middleware/correlation.middlewar
 import { ConfigurationModule } from './config/configuration.module';
 import { DatabaseModule } from './database/database.module';
 import { CipherModule } from './modules/cipher/cipher.module';
+import { DocumentControlModule } from './modules/document-control/document-control.module';
 import { HealthModule } from './modules/health/health.module';
 import { IdentityAccessModule } from './modules/identity-access/identity-access.module';
 import { NotificationModule } from './modules/notification/notification.module';
@@ -24,7 +25,8 @@ import { WorkflowModule } from './modules/workflow/workflow.module';
     ProjectControlsModule,
     RiskChangeModule,
     NotificationModule,
-    WorkflowModule
+    WorkflowModule,
+    DocumentControlModule
   ]
 })
 export class AppModule implements NestModule {

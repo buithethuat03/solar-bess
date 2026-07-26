@@ -1,0 +1,194 @@
+/*
+ * US-005/US-019 document control. The whole sheet exists around one idea: a revision the scanner has
+ * not cleared must never render like a normal, usable document. Colour, weight and a leading rule on
+ * the row all carry that signal, so it survives a greyscale print and a colour-blind reader.
+ */
+.document-toolbar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr)) auto auto;
+  gap: var(--space-3);
+  align-items: end;
+  padding: var(--space-4);
+  margin: var(--space-5) 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.document-toolbar label, .document-form label {
+  display: grid;
+  gap: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.document-register { margin-top: var(--space-4); }
+.document-table td { vertical-align: top; }
+
+/* The leading rule is the row-level version of the chip; a blocked row reads as blocked at a glance. */
+.document-table tbody tr[data-scan="INFECTED"] {
+  background: var(--danger-100);
+  box-shadow: inset 4px 0 0 var(--danger-600);
+}
+
+.document-table tbody tr[data-scan="INFECTED"]:hover { background: var(--danger-100); }
+
+.document-table tbody tr[data-scan="UNAVAILABLE"],
+.document-table tbody tr[data-scan="QUARANTINED"],
+.document-table tbody tr[data-scan="SCANNING"] {
+  background: var(--warning-100);
+  box-shadow: inset 4px 0 0 var(--warning-500);
+}
+
+.document-table tbody tr[data-selected="true"] { background: var(--brand-50); }
+
+.scan-chip-wrap { display: grid; gap: var(--space-1); }
+
+.scan-chip {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 3px var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  letter-spacing: .04em;
+  white-space: nowrap;
+}
+
+.scan-chip[data-scan="CLEAN"] {
+  border-color: var(--success-600);
+  background: var(--success-100);
+  color: var(--success-600);
+}
+
+.scan-chip[data-scan="SCANNING"] {
+  border-color: var(--info-600);
+  background: var(--info-100);
+  color: var(--info-600);
+}
+
+/* Held bytes: warning weight, dashed edge — visibly "in progress", never "ready". */
+.scan-chip[data-scan="QUARANTINED"] {
+  border-style: dashed;
+  border-color: var(--warning-600);
+  background: var(--warning-100);
+  color: var(--warning-600);
+}
+
+/* Scanner outage is its own state: solid warning edge so it never reads as a normal wait. */
+.scan-chip[data-scan="UNAVAILABLE"] {
+  border-width: 2px;
+  border-color: var(--warning-600);
+  background: var(--warning-100);
+  color: var(--warning-600);
+}
+
+/* The only inverted chip in the app; a detection must not be scannable past. */
+.scan-chip[data-scan="INFECTED"] {
+  border-color: var(--danger-600);
+  background: var(--danger-600);
+  color: var(--white);
+}
+
+.scan-chip__hint {
+  display: block;
+  max-width: 220px;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.35;
+}
+
+.status-pill[data-status="IN_REVIEW"] { background: var(--warning-100); color: var(--warning-600) !important; }
+.status-pill[data-status="APPROVED"] { background: var(--success-100); color: var(--success-600) !important; }
+.status-pill[data-status="ISSUED"] { background: var(--brand-100); color: var(--brand-700) !important; }
+.status-pill[data-status="SUPERSEDED"] { background: var(--neutral-100); color: var(--neutral-600) !important; }
+.status-pill[data-status="REJECTED"] { background: var(--danger-100); color: var(--danger-600) !important; }
+
+.document-detail, .document-upload {
+  padding: var(--space-6);
+  margin: var(--space-4) 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+}
+
+.document-detail .detail-heading small { color: var(--brand-500); font-weight: 900; letter-spacing: .1em; }
+.document-detail .detail-heading h2 { margin: var(--space-1) 0; }
+
+.document-current {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  margin: var(--space-4) 0;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+}
+
+.document-current > span {
+  color: var(--color-text-subtle);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.document-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+.document-form .form-wide { grid-column: 1 / -1; }
+
+.document-action-form {
+  padding: var(--space-4);
+  margin-top: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+}
+
+.document-action-form h3 { margin: 0 0 var(--space-3); }
+
+.upload-outcome {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+  padding: var(--space-4);
+  margin-top: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-border-strong);
+  border-radius: var(--radius-sm) var(--radius-md) var(--radius-md) var(--radius-sm);
+  background: var(--color-surface-sunken);
+}
+
+.upload-outcome p { margin: 0; }
+.upload-outcome[data-verdict="CLEAN"] { border-left-color: var(--success-600); background: var(--success-100); }
+.upload-outcome[data-verdict="INFECTED"] { border-left-color: var(--danger-600); background: var(--danger-100); }
+.upload-outcome[data-verdict="INFECTED"] p { color: var(--danger-600); font-weight: 700; }
+.upload-outcome[data-verdict="UNAVAILABLE"] { border-left-color: var(--warning-600); background: var(--warning-100); }
+.upload-outcome[data-verdict="UNAVAILABLE"] p { color: var(--warning-600); font-weight: 700; }
+.upload-outcome__signature { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--text-xs); }
+
+@media (max-width: 1100px) {
+  .document-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .document-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 720px) {
+  .document-toolbar, .document-form { grid-template-columns: 1fr; }
+}

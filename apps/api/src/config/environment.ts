@@ -8,7 +8,17 @@ loadDotEnvironment({
 });
 
 export interface AppConfig {
-  app: { port: number; trustProxyHops: number; swaggerEnabled: boolean };
+  app: {
+    port: number;
+    trustProxyHops: number;
+    swaggerEnabled: boolean;
+    /**
+     * Must stay above the largest body any DTO accepts (currently the ADR-005 base64 upload at
+     * 8,000,000 characters) so an oversize-but-in-spec request is rejected by validation with the
+     * standard error envelope instead of by Express with an opaque 413.
+     */
+    jsonBodyLimitBytes: number;
+  };
   database: { url: string };
   redis: {
     host: string;
@@ -58,6 +68,29 @@ export interface AppConfig {
     scoringVersion: string;
     thresholdVersion: string;
   };
+  /** ADR-005 document bytes live in S3-compatible object storage (MinIO), metadata stays relational. */
+  objectStorage: {
+    endpoint: string;
+    region: string;
+    quarantineBucket: string;
+    releaseBucket: string;
+    connectTimeoutMs: number;
+    requestTimeoutMs: number;
+    /**
+     * Resolved lazily from the enc:v1 envelope on every read. Deployments that do not run the
+     * ADR-005 document adapters can still load the rest of the configuration, while the adapter
+     * itself fails closed at construction time when the credential is missing or malformed.
+     */
+    readonly accessKey: string;
+    readonly secretKey: string;
+  };
+  /** ADR-005 uploads are scanned by clamd over the INSTREAM protocol before they can be released. */
+  malwareScanner: {
+    host: string;
+    port: number;
+    timeoutMs: number;
+    chunkSizeBytes: number;
+  };
 }
 
 function required(name: string): string {
@@ -105,6 +138,40 @@ function keyPrefix(): string {
   return value;
 }
 
+function endpointUrl(name: string, fallback: string): string {
+  const value = process.env[name]?.trim() || fallback;
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error(`${name} must be an absolute http or https URL`);
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(`${name} must be an absolute http or https URL`);
+  }
+  if (parsed.username || parsed.password) throw new Error(`${name} must not embed credentials`);
+  if (parsed.search || parsed.hash || (parsed.pathname !== '/' && parsed.pathname !== '')) {
+    throw new Error(`${name} must not contain a path, query or fragment`);
+  }
+  return `${parsed.protocol}//${parsed.host}`;
+}
+
+function regionName(name: string, fallback: string): string {
+  const value = process.env[name]?.trim() || fallback;
+  if (!/^[a-z0-9-]{2,32}$/.test(value)) {
+    throw new Error(`${name} must contain 2 to 32 lowercase letters, digits or hyphens`);
+  }
+  return value;
+}
+
+function bucketName(name: string, fallback: string): string {
+  const value = process.env[name]?.trim() || fallback;
+  if (!/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(value) || value.includes('..')) {
+    throw new Error(`${name} must be a valid bucket name of 3 to 63 lowercase characters`);
+  }
+  return value;
+}
+
 function versionName(name: string, fallback: string): string {
   const value = process.env[name]?.trim() || fallback;
   if (!/^[A-Z][A-Z0-9_]{2,99}$/.test(value)) {
@@ -146,11 +213,17 @@ export function loadAppConfig(): AppConfig {
   if (highExposureThreshold >= criticalExposureThreshold) {
     throw new Error('RISK_HIGH_EXPOSURE_THRESHOLD must be lower than RISK_CRITICAL_EXPOSURE_THRESHOLD');
   }
+  const quarantineBucket = bucketName('MINIO_QUARANTINE_BUCKET', 'solar-bess-quarantine');
+  const releaseBucket = bucketName('MINIO_RELEASE_BUCKET', 'solar-bess-documents');
+  if (quarantineBucket === releaseBucket) {
+    throw new Error('MINIO_QUARANTINE_BUCKET must differ from MINIO_RELEASE_BUCKET');
+  }
   return {
     app: {
       port: integer('APP_PORT', 3000, 1, 65_535),
       trustProxyHops: integer('TRUST_PROXY_HOPS', 1, 0, 10),
-      swaggerEnabled: boolean('SWAGGER_ENABLED', false)
+      swaggerEnabled: boolean('SWAGGER_ENABLED', false),
+      jsonBodyLimitBytes: integer('APP_JSON_BODY_LIMIT_BYTES', 9_000_000, 100_000, 33_554_432)
     },
     database: loadDatabaseConfig(),
     redis: {
@@ -206,6 +279,26 @@ export function loadAppConfig(): AppConfig {
       thresholdVersion: versionName(
         'RISK_CHANGE_THRESHOLD_VERSION', 'RISK_CHANGE_THRESHOLDS_V1'
       )
+    },
+    objectStorage: {
+      endpoint: endpointUrl('MINIO_ENDPOINT', 'http://127.0.0.1:9000'),
+      region: regionName('MINIO_REGION', 'us-east-1'),
+      quarantineBucket,
+      releaseBucket,
+      connectTimeoutMs: integer('MINIO_CONNECT_TIMEOUT_MS', 5_000, 100, 60_000),
+      requestTimeoutMs: integer('MINIO_REQUEST_TIMEOUT_MS', 30_000, 1_000, 600_000),
+      get accessKey(): string {
+        return encryptedEnvironmentValue('MINIO_ACCESS_KEY', 20);
+      },
+      get secretKey(): string {
+        return encryptedEnvironmentValue('MINIO_SECRET_KEY', 32);
+      }
+    },
+    malwareScanner: {
+      host: hostname('CLAMAV_HOST', '127.0.0.1'),
+      port: integer('CLAMAV_PORT', 3_310, 1, 65_535),
+      timeoutMs: integer('CLAMAV_TIMEOUT_MS', 30_000, 1_000, 600_000),
+      chunkSizeBytes: integer('CLAMAV_CHUNK_SIZE_BYTES', 65_536, 4_096, 1_048_576)
     }
   };
 }

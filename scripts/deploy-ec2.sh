@@ -20,7 +20,7 @@ command -v flock >/dev/null || fail 'flock is required'
 sudo -n docker info >/dev/null || fail 'runner requires passwordless sudo access to Docker'
 
 runtime_secrets_dir="$({ set -a; source "$ENV_FILE"; set +a; printf '%s' "${RUNTIME_SECRETS_DIR:-/tmp/solar-bess-secrets}"; })"
-for secret in postgres_user postgres_password database_url redis_password; do
+for secret in postgres_user postgres_password database_url redis_password minio_root_user minio_root_password; do
   [[ -s "$runtime_secrets_dir/$secret" ]] || fail "runtime secret is missing or empty: $runtime_secrets_dir/$secret"
 done
 

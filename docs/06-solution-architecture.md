@@ -470,13 +470,19 @@ Không chọn vendor chỉ vì phổ biến; selection cần constraints, benchm
 <a id="adr-005"></a>
 ### ADR-005 — DMS, object storage và search
 
-- **Status/Date/Owner:** Proposed; 2026-07-11; Architecture Owner TBD.
-- **Source/trace:** ARC-005; liên quan BR-031, BR-040 và FR/NFR tương ứng; DB/API/SEC/TEST forward reference TBD.
+- **Status/Date/Owner:** **Accepted for EC2 test profile; Proposed for production**; 2026-07-11, provider chốt 2026-07-26; Product Owner delegated / Architecture Owner production TBD.
+- **Source/trace:** ARC-005; liên quan BR-031, BR-035, BR-040; `FR-026…FR-035`; `DB-022…DB-027`, `DB-114`; `API-039…API-052`; `SEC-119…SEC-123`; `TEST-018…TEST-022`.
 - **Context:** Cần quyết định boundary cho dms, object storage và search mà không khóa vendor khi dữ liệu chưa đủ.
 - **Decision:** File versioned ở object storage; metadata/ACL ở relational store; search là derived ACL-aware index; quarantine/scan/hash trước release.
-- **Options considered:** DB blob; object+metadata; external DMS-only.
-- **Consequences/risks:** Scale/immutability tốt; phải giữ DB-object-index consistency và ACL rebuild.
-- **Verification/revisit:** Prove infected/timeout/hash/restore/reindex/permission-change; provider TBD.
+- **Provider chốt ngày 2026-07-26 (Product Owner):** **MinIO** cho object storage và **ClamAV** cho malware scanning.
+  - MinIO là S3-compatible nên adapter chỉ nói S3 API; đổi sang AWS S3 hoặc tương đương về sau không cần sửa service, chỉ đổi endpoint/credential. Đây là lý do chọn thay vì một API độc quyền.
+  - Hai bucket tách biệt: quarantine và release. Byte chỉ được copy sang release sau khi scan sạch, nên một object key đã release không bao giờ trỏ tới byte chưa quét.
+  - ClamAV nói giao thức clamd `INSTREAM` qua TCP, không thêm dependency runtime.
+  - **Scanner không truy cập được phải báo `UNAVAILABLE`, tuyệt đối không báo `CLEAN`.** Revision giữ nguyên trạng thái quarantine; sự cố scanner làm chậm phát hành chứ không âm thầm phát hành file chưa quét.
+  - Hash SHA-256 do server tính trên byte đã lưu, không nhận hash từ client.
+- **Options considered:** DB blob (loại: không scale, không immutable); object+metadata (chọn); external DMS-only (loại: khóa vendor, mất ACL nội bộ).
+- **Consequences/risks:** Scale/immutability tốt; phải giữ DB-object-index consistency và ACL rebuild. Thêm hai service hạ tầng phải vận hành, backup và cập nhật signature. ClamAV cần thời gian nạp signature nên healthcheck dùng `start_period` rộng.
+- **Verification/revisit:** Prove infected/timeout/hash/restore/reindex/permission-change. Ba verdict CLEAN/INFECTED/UNAVAILABLE đã có test. Production còn cần: chính sách retention/lifecycle bucket, mã hóa at-rest bằng KMS, HA cho MinIO và cập nhật signature tự động — tất cả vẫn Proposed.
 
 <a id="adr-006"></a>
 ### ADR-006 — Event, background job và connector

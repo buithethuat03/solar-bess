@@ -90,6 +90,7 @@ flowchart LR
 | Security scans | TBD SAST/SCA/secret/DAST/container/IaC | Not run |
 | Dependency audit | `npm audit --omit=dev`; `npm audit` | 0 vulnerability reported |
 | OpenAPI validation | `npm run openapi:lint` | Valid OpenAPI 3.1, zero reported problem |
+| Reverse-proxy config | `docker run --rm --add-host api:127.0.0.1 -v apps/web/nginx.conf:/etc/nginx/conf.d/default.conf:ro nginx:1.29-alpine nginx -t` | Pass 2026-07-26. Added because a malformed `nginx.conf` is otherwise only discovered when the web container starts — mid-rollout, where it fails the deploy and forces a rollback. It caught exactly that: an unquoted regex `location` whose `{36}` repetition count nginx parsed as a block delimiter. The `api` upstream is resolved at parse time and is stubbed through `/etc/hosts`, so the gate does not depend on the deployed stack being up |
 | Migration dry run | `npm run migration:show`; `npm run migration:revert`; `npm run migration:run`; `npm run migration:show` | TypeORM CLI show/up/down/up pass trên PostgreSQL test |
 | Artifact build/deploy | `sudo docker compose build/up` với timeout/poll | `postgres`/`api` healthy; `web` running; public health/database OK và HTTP 200; signing/SBOM TBD |
 | Operational foundation | Sau implementation: lint/type/unit/integration/build, PostgreSQL+Redis disposable, worker failure injection và Compose smoke | Approved/Planned; chưa chạy `TEST-180`, `TEST-200`, `TEST-202…208`, `TEST-231` cho foundation mới |
@@ -242,6 +243,40 @@ flowchart LR
 - Required order: disposable migration up/down/up and full integration → CI-like isolated-port preflight → materialize secrets → migrate EC2 PostgreSQL → idempotent seed/role reconciliation → API/worker/web rollout → authenticated tenant/package/Change→REBASELINE smoke → public `/web-health` and `/health` → record release/SHA/container health.
 - Application rollback order is web → worker → API. Database migrations are not automatically reverted after committed Risk/Issue/Change/baseline provenance exists; containment disables routes/worker and uses compatible image/forward-fix unless preflight proves zero source rows and safe `down`.
 
+### 9.5 US-005/US-019 document control migration/rollout profile
+
+- Migration chain adds `1783740000000-CreateDocumentControl` (7 tables, DB-022…DB-027 + DB-114, 3 triggers) and
+  `1783741000000-GrantDocumentPermissions` (`policy_version` 6, reversible state-table pattern). `down()` drops
+  triggers → functions → tables in reverse creation order.
+- This is the first release that introduces **stateful infrastructure outside PostgreSQL**. Two services join the
+  runtime, both on the internal `app` network:
+
+  | Service | Image | Volume | Health gate |
+  |---|---|---|---|
+  | `minio` | `minio/minio:RELEASE.2025-09-07T16-13-09Z` | `minio_data` | `service_healthy` (`mc ready local`, ~10 s) |
+  | `clamav` | `clamav/clamav:stable` | `clamav_signatures` | `service_started` — deliberately **not** `service_healthy` |
+
+- ClamAV is gated on `service_started` on purpose. clamd loads roughly a gigabyte of signatures before it answers,
+  which on this host takes ~47 s and is allowed up to 180 s. Gating the rollout on its health would push
+  `docker compose up --wait` past the deploy script's 240 s budget and fail an otherwise good release. Nothing is
+  weakened by this: while clamd is down the scanner adapter returns `UNAVAILABLE`, the revision stays quarantined and
+  `CHECK ck_document_revision_release_requires_clean` makes release impossible at the database level.
+- The bucket pair is bootstrapped best-effort at API start-up. A storage outage therefore degrades uploads rather
+  than blocking the API from booting.
+- Rollout order is unchanged (web → worker → API for rollback), with one addition: `minio` and `clamav` are brought up
+  before `api` and are **never** torn down as part of an application rollback, because `minio_data` holds released
+  document bytes that no application image can regenerate.
+- Verification beyond the standard gate: the live-adapter integration suite
+  (`test/integration/modules/document-control/adapter-live.integration-spec.ts`) is the only test that speaks S3 and
+  the clamd `INSTREAM` protocol for real — every other document test binds in-memory fakes to the two ports. It
+  asserts the quarantine → release promotion, refuses the reverse direction, detects the EICAR test signature, and
+  confirms an unreachable clamd yields `UNAVAILABLE` rather than `CLEAN`. CI starts `minio-test` and `clamav-test` on
+  isolated ports (`19002`, `13311`) so it runs on every push.
+- Transport body limits are explicit across all three layers so a lawful upload is never rejected as an opaque 413:
+  the upload DTO caps `content` at 8,000,000 base64 characters, `APP_JSON_BODY_LIMIT_BYTES` defaults to 9,000,000, and
+  nginx allows 1 MB by default with a 10 MB exception on the single upload route. nginx's ceiling sits *above* the
+  API's, so the API is always the layer that rejects and behaviour is identical with or without the proxy.
+
 ## 10. Deployment and rollout
 
 Proposed strategies vary by risk:
@@ -288,7 +323,10 @@ integration profile from `WORKER_TEST_SECRETS_DIR` (default `/tmp/solar-bess-wor
 
 Recovery order — materialise first, diagnose only if it still fails:
 
-1. `npm run secrets:materialize` — regenerates PostgreSQL/Redis secret files from the `enc:v1` values in `.env`.
+1. `npm run secrets:materialize` — regenerates all six secret files (`postgres_user`, `postgres_password`,
+   `database_url`, `redis_password`, `minio_root_user`, `minio_root_password`) from the `enc:v1` values in `.env`.
+   The two MinIO files are the *same* credential the API decrypts from `MINIO_ACCESS_KEY`/`MINIO_SECRET_KEY`, so the
+   object store and its only client can never drift apart.
 2. `sudo -n env RELEASE_SHA="$(git rev-parse --short=12 HEAD)" docker compose --env-file .env up -d --wait`.
 3. For the disposable integration stack, `npm run worker:test:secrets` before `docker compose -f docker-compose.test.yml up -d`.
 

@@ -11,7 +11,7 @@ import {
  * every catalog role on each run and would otherwise downgrade roles the migrations already raised.
  * Bump together with the next `*RoleGrants`/`Grant*Permissions` migration.
  */
-const rolePolicyVersion = 5;
+const rolePolicyVersion = 6;
 
 const roleCatalog = [
   {
@@ -26,7 +26,11 @@ const roleCatalog = [
       'riskChange.approve', 'riskChange.requestClosure', 'riskChange.close',
       'riskChange.closeCritical', 'notification.read', 'notification.acknowledge',
       'workflowDefinition.read', 'workflow.start', 'workflow.read', 'approvalTask.read',
-      'approval.decide', 'workflow.cancel'
+      'approval.decide', 'workflow.cancel',
+      'document.read', 'document.create', 'documentRevision.read', 'documentRevision.upload',
+      'documentRevision.submitReview', 'documentRevision.approve', 'documentRevision.issue',
+      'documentComment.create', 'transmittal.issue', 'transmittal.respond',
+      'documentShare.create', 'documentSignature.start'
     ]
   },
   {
@@ -40,7 +44,11 @@ const roleCatalog = [
       'riskChange.approve', 'riskChange.requestClosure', 'riskChange.close',
       'riskChange.closeCritical', 'notification.read', 'notification.acknowledge',
       'workflowDefinition.read', 'workflow.start', 'workflow.read', 'approvalTask.read',
-      'approval.decide', 'workflow.cancel'
+      'approval.decide', 'workflow.cancel',
+      'document.read', 'document.create', 'documentRevision.read', 'documentRevision.upload',
+      'documentRevision.submitReview', 'documentRevision.approve', 'documentRevision.issue',
+      'documentComment.create', 'transmittal.issue', 'transmittal.respond',
+      'documentShare.create', 'documentSignature.start'
     ]
   },
   {
@@ -48,7 +56,7 @@ const roleCatalog = [
     permissions: [
       'portfolio.read', 'project.read', 'package.read', 'schedule.read', 'riskChange.read',
       'notification.read', 'notification.acknowledge', 'workflowDefinition.read',
-      'workflow.read', 'approvalTask.read'
+      'workflow.read', 'approvalTask.read', 'document.read', 'documentRevision.read'
     ]
   },
   {
@@ -57,7 +65,9 @@ const roleCatalog = [
       'schedule.import', 'baseline.submit', 'progress.record', 'progress.correct',
       'user.read', 'riskChange.read', 'riskChange.create', 'riskChange.manage',
       'riskChange.requestClosure', 'notification.read', 'notification.acknowledge',
-      'workflowDefinition.read', 'workflow.start', 'workflow.read', 'approvalTask.read'
+      'workflowDefinition.read', 'workflow.start', 'workflow.read', 'approvalTask.read',
+      'document.read', 'document.create', 'documentRevision.read', 'documentRevision.upload',
+      'documentRevision.submitReview', 'documentComment.create', 'transmittal.respond'
     ]
   },
   {
@@ -65,7 +75,8 @@ const roleCatalog = [
       'package.read', 'schedule.read', 'progress.record', 'user.read',
       'riskChange.read', 'riskChange.create', 'riskChange.manage',
       'riskChange.requestClosure', 'notification.read', 'notification.acknowledge',
-      'workflow.read', 'approvalTask.read'
+      'workflow.read', 'approvalTask.read',
+      'document.read', 'documentRevision.read', 'documentComment.create'
     ]
   },
   {
@@ -73,7 +84,7 @@ const roleCatalog = [
       'organization.read', 'organization.create', 'legalEntity.read',
       'legalEntity.create', 'roleAssignment.manage', 'systemStatus.read',
       'notification.read', 'notification.acknowledge', 'workflowDefinition.read',
-      'workflowDefinition.publish', 'workflow.read'
+      'workflowDefinition.publish', 'workflow.read', 'document.read', 'documentRevision.read'
     ]
   }
 ] as const;

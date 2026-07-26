@@ -8,13 +8,20 @@ const SENSITIVE_ENV_KEYS = new Set([
   'POSTGRES_USER', 'POSTGRES_PASSWORD', 'DATABASE_URL',
   'REDIS_PASSWORD', 'RATE_LIMIT_HASH_SECRET',
   'JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET',
+  'MINIO_ACCESS_KEY', 'MINIO_SECRET_KEY',
   'BOOTSTRAP_USER_EMAIL', 'BOOTSTRAP_USER_PASSWORD'
 ]);
 
 const MINIMUM_SECRET_LENGTH: Readonly<Record<string, number>> = {
   REDIS_PASSWORD: 32,
-  RATE_LIMIT_HASH_SECRET: 32
+  RATE_LIMIT_HASH_SECRET: 32,
+  MINIO_ACCESS_KEY: 20,
+  MINIO_SECRET_KEY: 32
 };
+
+const GENERATED_SECRET_KEYS = [
+  'REDIS_PASSWORD', 'RATE_LIMIT_HASH_SECRET', 'MINIO_ACCESS_KEY', 'MINIO_SECRET_KEY'
+];
 
 const DEFAULT_ENV_VALUES: Record<string, string> = {
   RUNTIME_SECRETS_DIR: '/tmp/solar-bess-secrets',
@@ -41,7 +48,17 @@ const DEFAULT_ENV_VALUES: Record<string, string> = {
   ARGON2_PARALLELISM: '1',
   COOKIE_NAME: 'refresh_token',
   COOKIE_PATH: '/v1/auth',
-  COOKIE_SAME_SITE: 'lax'
+  COOKIE_SAME_SITE: 'lax',
+  MINIO_ENDPOINT: 'http://127.0.0.1:9000',
+  MINIO_REGION: 'us-east-1',
+  MINIO_QUARANTINE_BUCKET: 'solar-bess-quarantine',
+  MINIO_RELEASE_BUCKET: 'solar-bess-documents',
+  MINIO_CONNECT_TIMEOUT_MS: '5000',
+  MINIO_REQUEST_TIMEOUT_MS: '30000',
+  CLAMAV_HOST: '127.0.0.1',
+  CLAMAV_PORT: '3310',
+  CLAMAV_TIMEOUT_MS: '30000',
+  CLAMAV_CHUNK_SIZE_BYTES: '65536'
 };
 
 function envPath(): string {
@@ -119,7 +136,7 @@ function migrateEnvironment(): void {
     return `${name}=${cipher.encrypt(value)}`;
   });
   if (!keyFound) migrated.unshift(`CIPHER_KEY=${keyValue}`);
-  for (const name of ['REDIS_PASSWORD', 'RATE_LIMIT_HASH_SECRET']) {
+  for (const name of GENERATED_SECRET_KEYS) {
     if (names.has(name)) continue;
     const generated = randomBytes(32).toString('base64url');
     migrated.push(`${name}=${cipher.encrypt(generated)}`);
@@ -141,7 +158,11 @@ function materializeRuntimeSecrets(): void {
     ['postgres_user', encryptedEnvironmentValue('POSTGRES_USER')],
     ['postgres_password', encryptedEnvironmentValue('POSTGRES_PASSWORD')],
     ['database_url', encryptedEnvironmentValue('DATABASE_URL')],
-    ['redis_password', encryptedEnvironmentValue('REDIS_PASSWORD', 32)]
+    ['redis_password', encryptedEnvironmentValue('REDIS_PASSWORD', 32)],
+    // ADR-005 object storage root credentials. The MinIO container reads them through
+    // MINIO_ROOT_USER_FILE and MINIO_ROOT_PASSWORD_FILE, so they never appear in an env block.
+    ['minio_root_user', encryptedEnvironmentValue('MINIO_ACCESS_KEY', 20)],
+    ['minio_root_password', encryptedEnvironmentValue('MINIO_SECRET_KEY', 32)]
   ];
   for (const [name, value] of secrets) {
     const target = resolve(directory, name);
@@ -152,7 +173,7 @@ function materializeRuntimeSecrets(): void {
     chmodSync(target, mode);
   }
   chmodSync(directory, 0o700);
-  console.log(`PostgreSQL and Redis runtime secret files are ready in ${directory}`);
+  console.log(`PostgreSQL, Redis and MinIO runtime secret files are ready in ${directory}`);
 }
 
 async function run(): Promise<void> {

@@ -20,6 +20,8 @@ jobs:
     env:
       TEST_POSTGRES_HOST_PORT: "15433"
       TEST_REDIS_HOST_PORT: "16380"
+      TEST_MINIO_HOST_PORT: "19002"
+      TEST_CLAMAV_HOST_PORT: "13311"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,8 +38,8 @@ jobs:
       - name: Start disposable integration dependencies
         run: |
           npm run worker:test:secrets
-          sudo -n env TEST_POSTGRES_HOST_PORT="$TEST_POSTGRES_HOST_PORT" TEST_REDIS_HOST_PORT="$TEST_REDIS_HOST_PORT" docker compose --project-name solar-bess-ci -f docker-compose.test.yml down --volumes --remove-orphans
-          sudo -n env TEST_POSTGRES_HOST_PORT="$TEST_POSTGRES_HOST_PORT" TEST_REDIS_HOST_PORT="$TEST_REDIS_HOST_PORT" docker compose --project-name solar-bess-ci -f docker-compose.test.yml up -d --wait postgres-test redis-test
+          sudo -n env TEST_POSTGRES_HOST_PORT="$TEST_POSTGRES_HOST_PORT" TEST_REDIS_HOST_PORT="$TEST_REDIS_HOST_PORT" TEST_MINIO_HOST_PORT="$TEST_MINIO_HOST_PORT" TEST_CLAMAV_HOST_PORT="$TEST_CLAMAV_HOST_PORT" docker compose --project-name solar-bess-ci -f docker-compose.test.yml down --volumes --remove-orphans
+          sudo -n env TEST_POSTGRES_HOST_PORT="$TEST_POSTGRES_HOST_PORT" TEST_REDIS_HOST_PORT="$TEST_REDIS_HOST_PORT" TEST_MINIO_HOST_PORT="$TEST_MINIO_HOST_PORT" TEST_CLAMAV_HOST_PORT="$TEST_CLAMAV_HOST_PORT" docker compose --project-name solar-bess-ci -f docker-compose.test.yml up -d --wait postgres-test redis-test minio-test clamav-test
 
       - name: Lint
         run: npm run lint
@@ -54,17 +56,32 @@ jobs:
           REDIS_PORT: "16380"
           WORKER_TEST_DATABASE_PORT: "15433"
           WORKER_TEST_REDIS_PORT: "16380"
+          # The live-adapter suite is the only one that speaks S3 and clamd for real, so it needs the
+          # isolated CI ports rather than the local-development defaults.
+          MINIO_ENDPOINT: http://127.0.0.1:19002
+          CLAMAV_HOST: 127.0.0.1
+          CLAMAV_PORT: "13311"
         run: npm run test:integration
 
       - name: Validate OpenAPI
         run: npm run openapi:lint
+
+      # A malformed nginx.conf only surfaces when the web container starts, which is mid-rollout and
+      # too late: the deploy fails and rolls back. nginx resolves the `api` upstream while parsing,
+      # so it is stubbed via /etc/hosts rather than by joining the runtime network — the check must
+      # not depend on the deployed stack being up.
+      - name: Validate web reverse-proxy configuration
+        run: |
+          sudo -n docker run --rm --add-host api:127.0.0.1 \
+            -v "$GITHUB_WORKSPACE/apps/web/nginx.conf:/etc/nginx/conf.d/default.conf:ro" \
+            nginx:1.29-alpine nginx -t
 
       - name: Build
         run: npm run build
 
       - name: Stop disposable integration dependencies
         if: always()
-        run: sudo -n env TEST_POSTGRES_HOST_PORT="$TEST_POSTGRES_HOST_PORT" TEST_REDIS_HOST_PORT="$TEST_REDIS_HOST_PORT" docker compose --project-name solar-bess-ci -f docker-compose.test.yml down --volumes --remove-orphans
+        run: sudo -n env TEST_POSTGRES_HOST_PORT="$TEST_POSTGRES_HOST_PORT" TEST_REDIS_HOST_PORT="$TEST_REDIS_HOST_PORT" TEST_MINIO_HOST_PORT="$TEST_MINIO_HOST_PORT" TEST_CLAMAV_HOST_PORT="$TEST_CLAMAV_HOST_PORT" docker compose --project-name solar-bess-ci -f docker-compose.test.yml down --volumes --remove-orphans
 
   deploy:
     name: Deploy EC2 test

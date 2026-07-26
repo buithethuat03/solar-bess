@@ -9,7 +9,8 @@ const names = [
   'SCHEDULE_NEAR_CRITICAL_FLOAT_DAYS', 'SCHEDULE_DEFAULT_LOOKAHEAD_DAYS',
   'SCHEDULE_IMPORT_MAX_ROWS', 'SCHEDULE_MAX_ABS_LAG_DAYS',
   'RISK_HIGH_EXPOSURE_THRESHOLD', 'RISK_CRITICAL_EXPOSURE_THRESHOLD',
-  'RISK_CHANGE_ALERT_SCAN_INTERVAL_MS', 'RISK_CHANGE_THRESHOLD_VERSION', 'SWAGGER_ENABLED'
+  'RISK_CHANGE_ALERT_SCAN_INTERVAL_MS', 'RISK_CHANGE_THRESHOLD_VERSION', 'SWAGGER_ENABLED',
+  'APP_JSON_BODY_LIMIT_BYTES'
 ] as const;
 const original = new Map(names.map((name) => [name, process.env[name]]));
 
@@ -85,6 +86,16 @@ describe('typed encrypted environment — SEC-117/SEC-118', () => {
     configure();
     process.env.SWAGGER_ENABLED = 'yes';
     expect(() => loadAppConfig()).toThrow('SWAGGER_ENABLED must be true or false');
+  });
+
+  it('keeps the HTTP body limit above the largest upload a DTO will accept', () => {
+    configure();
+    delete process.env.APP_JSON_BODY_LIMIT_BYTES;
+    // The ADR-005 upload DTO caps `content` at 8,000,000 base64 characters. If the transport limit
+    // ever drops below that, a lawful upload dies as an opaque 413 before validation can answer.
+    expect(loadAppConfig().app.jsonBodyLimitBytes).toBeGreaterThan(8_000_000);
+    process.env.APP_JSON_BODY_LIMIT_BYTES = '33554433';
+    expect(() => loadAppConfig()).toThrow('APP_JSON_BODY_LIMIT_BYTES must be an integer');
   });
 
   it('allows a validated non-secret host override for container topology', () => {

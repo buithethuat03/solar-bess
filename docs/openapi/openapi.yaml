@@ -2928,56 +2928,99 @@ paths:
       - name: projectId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     get:
       tags: ["Document Control"]
       summary: "Liệt kê document register"
+      description: >-
+        Trả về DB-022 register của một dự án, mới nhất trước, theo keyset cursor `createdAt`/`id`.
+        Kết quả luôn bị cắt theo project/package scope được thẩm định lại tại thời điểm đọc, nên
+        người chỉ giữ scope package chỉ thấy tài liệu thuộc package đó và tổng số hàng không tiết lộ
+        phần bị ẩn. Dự án không thuộc tenant hiện tại trả 404 `PROJECT_NOT_FOUND` để không lộ sự tồn
+        tại của id; dự án thuộc tenant nhưng ngoài scope quyền bị chặn ở guard bằng 403
+        `PERMISSION_DENIED`. Cursor sai định dạng trả 400 `INVALID_CURSOR`, không bao giờ bỏ qua
+        phân trang.
+
+
+        Mỗi dòng đã nhúng sẵn tóm tắt revision trong cùng một truy vấn: `currentRevision` là revision
+        ISSUED mà `currentRevisionId` trỏ tới, `latestRevision` là revision mới nhất theo
+        `(createdAt, id)` bất kể trạng thái. `latestRevision` là trường duy nhất làm lộ một bản upload
+        INFECTED hoặc còn quarantine, vì các bản đó chưa bao giờ được ISSUED nên `currentRevisionId`
+        vẫn null. Cả hai đều bị ràng buộc cùng `tenant_id` với register row nên không có đường ghép
+        chéo tenant.
       operationId: api_039_get_v1_projects_projectid_documents
       x-api-id: "API-039"
+      x-implementation-status: implemented
       x-permission: "document.read"
-      x-data-scope: "project/folder/document/field"
-      x-idempotency: "safe"
+      x-data-scope: "project scope bắt buộc; hàng ngoài package scope bị loại khỏi kết quả"
+      x-idempotency: "safe; opaque keyset cursor theo createdAt/id giảm dần"
       x-related-requirements: ["FR-026"]
-      x-related-data: ["DB-022"]
+      x-related-data: ["DB-022", "DB-023"]
       x-related-security: ["SEC-112"]
+      x-error-codes: ["PROJECT_NOT_FOUND", "PERMISSION_DENIED", "INVALID_CURSOR"]
       security:
         - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/TenantHeader'
         - $ref: '#/components/parameters/CorrelationHeader'
+        - name: cursor
+          in: query
+          required: false
+          schema: {type: string, maxLength: 500}
+          description: Opaque cursor từ meta.nextCursor; đi tới null để duyệt hết
+        - name: limit
+          in: query
+          required: false
+          schema: {type: integer, minimum: 1, maximum: 100, default: 50}
+        - name: type
+          in: query
+          required: false
+          schema: {type: string, minLength: 1, maxLength: 100}
+        - name: discipline
+          in: query
+          required: false
+          schema: {type: string, minLength: 1, maxLength: 100}
+        - name: classification
+          in: query
+          required: false
+          schema: {$ref: '#/components/schemas/DocumentClassification'}
+        - name: packageId
+          in: query
+          required: false
+          schema: {type: string, format: uuid}
       responses:
         '200':
-          description: "Authorized result"
+          description: "Trang register đã lọc theo scope, mới nhất trước"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/DocumentListResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
     post:
       tags: ["Document Control"]
       summary: "Tạo Document logical record"
+      description: >-
+        Đăng ký một tài liệu logic; bytes chưa tồn tại ở bước này mà đến sau qua API-042/043, nên
+        `currentRevisionId` luôn null khi tạo. Dự án ngoài tenant hoặc ngoài scope trả 404
+        `PROJECT_NOT_FOUND`, package không thuộc dự án trả 422 `PACKAGE_NOT_FOUND`, owner ngoài
+        tenant trả 422 `OWNER_NOT_FOUND`; `ownerId` bỏ trống thì mặc định là người gọi. Trùng
+        `documentCode` trong cùng dự án trả 409 `DOCUMENT_CODE_TAKEN` và không ghi thêm gì.
+        `Idempotency-Key` là bắt buộc: cùng key với cùng nội dung phát lại đúng 201 cũ, cùng key với
+        nội dung khác trả 409 `IDEMPOTENCY_CONFLICT`.
       operationId: api_040_post_v1_projects_projectid_documents
       x-api-id: "API-040"
+      x-implementation-status: implemented
       x-permission: "document.create"
-      x-data-scope: "project/folder"
-      x-idempotency: "required"
+      x-data-scope: "project scope bắt buộc; package phải thuộc đúng dự án"
+      x-idempotency: "required; DB-101 command receipt phát lại nguyên trạng"
       x-related-requirements: ["FR-026"]
       x-related-data: ["DB-022"]
       x-related-security: ["SEC-112", "SEC-118"]
+      x-error-codes: ["PROJECT_NOT_FOUND", "PACKAGE_NOT_FOUND", "OWNER_NOT_FOUND", "DOCUMENT_CODE_TAKEN", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -2988,91 +3031,103 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/CreateDocumentRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '201':
+          description: "Document đã được đăng ký; chưa có revision nào"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/DocumentCommandResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/documents/{documentId}":
     parameters:
       - name: documentId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     get:
       tags: ["Document Control"]
       summary: "Đọc document/current-for-use/revision metadata"
+      description: >-
+        Trả về register entry, revision current-for-use (null cho tới lần issue đầu tiên) và một
+        trang lịch sử revision mới nhất trước theo cursor `createdAt`/`id`. Scope lấy từ chính hàng
+        register: tài liệu thuộc tenant khác hoặc ngoài project/package scope đều trả 404
+        `DOCUMENT_NOT_FOUND` chứ không phải 403, nên không thể dò sự tồn tại của một documentId.
+        Object key trong quarantine/release bucket không bao giờ rời khỏi service; revision chỉ
+        công bố `hasQuarantinedObject`/`hasReleasedObject`.
       operationId: api_041_get_v1_documents_documentid
       x-api-id: "API-041"
+      x-implementation-status: implemented
       x-permission: "document.read"
-      x-data-scope: "document"
-      x-idempotency: "safe"
+      x-data-scope: "scope lấy từ register row sở hữu tài liệu; ngoài scope là 404"
+      x-idempotency: "safe; opaque keyset cursor theo createdAt/id giảm dần"
       x-related-requirements: ["FR-027"]
       x-related-data: ["DB-022", "DB-023"]
       x-related-security: ["SEC-112"]
+      x-error-codes: ["DOCUMENT_NOT_FOUND", "PERMISSION_DENIED", "INVALID_CURSOR"]
       security:
         - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/TenantHeader'
         - $ref: '#/components/parameters/CorrelationHeader'
+        - name: cursor
+          in: query
+          required: false
+          schema: {type: string, maxLength: 500}
+          description: Opaque cursor từ meta.nextCursor cho lịch sử revision; đi tới null để duyệt hết
+        - name: limit
+          in: query
+          required: false
+          schema: {type: integer, minimum: 1, maximum: 100, default: 50}
       responses:
         '200':
-          description: "Authorized result"
+          description: "Register entry, current-for-use revision và một trang lịch sử revision"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/DocumentDetailResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/documents/{documentId}/upload-sessions":
     parameters:
       - name: documentId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     post:
       tags: ["Document Control"]
       summary: "Khởi tạo upload session vào quarantine"
+      description: >-
+        Body mang chính bytes ở dạng base64 vì object-storage port không cấp pre-signed URL: server
+        phải là bên ghi vào quarantine bucket, nếu không client có thể đặt bytes chưa quét vào đúng
+        nơi mà API-043 sẽ đọc như thể đã được thẩm định. Session chính là revision — hàng DB-023
+        được tạo ngay khi bytes hạ cánh nên `uploadSessionId` bằng `id` của revision và không tồn
+        tại bảng upload session nào có thể lệch khỏi nội dung bucket. Revision sinh ra với
+        `scanStatus = QUARANTINED`, `contentHash = null` và `sizeBytes = null`; chỉ API-043 mới được
+        ghi hash, và chỉ sau khi server tự đọc lại bytes để băm. Tài liệu ngoài tenant hoặc ngoài
+        project/package scope trả 404 `DOCUMENT_NOT_FOUND` chứ không phải 403 để chống dò id; tài
+        liệu không ở trạng thái ACTIVE trả 422 `INVALID_STATE_TRANSITION`; nội dung rỗng trả 422
+        `EMPTY_UPLOAD`. Tên tệp do client gửi không bao giờ được dùng làm object key.
       operationId: api_042_post_v1_documents_documentid_upload_sessions
       x-api-id: "API-042"
+      x-implementation-status: implemented
       x-permission: "documentRevision.upload"
-      x-data-scope: "document"
-      x-idempotency: "required"
+      x-data-scope: "scope lấy từ register row sở hữu tài liệu; ngoài scope là 404"
+      x-idempotency: "required; DB-101 command receipt phát lại nguyên trạng"
       x-related-requirements: ["FR-027"]
       x-related-data: ["DB-023"]
       x-related-security: ["SEC-120", "SEC-121"]
+      x-error-codes: ["DOCUMENT_NOT_FOUND", "INVALID_STATE_TRANSITION", "EMPTY_UPLOAD", "REVISION_CODE_TAKEN", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -3083,47 +3138,50 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/UploadInitiateRequest'
+            schema: {$ref: '#/components/schemas/DocumentUploadSessionRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '201':
+          description: "Bytes đã nằm trong quarantine; revision ở DRAFT/QUARANTINED, chưa có hash"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/DocumentUploadSessionResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/upload-sessions/{uploadSessionId}:finalize":
     parameters:
       - name: uploadSessionId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     post:
       tags: ["Document Control"]
       summary: "Finalize hash/scan và tạo revision an toàn"
+      description: >-
+        Server đọc lại bytes từ quarantine, tự băm SHA-256 (SEC-120) rồi giao cho trình quét quyết
+        định. Ba kết cục: CLEAN promote object sang release bucket, xóa bản quarantine, ghi
+        `contentHash`/`sizeBytes` và trả 200; INFECTED lưu `scanSignature`, hủy object quarantine,
+        không bao giờ ghi hash và trả 200 với revision không thể phát hành; UNAVAILABLE giữ nguyên
+        bytes trong quarantine, đánh dấu `scanStatus = UNAVAILABLE` và trả 503 `SCANNER_UNAVAILABLE`
+        với `retryable: true` để có thể quét lại bằng một `Idempotency-Key` mới. Không có nhánh nào
+        coi bytes chưa quét hoặc trình quét không liên hệ được là sạch. Upload session ngoài tenant
+        hoặc ngoài scope trả 404 `DOCUMENT_REVISION_NOT_FOUND` chứ không phải 403; session không còn
+        chờ quét trả 422 `INVALID_STATE_TRANSITION`.
       operationId: api_043_post_v1_upload_sessions_uploadsessionid_finalize
       x-api-id: "API-043"
+      x-implementation-status: implemented
       x-permission: "documentRevision.upload"
-      x-data-scope: "upload/document"
-      x-idempotency: "required"
+      x-data-scope: "scope lấy từ register row sở hữu revision; ngoài scope là 404"
+      x-idempotency: "required; DB-101 command receipt phát lại nguyên trạng, retry sau 503 cần key mới"
       x-related-requirements: ["FR-027"]
       x-related-data: ["DB-023"]
       x-related-security: ["SEC-120", "SEC-121"]
+      x-error-codes: ["DOCUMENT_REVISION_NOT_FOUND", "INVALID_STATE_TRANSITION", "CONTENT_HASH_MISMATCH", "SCANNER_UNAVAILABLE", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -3134,47 +3192,47 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/UploadFinalizeRequest'
+            schema: {$ref: '#/components/schemas/DocumentUploadFinalizeRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '200':
+          description: "Đã băm và quét; CLEAN thì revision được release, INFECTED thì bytes bị hủy"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/DocumentUploadFinalizeResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
+        '503': {$ref: '#/components/responses/Error503'}
   "/v1/document-revisions/{revisionId}":
     parameters:
       - name: revisionId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     get:
       tags: ["Document Control"]
       summary: "Đọc revision metadata/scan/hash/ACL"
+      description: >-
+        Trả về metadata revision kèm register entry sở hữu nó, gồm `scanStatus`, `scanSignature`,
+        `contentHash` và `sizeBytes`. Scope được giải từ hàng register chứ không lấy từ request, nên
+        revision thuộc tenant khác hoặc ngoài project/package scope đều trả 404
+        `DOCUMENT_REVISION_NOT_FOUND` chứ không phải 403. Object key quarantine/release không bao
+        giờ được trả ra; chỉ có cờ boolean cho biết bytes đang nằm ở đâu.
       operationId: api_044_get_v1_document_revisions_revisionid
       x-api-id: "API-044"
+      x-implementation-status: implemented
       x-permission: "documentRevision.read"
-      x-data-scope: "revision"
+      x-data-scope: "scope lấy từ register row sở hữu revision; ngoài scope là 404"
       x-idempotency: "safe"
       x-related-requirements: ["FR-027"]
-      x-related-data: ["DB-023"]
+      x-related-data: ["DB-022", "DB-023"]
       x-related-security: ["SEC-112", "SEC-120"]
+      x-error-codes: ["DOCUMENT_REVISION_NOT_FOUND", "PERMISSION_DENIED"]
       security:
         - bearerAuth: []
       parameters:
@@ -3182,43 +3240,42 @@ paths:
         - $ref: '#/components/parameters/CorrelationHeader'
       responses:
         '200':
-          description: "Authorized result"
+          description: "Revision metadata kèm register entry sở hữu nó"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/DocumentRevisionDetailResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/document-revisions/{revisionId}:submit-review":
     parameters:
       - name: revisionId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     post:
       tags: ["Document Control"]
       summary: "Submit review cycle"
+      description: >-
+        Mở một chu kỳ review mới: chỉ revision DRAFT hoặc REJECTED mới được trình duyệt, ngược lại
+        422 `INVALID_STATE_TRANSITION`. AC-019 được thực thi trước khi đổi trạng thái: revision chưa
+        có verdict CLEAN, chưa có `contentHash` hoặc chưa nằm trong release bucket đều bị chặn bằng
+        422 `REVISION_NOT_SCANNED`, nên bytes chưa quét hoặc nhiễm mã độc không thể đi tiếp. Xung
+        đột phiên bản dùng `expectedVersion` trong body và trả 409 `VERSION_CONFLICT` kèm
+        `currentVersion`. Revision ngoài tenant hoặc ngoài scope trả 404 chứ không phải 403.
       operationId: api_045_post_v1_document_revisions_revisionid_submit_review
       x-api-id: "API-045"
+      x-implementation-status: implemented
       x-permission: "documentRevision.submitReview"
-      x-data-scope: "revision"
-      x-idempotency: "required"
+      x-data-scope: "scope lấy từ register row sở hữu revision; ngoài scope là 404"
+      x-idempotency: "required; expectedVersion bắt buộc; DB-101 command receipt phát lại nguyên trạng"
       x-related-requirements: ["FR-028"]
       x-related-data: ["DB-023", "DB-024", "DB-071"]
       x-related-security: ["SEC-108", "SEC-112"]
+      x-error-codes: ["DOCUMENT_REVISION_NOT_FOUND", "INVALID_STATE_TRANSITION", "REVISION_NOT_SCANNED", "VERSION_CONFLICT", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -3229,47 +3286,46 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/SubmitRevisionReviewRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '200':
+          description: "Revision chuyển sang IN_REVIEW và tăng reviewCycleNo"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/DocumentRevisionCommandResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/document-revisions/{revisionId}/comments":
     parameters:
       - name: revisionId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     post:
       tags: ["Document Control"]
       summary: "Ghi review comment/disposition"
+      description: >-
+        Ghi thêm một ý kiến review vào lịch sử append-only của DB-024: `sequenceNo` do server cấp
+        theo số ý kiến đã có, `cycleNo` lấy từ chu kỳ review hiện tại và `disposition` luôn bắt đầu
+        ở OPEN. Lịch sử không bao giờ được viết lại — sửa disposition là thêm hàng mới, và trigger
+        cấm UPDATE/DELETE trên bảng này. Chỉ revision đang IN_REVIEW mới nhận ý kiến, ngược lại 422
+        `INVALID_STATE_TRANSITION`. Revision ngoài tenant hoặc ngoài scope trả 404 chứ không 403.
       operationId: api_046_post_v1_document_revisions_revisionid_comments
       x-api-id: "API-046"
+      x-implementation-status: implemented
       x-permission: "documentComment.create"
-      x-data-scope: "revision/cycle"
-      x-idempotency: "required"
+      x-data-scope: "scope lấy từ register row sở hữu revision; ngoài scope là 404"
+      x-idempotency: "required; DB-101 command receipt phát lại nguyên trạng"
       x-related-requirements: ["FR-028"]
       x-related-data: ["DB-024"]
       x-related-security: ["SEC-112"]
+      x-error-codes: ["DOCUMENT_REVISION_NOT_FOUND", "INVALID_STATE_TRANSITION", "REVIEW_COMMENT_SEQUENCE_TAKEN", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -3280,47 +3336,48 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/CreateReviewCommentRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '201':
+          description: "Ý kiến review đã được ghi vào lịch sử append-only"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/DocumentReviewCommentResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/document-revisions/{revisionId}:approve":
     parameters:
       - name: revisionId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     post:
       tags: ["Document Control"]
       summary: "Approve revision theo workflow result"
+      description: >-
+        Chỉ revision đang IN_REVIEW mới được phê duyệt, ngược lại 422 `INVALID_STATE_TRANSITION`.
+        AC-019 được kiểm tra ngay tại tầng dịch vụ để người gọi nhận lỗi nghiệp vụ 422
+        `REVISION_NOT_SCANNED` thay vì vi phạm constraint thô
+        `ck_document_revision_release_requires_clean`: một revision chưa CLEAN, chưa có hash hoặc
+        chưa nằm trong release bucket không thể APPROVED. `expectedVersion` sai trả 409
+        `VERSION_CONFLICT` kèm `currentVersion`. Revision ngoài tenant hoặc ngoài scope trả 404 chứ
+        không 403.
       operationId: api_047_post_v1_document_revisions_revisionid_approve
       x-api-id: "API-047"
+      x-implementation-status: implemented
       x-permission: "documentRevision.approve"
-      x-data-scope: "revision"
-      x-idempotency: "required"
+      x-data-scope: "scope lấy từ register row sở hữu revision; ngoài scope là 404"
+      x-idempotency: "required; expectedVersion bắt buộc; DB-101 command receipt phát lại nguyên trạng"
       x-related-requirements: ["FR-029"]
       x-related-data: ["DB-023", "DB-072"]
       x-related-security: ["SEC-108", "SEC-109", "SEC-112"]
+      x-error-codes: ["DOCUMENT_REVISION_NOT_FOUND", "INVALID_STATE_TRANSITION", "REVISION_NOT_SCANNED", "VERSION_CONFLICT", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -3331,47 +3388,48 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/ApproveRevisionRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '200':
+          description: "Revision chuyển sang APPROVED kèm approvedBy/approvedAt"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/DocumentRevisionCommandResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/document-revisions/{revisionId}:issue":
     parameters:
       - name: revisionId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     post:
       tags: ["Document Control"]
       summary: "Issue immutable revision/current-for-use"
+      description: >-
+        Chỉ revision APPROVED mới được phát hành, ngược lại 422 `INVALID_STATE_TRANSITION`; AC-019
+        vẫn được kiểm tra lại nên revision chưa CLEAN bị chặn bằng 422 `REVISION_NOT_SCANNED`. Khóa
+        revision mới, chuyển revision cũ sang SUPERSEDED và dời con trỏ `currentRevisionId` của
+        register diễn ra trong đúng một transaction, nên người đọc không bao giờ thấy hai revision
+        cùng là current-for-use; `supersededRevisionId` trong response là revision bị thay thế hoặc
+        null nếu đây là lần phát hành đầu tiên. Revision đã ISSUED bị khóa `LOCKED` và trigger cơ sở
+        dữ liệu chặn mọi lần sửa nội dung sau đó. `expectedVersion` sai trả 409 `VERSION_CONFLICT`.
       operationId: api_048_post_v1_document_revisions_revisionid_issue
       x-api-id: "API-048"
+      x-implementation-status: implemented
       x-permission: "documentRevision.issue"
-      x-data-scope: "revision"
-      x-idempotency: "required"
+      x-data-scope: "scope lấy từ register row sở hữu revision; ngoài scope là 404"
+      x-idempotency: "required; expectedVersion bắt buộc; DB-101 command receipt phát lại nguyên trạng"
       x-related-requirements: ["FR-029"]
-      x-related-data: ["DB-023"]
+      x-related-data: ["DB-022", "DB-023"]
       x-related-security: ["SEC-109", "SEC-112", "SEC-118"]
+      x-error-codes: ["DOCUMENT_REVISION_NOT_FOUND", "INVALID_STATE_TRANSITION", "REVISION_NOT_SCANNED", "VERSION_CONFLICT", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -3382,47 +3440,49 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/IssueRevisionRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '200':
+          description: "Revision ISSUED/LOCKED, register trỏ tới nó, revision cũ đã SUPERSEDED"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/DocumentRevisionIssueResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/projects/{projectId}/transmittals":
     parameters:
       - name: projectId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     post:
       tags: ["Document Control"]
       summary: "Tạo/issue transmittal snapshot"
+      description: >-
+        Phát hành một transmittal bất biến trên các revision đã ISSUED của đúng dự án này. Người
+        nhận được lưu dưới dạng snapshot trong DB-025 nên đổi danh bạ về sau không làm biến dạng bản
+        ghi đã gửi. Revision chưa ISSUED trả 422 `REVISION_NOT_ISSUED`, revision thuộc dự án khác
+        hoặc ngoài scope trả 404 `DOCUMENT_REVISION_NOT_FOUND`, cùng một revision xuất hiện hai lần
+        trả 422 `TRANSMITTAL_ITEM_DUPLICATED`, bên gửi không thuộc dự án trả 422
+        `SENDER_PARTY_NOT_FOUND`, trùng số transmittal trong dự án trả 409
+        `TRANSMITTAL_NUMBER_TAKEN`. Mọi lỗi đều nằm trong một transaction nên không có transmittal
+        hoặc item nào bị ghi dở.
       operationId: api_049_post_v1_projects_projectid_transmittals
       x-api-id: "API-049"
+      x-implementation-status: implemented
       x-permission: "transmittal.issue"
-      x-data-scope: "project/revisions/recipients"
-      x-idempotency: "required"
+      x-data-scope: "project scope bắt buộc; mỗi revision phải thuộc đúng dự án và trong scope"
+      x-idempotency: "required; DB-101 command receipt phát lại nguyên trạng"
       x-related-requirements: ["FR-031"]
       x-related-data: ["DB-025", "DB-026"]
       x-related-security: ["SEC-112", "SEC-113"]
+      x-error-codes: ["PROJECT_NOT_FOUND", "DOCUMENT_REVISION_NOT_FOUND", "REVISION_NOT_ISSUED", "TRANSMITTAL_ITEM_DUPLICATED", "SENDER_PARTY_NOT_FOUND", "TRANSMITTAL_NUMBER_TAKEN", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -3433,47 +3493,47 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/IssueTransmittalRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '201':
+          description: "Transmittal ISSUED kèm toàn bộ item ở trạng thái phản hồi PENDING"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/TransmittalCommandResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/transmittals/{transmittalId}/responses":
     parameters:
       - name: transmittalId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     post:
       tags: ["Document Control"]
       summary: "Ghi response/disposition"
+      description: >-
+        Ghi phản hồi của bên nhận cho đúng một revision trong transmittal. Item được khóa
+        pessimistic trước khi cập nhật nên hai phản hồi song song không thể cùng thắng: lần thứ hai
+        trả 409 `TRANSMITTAL_ALREADY_RESPONDED` và `responseCode` đầu tiên được giữ nguyên.
+        Transmittal ngoài tenant hoặc ngoài project scope trả 404 `TRANSMITTAL_NOT_FOUND`, revision
+        không nằm trong transmittal trả 404 `TRANSMITTAL_ITEM_NOT_FOUND`, transmittal chưa ISSUED
+        trả 422 `INVALID_STATE_TRANSITION`.
       operationId: api_050_post_v1_transmittals_transmittalid_responses
       x-api-id: "API-050"
+      x-implementation-status: implemented
       x-permission: "transmittal.respond"
-      x-data-scope: "recipient/transmittal item"
-      x-idempotency: "required"
+      x-data-scope: "scope lấy từ dự án sở hữu transmittal; ngoài scope là 404"
+      x-idempotency: "required; DB-101 command receipt phát lại nguyên trạng"
       x-related-requirements: ["FR-032"]
       x-related-data: ["DB-026"]
       x-related-security: ["SEC-113"]
+      x-error-codes: ["TRANSMITTAL_NOT_FOUND", "TRANSMITTAL_ITEM_NOT_FOUND", "TRANSMITTAL_ALREADY_RESPONDED", "INVALID_STATE_TRANSITION", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -3484,47 +3544,48 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/RecordTransmittalResponseRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '201':
+          description: "Item chuyển sang RESPONDED kèm respondedBy/respondedAt"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/TransmittalItemCommandResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/document-revisions/{revisionId}/external-shares":
     parameters:
       - name: revisionId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     post:
       tags: ["Document Control"]
       summary: "Tạo share có expiry/watermark/download policy"
+      description: >-
+        Chỉ revision đã ISSUED mới được chia sẻ ra ngoài, ngược lại 422 `REVISION_NOT_ISSUED`; hạn
+        dùng phải ở tương lai, ngược lại 422 `SHARE_EXPIRY_INVALID`. Theo AC-089, `watermarkRequired`
+        mặc định true và `downloadAllowed` mặc định false, chỉ nới ra khi có người khai báo rõ ràng.
+        Token plaintext rời khỏi hệ thống đúng một lần trong response này; DB-114 chỉ lưu SHA-256
+        của nó, và audit payload không chứa token, nên rò rỉ cơ sở dữ liệu không sinh ra link dùng
+        được. Việc đổi token (redeem) chưa có endpoint trong catalog nên chưa được triển khai.
+        Revision ngoài tenant hoặc ngoài scope trả 404 chứ không 403.
       operationId: api_051_post_v1_document_revisions_revisionid_external_shares
       x-api-id: "API-051"
+      x-implementation-status: implemented
       x-permission: "documentShare.create"
-      x-data-scope: "revision/recipient"
-      x-idempotency: "required"
+      x-data-scope: "scope lấy từ register row sở hữu revision; ngoài scope là 404"
+      x-idempotency: "required; DB-101 command receipt phát lại nguyên trạng, kể cả token plaintext"
       x-related-requirements: ["FR-033"]
-      x-related-data: ["DB-023"]
+      x-related-data: ["DB-023", "DB-114"]
       x-related-security: ["SEC-113", "SEC-119"]
+      x-error-codes: ["DOCUMENT_REVISION_NOT_FOUND", "REVISION_NOT_ISSUED", "SHARE_EXPIRY_INVALID", "SHARE_TOKEN_COLLISION", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -3535,47 +3596,48 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/CreateExternalShareRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '201':
+          description: "Share ACTIVE; token plaintext chỉ xuất hiện ở đây, cơ sở dữ liệu chỉ giữ hash"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/DocumentExternalShareResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/document-revisions/{revisionId}/signature-envelopes":
     parameters:
       - name: revisionId
         in: path
         required: true
-        schema:
-          type: string
+        schema: {type: string, format: uuid}
     post:
       tags: ["Document Control"]
       summary: "Khởi tạo e-sign với signer snapshot/hash"
+      description: >-
+        Tạo envelope cục bộ ở trạng thái DRAFT với signer snapshot và đúng `artifactHash` của bytes
+        sẽ được ký; không nhà cung cấp bên ngoài nào được liên hệ vì chưa có nhà cung cấp nào được
+        ký hợp đồng, nên `provider` chỉ ghi nhận ý định và `externalId` luôn null cho tới khi
+        envelope rời DRAFT một cách hợp lệ. Revision chưa được quét sạch trả 422
+        `REVISION_NOT_SCANNED` — không thể ký một artifact chưa có hash của record. Revision ngoài
+        tenant hoặc ngoài scope trả 404 chứ không 403. Callback hoàn tất chữ ký chưa có endpoint
+        trong catalog nên chưa được triển khai.
       operationId: api_052_post_v1_document_revisions_revisionid_signature_envelopes
       x-api-id: "API-052"
+      x-implementation-status: implemented
       x-permission: "documentSignature.start"
-      x-data-scope: "revision/signers"
-      x-idempotency: "required"
+      x-data-scope: "scope lấy từ register row sở hữu revision; ngoài scope là 404"
+      x-idempotency: "required; DB-101 command receipt phát lại nguyên trạng"
       x-related-requirements: ["FR-034"]
       x-related-data: ["DB-027"]
       x-related-security: ["SEC-102", "SEC-112", "SEC-126"]
+      x-error-codes: ["DOCUMENT_REVISION_NOT_FOUND", "REVISION_NOT_SCANNED", "PERMISSION_DENIED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_CONFLICT", "COMMAND_IN_PROGRESS"]
       security:
         - bearerAuth: []
       parameters:
@@ -3586,29 +3648,21 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/GenericCommand'
+            schema: {$ref: '#/components/schemas/StartSignatureEnvelopeRequest'}
       responses:
-        '202':
-          description: "Accepted or committed command result"
+        '201':
+          description: "Envelope DRAFT cục bộ, chưa gửi ra ngoài, gắn với artifactHash cố định"
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Envelope'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '500':
-          $ref: '#/components/responses/Error500'
+              schema: {$ref: '#/components/schemas/SignatureEnvelopeCommandResponse'}
+        '400': {$ref: '#/components/responses/Error400'}
+        '401': {$ref: '#/components/responses/Error401'}
+        '403': {$ref: '#/components/responses/Error403'}
+        '404': {$ref: '#/components/responses/Error404'}
+        '409': {$ref: '#/components/responses/Error409'}
+        '422': {$ref: '#/components/responses/Error422'}
+        '429': {$ref: '#/components/responses/Error429'}
+        '500': {$ref: '#/components/responses/Error500'}
   "/v1/projects/{projectId}/contracts":
     parameters:
       - name: projectId
@@ -9605,6 +9659,672 @@ components:
         meta: {$ref: '#/components/schemas/RiskChangePageMeta'}
         correlationId: {type: string}
       additionalProperties: false
+    DocumentClassification:
+      type: string
+      enum: [PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED]
+    DocumentRecordStatus:
+      type: string
+      enum: [ACTIVE, SUPERSEDED, ARCHIVED]
+    DocumentRevisionStatus:
+      type: string
+      enum: [DRAFT, IN_REVIEW, APPROVED, ISSUED, SUPERSEDED, REJECTED]
+    DocumentScanStatus:
+      type: string
+      enum: [QUARANTINED, SCANNING, CLEAN, INFECTED, UNAVAILABLE]
+      description: >-
+        Bytes bắt đầu ở QUARANTINED. UNAVAILABLE là trạng thái riêng biệt với INFECTED: trình quét
+        mất liên lạc phải giữ revision lại, không bao giờ được release và không bao giờ được coi là
+        sạch. Chỉ CLEAN mới cho phép APPROVED/ISSUED/SUPERSEDED theo
+        ck_document_revision_release_requires_clean.
+    DocumentScanVerdict:
+      type: string
+      enum: [CLEAN, INFECTED]
+      description: >-
+        Verdict của lần quét vừa chạy trong API-043. UNAVAILABLE không bao giờ xuất hiện ở đây vì
+        outage được trả về dưới dạng 503 SCANNER_UNAVAILABLE thay cho body 200.
+    DocumentLockState:
+      type: string
+      enum: [UNLOCKED, LOCKED, LEGAL_HOLD]
+    ReviewCommentSeverity:
+      type: string
+      enum: [INFO, MINOR, MAJOR, CRITICAL]
+    ReviewCommentDisposition:
+      type: string
+      enum: [OPEN, ACCEPTED, REJECTED, CLOSED]
+    TransmittalStatus:
+      type: string
+      enum: [DRAFT, ISSUED, CLOSED]
+    TransmittalResponseStatus:
+      type: string
+      enum: [PENDING, RESPONDED, OVERDUE]
+    SignatureEnvelopeStatus:
+      type: string
+      enum: [DRAFT, SENT, COMPLETED, DECLINED, VOIDED]
+    ExternalShareStatus:
+      type: string
+      enum: [ACTIVE, REVOKED, EXPIRED]
+    DocumentRecipient:
+      type: object
+      required: [partyId, organisation, contactName, contactEmail]
+      properties:
+        partyId: {type: [string, 'null'], format: uuid}
+        organisation: {type: string, minLength: 1, maxLength: 200}
+        contactName: {type: string, minLength: 1, maxLength: 200}
+        contactEmail: {type: string, format: email, maxLength: 254}
+      additionalProperties: false
+    DocumentSigner:
+      type: object
+      required: [name, email, order, role]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 200}
+        email: {type: string, format: email, maxLength: 254}
+        order: {type: integer, minimum: 1, maximum: 50}
+        role: {type: string, minLength: 1, maxLength: 100}
+      additionalProperties: false
+    DocumentPageMeta:
+      type: object
+      required: [nextCursor, limit]
+      properties:
+        nextCursor: {type: [string, 'null'], maxLength: 500}
+        limit: {type: integer, minimum: 1, maximum: 100}
+      additionalProperties: false
+    Document:
+      type: object
+      required: [id, projectId, packageId, documentCode, title, discipline, type, classification, ownerId, currentRevisionId, legalHold, status, versionNo, createdBy, updatedBy, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        packageId: {type: [string, 'null'], format: uuid}
+        documentCode: {type: string, pattern: '^[A-Z0-9][A-Z0-9_./-]{1,79}$', maxLength: 80}
+        title: {type: string, minLength: 3, maxLength: 400}
+        discipline: {type: string, minLength: 1, maxLength: 100}
+        type: {type: string, minLength: 1, maxLength: 100}
+        classification: {$ref: '#/components/schemas/DocumentClassification'}
+        ownerId: {type: string, format: uuid}
+        currentRevisionId:
+          type: [string, 'null']
+          format: uuid
+          description: Revision ISSUED đang có hiệu lực; null cho tới lần phát hành đầu tiên
+        legalHold: {type: boolean}
+        status: {$ref: '#/components/schemas/DocumentRecordStatus'}
+        versionNo: {type: integer, minimum: 1}
+        createdBy: {type: string, format: uuid}
+        updatedBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+      additionalProperties: false
+    DocumentRegisterRevision:
+      type: object
+      description: Tóm tắt revision nhúng trong register; chỉ các trường bảng register hiển thị, không có contentHash, object key hay chữ ký quét
+      required: [id, revisionCode, workingVersion, status, scanStatus]
+      properties:
+        id: {type: string, format: uuid}
+        revisionCode: {type: string, pattern: '^[A-Z0-9][A-Z0-9_.-]{0,39}$', maxLength: 40}
+        workingVersion: {type: integer, minimum: 1}
+        status: {$ref: '#/components/schemas/DocumentRevisionStatus'}
+        scanStatus: {$ref: '#/components/schemas/DocumentScanStatus'}
+      additionalProperties: false
+    DocumentRegisterRow:
+      type: object
+      description: Một dòng register API-039; kèm sẵn tóm tắt revision để client không phải gọi API-044 cho từng dòng
+      required: [id, projectId, packageId, documentCode, title, discipline, type, classification, ownerId, currentRevisionId, legalHold, status, versionNo, createdBy, updatedBy, createdAt, updatedAt, currentRevision, latestRevision]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        packageId: {type: [string, 'null'], format: uuid}
+        documentCode: {type: string, pattern: '^[A-Z0-9][A-Z0-9_./-]{1,79}$', maxLength: 80}
+        title: {type: string, minLength: 3, maxLength: 400}
+        discipline: {type: string, minLength: 1, maxLength: 100}
+        type: {type: string, minLength: 1, maxLength: 100}
+        classification: {$ref: '#/components/schemas/DocumentClassification'}
+        ownerId: {type: string, format: uuid}
+        currentRevisionId:
+          type: [string, 'null']
+          format: uuid
+          description: Revision ISSUED đang có hiệu lực; null cho tới lần phát hành đầu tiên
+        legalHold: {type: boolean}
+        status: {$ref: '#/components/schemas/DocumentRecordStatus'}
+        versionNo: {type: integer, minimum: 1}
+        createdBy: {type: string, format: uuid}
+        updatedBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+        currentRevision:
+          oneOf:
+            - $ref: '#/components/schemas/DocumentRegisterRevision'
+            - type: 'null'
+          description: Revision ISSUED mà currentRevisionId trỏ tới; null cho tới lần phát hành đầu tiên
+        latestRevision:
+          oneOf:
+            - $ref: '#/components/schemas/DocumentRegisterRevision'
+            - type: 'null'
+          description: Revision mới nhất theo (createdAt, id) bất kể trạng thái; đây là trường làm lộ bản upload INFECTED hoặc còn quarantine vì các bản đó chưa bao giờ được ISSUED nên currentRevisionId vẫn null; null khi tài liệu chưa có revision nào
+      additionalProperties: false
+    DocumentRevision:
+      type: object
+      required: [id, documentId, projectId, revisionCode, workingVersion, status, purpose, fileName, mimeType, hasQuarantinedObject, hasReleasedObject, contentHash, sizeBytes, scanStatus, scanSignature, scannedAt, scannerVersion, lockState, reviewCycleNo, approvedBy, approvedAt, issuedBy, issuedAt, uploadedBy, versionNo, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        documentId: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        revisionCode: {type: string, pattern: '^[A-Z0-9][A-Z0-9_.-]{0,39}$', maxLength: 40}
+        workingVersion: {type: integer, minimum: 1}
+        status: {$ref: '#/components/schemas/DocumentRevisionStatus'}
+        purpose: {type: string, minLength: 3, maxLength: 200}
+        fileName: {type: string, minLength: 1, maxLength: 400}
+        mimeType: {type: string, minLength: 1, maxLength: 200}
+        hasQuarantinedObject:
+          type: boolean
+          description: Object key là địa chỉ lưu trữ nội bộ và không bao giờ rời khỏi service; chỉ có cờ này
+        hasReleasedObject: {type: boolean}
+        contentHash:
+          type: [string, 'null']
+          pattern: '^[0-9a-f]{64}$'
+          description: SHA-256 do server tính trên bytes đã lưu; null cho tới khi API-043 quét sạch
+        sizeBytes: {type: [integer, 'null'], minimum: 0}
+        scanStatus: {$ref: '#/components/schemas/DocumentScanStatus'}
+        scanSignature:
+          type: [string, 'null']
+          maxLength: 400
+          description: Tên signature khi INFECTED, chẩn đoán adapter khi UNAVAILABLE, null khi CLEAN
+        scannedAt: {type: [string, 'null'], format: date-time}
+        scannerVersion: {type: [string, 'null'], maxLength: 200}
+        lockState: {$ref: '#/components/schemas/DocumentLockState'}
+        reviewCycleNo: {type: integer, minimum: 0}
+        approvedBy: {type: [string, 'null'], format: uuid}
+        approvedAt: {type: [string, 'null'], format: date-time}
+        issuedBy: {type: [string, 'null'], format: uuid}
+        issuedAt: {type: [string, 'null'], format: date-time}
+        uploadedBy: {type: string, format: uuid}
+        versionNo: {type: integer, minimum: 1}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+      additionalProperties: false
+    DocumentUploadSession:
+      type: object
+      description: Revision vừa được tạo bởi API-042; uploadSessionId luôn bằng id vì session chính là revision
+      required: [id, uploadSessionId, documentId, projectId, revisionCode, workingVersion, status, purpose, fileName, mimeType, hasQuarantinedObject, hasReleasedObject, contentHash, sizeBytes, scanStatus, scanSignature, scannedAt, scannerVersion, lockState, reviewCycleNo, approvedBy, approvedAt, issuedBy, issuedAt, uploadedBy, versionNo, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        uploadSessionId: {type: string, format: uuid, description: Bằng id; API-043 nhận đúng giá trị này}
+        documentId: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        revisionCode: {type: string, pattern: '^[A-Z0-9][A-Z0-9_.-]{0,39}$', maxLength: 40}
+        workingVersion: {type: integer, minimum: 1}
+        status: {$ref: '#/components/schemas/DocumentRevisionStatus'}
+        purpose: {type: string, minLength: 3, maxLength: 200}
+        fileName: {type: string, minLength: 1, maxLength: 400}
+        mimeType: {type: string, minLength: 1, maxLength: 200}
+        hasQuarantinedObject: {type: boolean}
+        hasReleasedObject: {type: boolean}
+        contentHash: {type: [string, 'null'], pattern: '^[0-9a-f]{64}$', description: Luôn null ở bước này; chỉ API-043 được ghi hash}
+        sizeBytes: {type: [integer, 'null'], minimum: 0}
+        scanStatus: {$ref: '#/components/schemas/DocumentScanStatus'}
+        scanSignature: {type: [string, 'null'], maxLength: 400}
+        scannedAt: {type: [string, 'null'], format: date-time}
+        scannerVersion: {type: [string, 'null'], maxLength: 200}
+        lockState: {$ref: '#/components/schemas/DocumentLockState'}
+        reviewCycleNo: {type: integer, minimum: 0}
+        approvedBy: {type: [string, 'null'], format: uuid}
+        approvedAt: {type: [string, 'null'], format: date-time}
+        issuedBy: {type: [string, 'null'], format: uuid}
+        issuedAt: {type: [string, 'null'], format: date-time}
+        uploadedBy: {type: string, format: uuid}
+        versionNo: {type: integer, minimum: 1}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+      additionalProperties: false
+    DocumentRevisionScanResult:
+      type: object
+      description: Revision sau khi API-043 đã băm và quét; scanVerdict là kết quả của chính lần quét vừa chạy
+      required: [id, scanVerdict, documentId, projectId, revisionCode, workingVersion, status, purpose, fileName, mimeType, hasQuarantinedObject, hasReleasedObject, contentHash, sizeBytes, scanStatus, scanSignature, scannedAt, scannerVersion, lockState, reviewCycleNo, approvedBy, approvedAt, issuedBy, issuedAt, uploadedBy, versionNo, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        scanVerdict: {$ref: '#/components/schemas/DocumentScanVerdict'}
+        documentId: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        revisionCode: {type: string, pattern: '^[A-Z0-9][A-Z0-9_.-]{0,39}$', maxLength: 40}
+        workingVersion: {type: integer, minimum: 1}
+        status: {$ref: '#/components/schemas/DocumentRevisionStatus'}
+        purpose: {type: string, minLength: 3, maxLength: 200}
+        fileName: {type: string, minLength: 1, maxLength: 400}
+        mimeType: {type: string, minLength: 1, maxLength: 200}
+        hasQuarantinedObject: {type: boolean, description: False sau CLEAN và sau INFECTED; bytes chỉ còn ở release bucket hoặc đã bị hủy}
+        hasReleasedObject: {type: boolean, description: Chỉ true khi verdict là CLEAN}
+        contentHash: {type: [string, 'null'], pattern: '^[0-9a-f]{64}$', description: Chỉ được ghi khi verdict là CLEAN; INFECTED giữ null}
+        sizeBytes: {type: [integer, 'null'], minimum: 0}
+        scanStatus: {$ref: '#/components/schemas/DocumentScanStatus'}
+        scanSignature: {type: [string, 'null'], maxLength: 400}
+        scannedAt: {type: [string, 'null'], format: date-time}
+        scannerVersion: {type: [string, 'null'], maxLength: 200}
+        lockState: {$ref: '#/components/schemas/DocumentLockState'}
+        reviewCycleNo: {type: integer, minimum: 0}
+        approvedBy: {type: [string, 'null'], format: uuid}
+        approvedAt: {type: [string, 'null'], format: date-time}
+        issuedBy: {type: [string, 'null'], format: uuid}
+        issuedAt: {type: [string, 'null'], format: date-time}
+        uploadedBy: {type: string, format: uuid}
+        versionNo: {type: integer, minimum: 1}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+      additionalProperties: false
+    IssuedDocumentRevision:
+      type: object
+      description: Revision sau API-048; supersededRevisionId là revision bị thay thế trong cùng transaction
+      required: [id, supersededRevisionId, documentId, projectId, revisionCode, workingVersion, status, purpose, fileName, mimeType, hasQuarantinedObject, hasReleasedObject, contentHash, sizeBytes, scanStatus, scanSignature, scannedAt, scannerVersion, lockState, reviewCycleNo, approvedBy, approvedAt, issuedBy, issuedAt, uploadedBy, versionNo, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        supersededRevisionId: {type: [string, 'null'], format: uuid, description: Null khi đây là lần phát hành đầu tiên của tài liệu}
+        documentId: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        revisionCode: {type: string, pattern: '^[A-Z0-9][A-Z0-9_.-]{0,39}$', maxLength: 40}
+        workingVersion: {type: integer, minimum: 1}
+        status: {$ref: '#/components/schemas/DocumentRevisionStatus'}
+        purpose: {type: string, minLength: 3, maxLength: 200}
+        fileName: {type: string, minLength: 1, maxLength: 400}
+        mimeType: {type: string, minLength: 1, maxLength: 200}
+        hasQuarantinedObject: {type: boolean}
+        hasReleasedObject: {type: boolean}
+        contentHash: {type: [string, 'null'], pattern: '^[0-9a-f]{64}$'}
+        sizeBytes: {type: [integer, 'null'], minimum: 0}
+        scanStatus: {$ref: '#/components/schemas/DocumentScanStatus'}
+        scanSignature: {type: [string, 'null'], maxLength: 400}
+        scannedAt: {type: [string, 'null'], format: date-time}
+        scannerVersion: {type: [string, 'null'], maxLength: 200}
+        lockState: {$ref: '#/components/schemas/DocumentLockState'}
+        reviewCycleNo: {type: integer, minimum: 0}
+        approvedBy: {type: [string, 'null'], format: uuid}
+        approvedAt: {type: [string, 'null'], format: date-time}
+        issuedBy: {type: [string, 'null'], format: uuid}
+        issuedAt: {type: [string, 'null'], format: date-time}
+        uploadedBy: {type: string, format: uuid}
+        versionNo: {type: integer, minimum: 1}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+      additionalProperties: false
+    DocumentReviewComment:
+      type: object
+      required: [id, revisionId, sequenceNo, cycleNo, authorId, location, severity, body, disposition, dispositionNote, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        revisionId: {type: string, format: uuid}
+        sequenceNo: {type: integer, minimum: 1, description: Do server cấp theo số ý kiến đã có; client không đặt được}
+        cycleNo: {type: integer, minimum: 1}
+        authorId: {type: string, format: uuid}
+        location: {type: [string, 'null'], maxLength: 200}
+        severity: {$ref: '#/components/schemas/ReviewCommentSeverity'}
+        body: {type: string, minLength: 3, maxLength: 4000}
+        disposition: {$ref: '#/components/schemas/ReviewCommentDisposition'}
+        dispositionNote: {type: [string, 'null'], maxLength: 2000}
+        createdAt: {type: string, format: date-time}
+      additionalProperties: false
+    TransmittalItem:
+      type: object
+      required: [id, transmittalId, revisionId, actionCode, responseCode, responseDue, responseStatus, responseNote, respondedBy, respondedAt, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        transmittalId: {type: string, format: uuid}
+        revisionId: {type: string, format: uuid}
+        actionCode: {type: string, pattern: '^[A-Z0-9][A-Z0-9_.-]{0,39}$', maxLength: 40}
+        responseCode: {type: [string, 'null'], pattern: '^[A-Z0-9][A-Z0-9_.-]{0,39}$', maxLength: 40}
+        responseDue: {type: [string, 'null'], format: date}
+        responseStatus: {$ref: '#/components/schemas/TransmittalResponseStatus'}
+        responseNote: {type: [string, 'null'], maxLength: 2000}
+        respondedBy: {type: [string, 'null'], format: uuid}
+        respondedAt: {type: [string, 'null'], format: date-time}
+        createdAt: {type: string, format: date-time}
+      additionalProperties: false
+    TransmittalWithItems:
+      type: object
+      required: [id, projectId, number, senderPartyId, recipientSnapshot, purpose, dueDate, status, issuedBy, issuedAt, versionNo, createdBy, createdAt, updatedAt, items]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        number: {type: string, pattern: '^[A-Z0-9][A-Z0-9_./-]{1,79}$', maxLength: 80}
+        senderPartyId: {type: [string, 'null'], format: uuid}
+        recipientSnapshot:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: {$ref: '#/components/schemas/DocumentRecipient'}
+        purpose: {type: string, minLength: 3, maxLength: 400}
+        dueDate: {type: [string, 'null'], format: date}
+        status: {$ref: '#/components/schemas/TransmittalStatus'}
+        issuedBy: {type: [string, 'null'], format: uuid}
+        issuedAt: {type: [string, 'null'], format: date-time}
+        versionNo: {type: integer, minimum: 1}
+        createdBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+        items:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items: {$ref: '#/components/schemas/TransmittalItem'}
+      additionalProperties: false
+    DocumentExternalShareWithToken:
+      type: object
+      description: Chỉ API-051 trả về dạng này; tokenHash không bao giờ được công bố
+      required: [id, revisionId, token, recipientSnapshot, purpose, expiresAt, watermarkRequired, downloadAllowed, downloadCount, status, revokedBy, revokedAt, createdBy, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        revisionId: {type: string, format: uuid}
+        token:
+          type: string
+          minLength: 43
+          maxLength: 43
+          description: >-
+            Token base64url ngẫu nhiên 256-bit, rời khỏi hệ thống đúng một lần tại đây; cơ sở dữ
+            liệu chỉ giữ SHA-256 của nó và audit payload không chứa nó
+        recipientSnapshot:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: {$ref: '#/components/schemas/DocumentRecipient'}
+        purpose: {type: string, minLength: 3, maxLength: 400}
+        expiresAt: {type: string, format: date-time}
+        watermarkRequired: {type: boolean}
+        downloadAllowed: {type: boolean}
+        downloadCount: {type: integer, minimum: 0}
+        status: {$ref: '#/components/schemas/ExternalShareStatus'}
+        revokedBy: {type: [string, 'null'], format: uuid}
+        revokedAt: {type: [string, 'null'], format: date-time}
+        createdBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+      additionalProperties: false
+    SignatureEnvelope:
+      type: object
+      required: [id, revisionId, provider, externalId, signerSnapshot, artifactHash, status, completionHash, completedAt, createdBy, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        revisionId: {type: string, format: uuid}
+        provider:
+          type: string
+          minLength: 2
+          maxLength: 80
+          description: Chỉ ghi nhận ý định; không nhà cung cấp nào được liên hệ vì chưa có hợp đồng
+        externalId:
+          type: [string, 'null']
+          maxLength: 200
+          description: Luôn null khi status là DRAFT theo ck_signature_envelope_external
+        signerSnapshot:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: {$ref: '#/components/schemas/DocumentSigner'}
+        artifactHash:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+          description: Hash của record thuộc revision được ký; envelope không thể tạo nếu revision chưa CLEAN
+        status: {$ref: '#/components/schemas/SignatureEnvelopeStatus'}
+        completionHash: {type: [string, 'null'], pattern: '^[0-9a-f]{64}$'}
+        completedAt: {type: [string, 'null'], format: date-time}
+        createdBy: {type: string, format: uuid}
+        createdAt: {type: string, format: date-time}
+      additionalProperties: false
+    CreateDocumentRequest:
+      type: object
+      required: [documentCode, title, discipline, type, classification]
+      properties:
+        documentCode: {type: string, pattern: '^[A-Z0-9][A-Z0-9_./-]{1,79}$', maxLength: 80}
+        title: {type: string, minLength: 3, maxLength: 400}
+        discipline: {type: string, minLength: 1, maxLength: 100}
+        type: {type: string, minLength: 1, maxLength: 100}
+        classification: {$ref: '#/components/schemas/DocumentClassification'}
+        packageId:
+          type: string
+          format: uuid
+          description: Phải thuộc đúng dự án trong path, nếu không là 422 PACKAGE_NOT_FOUND
+        ownerId:
+          type: string
+          format: uuid
+          description: Mặc định là người gọi; owner khai báo rõ vẫn phải thuộc cùng tenant
+      additionalProperties: false
+    DocumentUploadSessionRequest:
+      type: object
+      description: >-
+        Body mang chính bytes vì object-storage port không cấp pre-signed URL: server phải là bên
+        ghi vào quarantine bucket, nếu không client có thể đặt bytes chưa quét vào đúng nơi mà
+        API-043 sẽ đọc như thể đã được thẩm định. Không có trường size hay hash do client khai báo ở
+        bước này — cả hai chỉ được server tính sau khi đọc lại bytes trong API-043.
+      required: [revisionCode, purpose, fileName, mimeType, content]
+      properties:
+        revisionCode: {type: string, pattern: '^[A-Z0-9][A-Z0-9_.-]{0,39}$', maxLength: 40}
+        purpose: {type: string, minLength: 3, maxLength: 200}
+        fileName:
+          type: string
+          minLength: 1
+          maxLength: 400
+          description: Chỉ là metadata hiển thị; object key được dựng từ định danh nên tên tệp không bao giờ chạm tới storage
+        mimeType: {type: string, minLength: 1, maxLength: 200}
+        content:
+          type: string
+          format: byte
+          maxLength: 8000000
+          description: >-
+            Nội dung tệp mã hóa base64, tối đa 8.000.000 ký tự base64. Nội dung giải mã ra 0 byte
+            trả 422 EMPTY_UPLOAD.
+      additionalProperties: false
+    DocumentUploadFinalizeRequest:
+      type: object
+      description: >-
+        Không có upload token: định danh session lấy từ path và bytes đã nằm trong quarantine từ
+        API-042.
+      properties:
+        contentHash:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+          description: >-
+            Hash do client khai báo, tùy chọn. Server luôn tự tính SHA-256 trên bytes đã lưu và chỉ
+            *so sánh* giá trị này với hash của mình, không bao giờ dùng thay cho nó; lệch nhau trả
+            422 CONTENT_HASH_MISMATCH và không ghi gì. Bỏ trống thì hash của server vẫn là hash của
+            record, nên client không thể tự chứng thực nội dung mình tải lên.
+      additionalProperties: false
+    SubmitRevisionReviewRequest:
+      type: object
+      required: [expectedVersion, note]
+      properties:
+        expectedVersion: {type: integer, minimum: 1, description: versionNo hiện tại của revision}
+        note: {type: string, minLength: 3, maxLength: 2000}
+      additionalProperties: false
+    CreateReviewCommentRequest:
+      type: object
+      required: [severity, body]
+      properties:
+        severity: {$ref: '#/components/schemas/ReviewCommentSeverity'}
+        body: {type: string, minLength: 3, maxLength: 4000}
+        location: {type: string, minLength: 1, maxLength: 200}
+      additionalProperties: false
+    ApproveRevisionRequest:
+      type: object
+      required: [expectedVersion, comment]
+      properties:
+        expectedVersion: {type: integer, minimum: 1, description: versionNo hiện tại của revision}
+        comment: {type: string, minLength: 3, maxLength: 2000}
+      additionalProperties: false
+    IssueRevisionRequest:
+      type: object
+      required: [expectedVersion, comment]
+      properties:
+        expectedVersion: {type: integer, minimum: 1, description: versionNo hiện tại của revision}
+        comment: {type: string, minLength: 3, maxLength: 2000}
+      additionalProperties: false
+    TransmittalItemInput:
+      type: object
+      required: [revisionId, actionCode]
+      properties:
+        revisionId: {type: string, format: uuid, description: Phải là revision đã ISSUED thuộc đúng dự án trong path}
+        actionCode: {type: string, pattern: '^[A-Z0-9][A-Z0-9_.-]{0,39}$', maxLength: 40}
+        responseDue: {type: string, format: date}
+      additionalProperties: false
+    IssueTransmittalRequest:
+      type: object
+      required: [number, purpose, recipients, items]
+      properties:
+        number: {type: string, pattern: '^[A-Z0-9][A-Z0-9_./-]{1,79}$', maxLength: 80}
+        purpose: {type: string, minLength: 3, maxLength: 400}
+        dueDate: {type: string, format: date}
+        senderPartyId: {type: string, format: uuid, description: Phải là project party của đúng dự án này}
+        recipients:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: {$ref: '#/components/schemas/DocumentRecipient'}
+        items:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items: {$ref: '#/components/schemas/TransmittalItemInput'}
+          description: Mỗi revision chỉ được xuất hiện một lần, trùng lặp trả 422 TRANSMITTAL_ITEM_DUPLICATED
+      additionalProperties: false
+    RecordTransmittalResponseRequest:
+      type: object
+      required: [revisionId, responseCode]
+      properties:
+        revisionId: {type: string, format: uuid, description: Xác định item trong transmittal cần ghi phản hồi}
+        responseCode: {type: string, pattern: '^[A-Z0-9][A-Z0-9_.-]{0,39}$', maxLength: 40}
+        responseNote: {type: string, minLength: 1, maxLength: 2000}
+      additionalProperties: false
+    CreateExternalShareRequest:
+      type: object
+      required: [purpose, expiresAt, recipients]
+      properties:
+        purpose: {type: string, minLength: 3, maxLength: 400}
+        expiresAt:
+          type: string
+          format: date-time
+          description: Phải ở tương lai, nếu không trả 422 SHARE_EXPIRY_INVALID
+        recipients:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: {$ref: '#/components/schemas/DocumentRecipient'}
+        watermarkRequired: {type: boolean, default: true, description: AC-089 giữ watermark bật trừ khi có người tắt rõ ràng}
+        downloadAllowed: {type: boolean, default: false, description: AC-089 giữ download tắt trừ khi có người bật rõ ràng}
+      additionalProperties: false
+    StartSignatureEnvelopeRequest:
+      type: object
+      required: [provider, signers]
+      properties:
+        provider:
+          type: string
+          minLength: 2
+          maxLength: 80
+          description: Chỉ ghi nhận nhà cung cấp dự kiến; không có lời gọi ra ngoài nào được thực hiện
+        signers:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: {$ref: '#/components/schemas/DocumentSigner'}
+      additionalProperties: false
+    DocumentListResponse:
+      type: object
+      required: [data, meta, correlationId]
+      properties:
+        data:
+          type: array
+          maxItems: 100
+          items: {$ref: '#/components/schemas/DocumentRegisterRow'}
+          description: Mỗi dòng đã kèm currentRevision và latestRevision; register không cần gọi thêm API-044 cho từng dòng
+        meta: {$ref: '#/components/schemas/DocumentPageMeta'}
+        correlationId: {type: string}
+      additionalProperties: false
+    DocumentCommandResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/Document'}
+        correlationId: {type: string}
+      additionalProperties: false
+    DocumentDetailResponse:
+      type: object
+      required: [data, currentRevision, revisions, meta, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/Document'}
+        currentRevision:
+          oneOf:
+            - $ref: '#/components/schemas/DocumentRevision'
+            - type: 'null'
+          description: Revision current-for-use; null cho tới lần phát hành đầu tiên
+        revisions:
+          type: array
+          maxItems: 100
+          items: {$ref: '#/components/schemas/DocumentRevision'}
+          description: Một trang lịch sử revision mới nhất trước; đi theo meta.nextCursor tới null để lấy đủ
+        meta: {$ref: '#/components/schemas/DocumentPageMeta'}
+        correlationId: {type: string}
+      additionalProperties: false
+    DocumentUploadSessionResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/DocumentUploadSession'}
+        correlationId: {type: string}
+      additionalProperties: false
+    DocumentUploadFinalizeResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/DocumentRevisionScanResult'}
+        correlationId: {type: string}
+      additionalProperties: false
+    DocumentRevisionDetailResponse:
+      type: object
+      required: [data, document, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/DocumentRevision'}
+        document: {$ref: '#/components/schemas/Document'}
+        correlationId: {type: string}
+      additionalProperties: false
+    DocumentRevisionCommandResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/DocumentRevision'}
+        correlationId: {type: string}
+      additionalProperties: false
+    DocumentRevisionIssueResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/IssuedDocumentRevision'}
+        correlationId: {type: string}
+      additionalProperties: false
+    DocumentReviewCommentResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/DocumentReviewComment'}
+        correlationId: {type: string}
+      additionalProperties: false
+    TransmittalCommandResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/TransmittalWithItems'}
+        correlationId: {type: string}
+      additionalProperties: false
+    TransmittalItemCommandResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/TransmittalItem'}
+        correlationId: {type: string}
+      additionalProperties: false
+    DocumentExternalShareResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/DocumentExternalShareWithToken'}
+        correlationId: {type: string}
+      additionalProperties: false
+    SignatureEnvelopeCommandResponse:
+      type: object
+      required: [data, correlationId]
+      properties:
+        data: {$ref: '#/components/schemas/SignatureEnvelope'}
+        correlationId: {type: string}
+      additionalProperties: false
     GenericCommand:
       type: object
       required: [commandType, data]
@@ -9620,23 +10340,6 @@ components:
         data:
           type: object
           additionalProperties: true
-      additionalProperties: false
-    UploadInitiateRequest:
-      type: object
-      required: [fileName, size, mimeType]
-      properties:
-        fileName: {type: string, maxLength: 500}
-        size: {type: integer, minimum: 1}
-        mimeType: {type: string}
-        expectedHash: {type: string}
-      additionalProperties: false
-    UploadFinalizeRequest:
-      type: object
-      required: [uploadToken, contentHash]
-      properties:
-        uploadToken: {type: string}
-        contentHash: {type: string}
-        revisionCode: {type: string}
       additionalProperties: false
     TelemetryEnvelope:
       type: object
@@ -9733,6 +10436,16 @@ components:
             $ref: '#/components/schemas/Error'
     Error500:
       description: "Opaque internal error"
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error503:
+      description: >-
+        Một dependency bắt buộc đang không sẵn sàng nên lệnh chưa thể hoàn tất, nhưng không có gì bị
+        ghi sai: người gọi thử lại được. Trường hợp duy nhất hiện nay là ADR-005 malware scanner —
+        khi clamd không trả lời, verdict được ghi bền là `UNAVAILABLE`, bytes tiếp tục nằm trong
+        quarantine và revision không bao giờ được phát hành, thay vì bị coi là sạch.
       content:
         application/json:
           schema:

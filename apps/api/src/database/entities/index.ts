@@ -31,6 +31,12 @@ import { WorkflowDefinitionEntity } from './workflow-definition.entity';
 import { WorkflowVersionEntity } from './workflow-version.entity';
 import { WorkflowInstanceEntity } from './workflow-instance.entity';
 import { ApprovalDecisionEntity } from './approval-decision.entity';
+import { DocumentEntity } from './document.entity';
+import { DocumentRevisionEntity } from './document-revision.entity';
+import {
+  DocumentExternalShareEntity, DocumentReviewCommentEntity, SignatureEnvelopeEntity,
+  TransmittalEntity, TransmittalItemEntity
+} from './document-collaboration.entity';
 
 export {
   AuditEventEntity, AuthenticationSessionEntity, LocalCredentialEntity,
@@ -43,13 +49,16 @@ export {
   NotificationEntity, NotificationEntity as ScheduleNotificationEntity, WbsNodeEntity,
   ChangeRequestEntity, IssueEntity, RiskEntity, RiskIssueActionEntity,
   RiskIssueClosureCycleEntity, WorkflowDefinitionEntity, WorkflowVersionEntity,
-  WorkflowInstanceEntity, ApprovalDecisionEntity
+  WorkflowInstanceEntity, ApprovalDecisionEntity, DocumentEntity, DocumentRevisionEntity,
+  DocumentReviewCommentEntity, TransmittalEntity, TransmittalItemEntity,
+  SignatureEnvelopeEntity, DocumentExternalShareEntity
 };
 export * from './operational.enums';
 export * from './project-controls.enums';
 export * from './project.enums';
 export * from './risk-change.enums';
 export * from './workflow.enums';
+export * from './document-control.enums';
 export type {
   WorkflowApproverSelector, WorkflowRoutingCondition, WorkflowRoutingRules, WorkflowRoutingStep
 } from './workflow-version.entity';
@@ -64,5 +73,8 @@ export const databaseEntities = [
   ActivityDependencyEntity, ScheduleBaselineEntity, ProgressUpdateEntity,
   NotificationEntity, RiskEntity, IssueEntity, ChangeRequestEntity,
   RiskIssueActionEntity, RiskIssueClosureCycleEntity, WorkflowDefinitionEntity,
-  WorkflowVersionEntity, WorkflowInstanceEntity, ApprovalDecisionEntity
+  WorkflowVersionEntity, WorkflowInstanceEntity, ApprovalDecisionEntity,
+  DocumentEntity, DocumentRevisionEntity, DocumentReviewCommentEntity,
+  TransmittalEntity, TransmittalItemEntity, SignatureEnvelopeEntity,
+  DocumentExternalShareEntity
 ];
