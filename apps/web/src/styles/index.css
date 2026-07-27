@@ -9,3 +9,10 @@
 @import './contracts.css';
 @import './notification.css';
 @import './workflow.css';
+@import './field-operations.css';
+@import './quality.css';
+@import './procurement.css';
+@import './commissioning.css';
+@import './operations.css';
+@import './opportunity.css';
+@import './search.css';

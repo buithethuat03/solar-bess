@@ -40,6 +40,48 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, permission: 'contract.read' }
   },
   {
+    path: RoutePath.projectFieldOperations,
+    name: RouteName.projectFieldOperations,
+    component: () => import('@/views/field-operations/ProjectFieldOperationsView.vue'),
+    meta: { requiresAuth: true, permission: 'workfront.read' }
+  },
+  {
+    path: RoutePath.projectQuality,
+    name: RouteName.projectQuality,
+    component: () => import('@/views/quality/ProjectQualityView.vue'),
+    meta: { requiresAuth: true, permission: 'workfront.read' }
+  },
+  {
+    path: RoutePath.projectProcurement,
+    name: RouteName.projectProcurement,
+    component: () => import('@/views/procurement/ProjectProcurementView.vue'),
+    meta: { requiresAuth: true, permission: 'supplier.read' }
+  },
+  {
+    path: RoutePath.projectCommissioning,
+    name: RouteName.projectCommissioning,
+    component: () => import('@/views/commissioning/ProjectCommissioningView.vue'),
+    meta: { requiresAuth: true, permission: 'commissioning.read' }
+  },
+  {
+    path: RoutePath.assetOperations,
+    name: RouteName.assetOperations,
+    component: () => import('@/views/operations/AssetOperationsView.vue'),
+    meta: { requiresAuth: true, permission: 'workOrder.read' }
+  },
+  {
+    path: RoutePath.opportunities,
+    name: RouteName.opportunities,
+    component: () => import('@/views/opportunity/OpportunityListView.vue'),
+    meta: { requiresAuth: true, permission: 'opportunity.read' }
+  },
+  {
+    path: RoutePath.search,
+    name: RouteName.search,
+    component: () => import('@/views/search/GlobalSearchView.vue'),
+    meta: { requiresAuth: true, permission: 'search.execute' }
+  },
+  {
     path: RoutePath.projectDetail,
     name: RouteName.projectDetail,
     component: () => import('@/views/projects/ProjectDetailView.vue'),

@@ -1,0 +1,181 @@
+/*
+ * Search & Reporting (API-130…134) plus the identity context panel.
+ *
+ * The one deliberate anti-affordance in this sheet: `.object-reference` is styled as a monospace
+ * record, NOT as a link. A completed export resolves to a bucket/object pair and no presigner is
+ * installed, so anything that looked clickable would be a promise the build cannot keep.
+ */
+.search-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: end;
+  padding: var(--space-4);
+  margin: var(--space-5) 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.search-toolbar label {
+  display: grid;
+  gap: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.search-panel {
+  padding: var(--space-6);
+  margin: var(--space-4) 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+}
+
+.search-panel .detail-heading small {
+  color: var(--brand-500);
+  font-weight: 900;
+  letter-spacing: .1em;
+}
+
+.search-panel .detail-heading h2 { margin: var(--space-1) 0; }
+
+.search-inline-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  align-items: end;
+  padding: var(--space-4);
+  margin: var(--space-3) 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+}
+
+.search-inline-form label {
+  display: grid;
+  gap: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.search-inline-form .form-wide { grid-column: 1 / -1; }
+
+.search-results { margin: var(--space-5) 0; }
+
+.search-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
+}
+
+.search-chip {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.search-chip:hover { border-color: var(--brand-300); background: var(--brand-50); }
+.search-chip[aria-pressed="true"] { border-color: var(--brand-600); background: var(--brand-700); color: var(--white); }
+.search-chip span { font-variant-numeric: tabular-nums; }
+
+.search-table td { vertical-align: top; }
+.search-table code, .audit-table code { font-size: var(--text-xs); overflow-wrap: anywhere; }
+
+.saved-view-filter {
+  display: grid;
+  gap: var(--space-1);
+  max-width: 320px;
+  margin: var(--space-3) 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.saved-view-list, .report-job-list {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0;
+  margin: var(--space-3) 0 0;
+  list-style: none;
+}
+
+.saved-view-list li, .report-job-list li {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+}
+
+.saved-view-list li > div, .report-job-list li > div {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.saved-view-list small, .report-job-list small { color: var(--color-text-muted); }
+.report-job-list li[data-status="FAILED"] { border-left: 4px solid var(--danger-600); }
+.report-job-list li[data-status="COMPLETED"] { border-left: 4px solid var(--success-600); }
+
+/*
+ * A record, not a link. No underline, no pointer, no brand colour — nothing that suggests a click
+ * would fetch the file, because nothing here can.
+ */
+.object-reference {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  margin: var(--space-2) 0;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+
+.object-reference > span {
+  color: var(--color-text-subtle);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.object-reference code {
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.object-reference small { color: var(--color-text-muted); font-size: var(--text-xs); line-height: 1.5; }
+
+.identity-admin-panel .fact-grid { margin: var(--space-4) 0; }
+.audit-table tbody tr[data-result="FAILED"] { background: var(--danger-100); }
+.status-pill[data-status="SUCCEEDED"] { background: var(--success-100); color: var(--success-600) !important; }
+.status-pill[data-status="FAILED"] { background: var(--danger-100); color: var(--danger-600) !important; }
+.status-pill[data-status="QUEUED"] { background: var(--info-100); color: var(--info-600) !important; }
+.status-pill[data-status="RUNNING"] { background: var(--warning-100); color: var(--warning-600) !important; }
+.status-pill[data-status="PROJECT"],
+.status-pill[data-status="CONTRACT"] { background: var(--brand-100); color: var(--brand-700) !important; }
+.status-pill[data-status="DOCUMENT"] { background: var(--info-100); color: var(--info-600) !important; }
+.status-pill[data-status="RISK"],
+.status-pill[data-status="ISSUE"],
+.status-pill[data-status="CHANGE_REQUEST"] { background: var(--accent-100); color: var(--accent-600) !important; }
+
+@media (max-width: 1100px) {
+  .search-inline-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 720px) {
+  .search-toolbar, .search-inline-form { grid-template-columns: 1fr; }
+}

@@ -1,0 +1,301 @@
+/*
+ * Procurement & Logistics (API-076…085). Ba tín hiệu được ưu tiên trong sheet này:
+ * 1. hồ sơ sơ tuyển đã hết hiệu lực phải khác biệt bằng mắt ngay trên hàng, không chỉ bằng chữ;
+ * 2. giá dự thầu còn niêm phong phải đọc như một trạng thái, không như một ô trống;
+ * 3. hành trình lô hàng là một trục có thứ tự — chặng chưa tới phải nhạt đi chứ không biến mất.
+ */
+.procurement-toolbar {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr)) auto;
+  gap: var(--space-3);
+  align-items: end;
+  padding: var(--space-4);
+  margin: var(--space-5) 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.procurement-toolbar label {
+  display: grid;
+  gap: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.procurement-scope-note {
+  padding: var(--space-3) var(--space-4);
+  margin: var(--space-4) 0 0;
+  border-left: 4px solid var(--info-600);
+  border-radius: var(--radius-sm);
+  background: var(--info-100);
+  color: var(--info-600);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.procurement-panel {
+  padding: var(--space-6);
+  margin: var(--space-4) 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+}
+
+.procurement-panel .detail-heading small { color: var(--brand-500); font-weight: 900; letter-spacing: .1em; }
+.procurement-panel .detail-heading h2 { margin: var(--space-1) 0; }
+.procurement-panel .section-heading { margin-top: var(--space-5); }
+.procurement-table td { vertical-align: top; }
+
+.procurement-note {
+  margin: var(--space-3) 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.procurement-blocked {
+  padding: var(--space-2) var(--space-3);
+  margin: var(--space-2) 0;
+  border-left: 4px solid var(--danger-600);
+  border-radius: var(--radius-sm);
+  background: var(--danger-100);
+  color: var(--danger-600);
+  font-size: var(--text-sm);
+  font-weight: 800;
+}
+
+.procurement-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  align-items: end;
+  padding: var(--space-4);
+  margin: var(--space-3) 0 var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+}
+
+.procurement-form label {
+  display: grid;
+  gap: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.procurement-form h3, .procurement-form h4 { margin: 0; }
+.procurement-form .form-wide { grid-column: 1 / -1; }
+
+/*
+ * Hồ sơ hết hiệu lực: nền cảnh báo cộng thanh dẫn đầu hàng, để tín hiệu sống sót cả khi in đen
+ * trắng lẫn khi người đọc không phân biệt được màu.
+ */
+.supplier-table tbody tr[data-expired="true"] {
+  background: var(--warning-100);
+  box-shadow: inset 4px 0 0 var(--warning-500);
+}
+
+.supplier-table tbody tr[data-expired="true"]:hover { background: var(--warning-100); }
+
+.supplier-expired-flag {
+  display: block;
+  color: var(--warning-600);
+  font-size: var(--text-xs);
+  font-weight: 900;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.supplier-invitable { color: var(--success-600); font-weight: 800; }
+.supplier-blocked { color: var(--danger-600); font-weight: 800; }
+.supplier-register__count { margin: 0; color: var(--color-text-muted); font-size: var(--text-sm); }
+
+.invitee-picker {
+  padding: var(--space-3);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+}
+
+.invitee-picker legend { color: var(--brand-600); font-size: var(--text-sm); font-weight: 900; }
+.invitee-picker__note { margin: 0 0 var(--space-2); color: var(--color-text-muted); font-size: var(--text-xs); }
+
+.invitee-picker__option {
+  display: flex !important;
+  gap: var(--space-2);
+  align-items: baseline;
+  padding: var(--space-1) 0;
+  font-weight: 500 !important;
+}
+
+.invitee-picker__empty { color: var(--danger-600); font-size: var(--text-sm); font-weight: 700; }
+
+/*
+ * Niêm phong là một TRẠNG THÁI, nên nó được vẽ như một chip chứ không như một ô giá trị rỗng. Cột
+ * giá của hàng niêm phong không bao giờ chứa chữ số.
+ */
+.bid-sealed {
+  display: inline-block;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--neutral-400);
+  border-radius: var(--radius-pill);
+  background: var(--neutral-100);
+  color: var(--neutral-700);
+  font-size: var(--text-xs);
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.bid-table tbody tr[data-sealed="true"] { background: var(--neutral-50); }
+.evaluation-panel__sealed-count { margin: 0; color: var(--color-text-muted); font-size: var(--text-sm); }
+
+.po-line-editor {
+  padding: var(--space-3);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+}
+
+.po-line-editor__row {
+  display: grid;
+  grid-template-columns: 70px minmax(160px, 1fr) repeat(3, minmax(90px, 1fr)) minmax(110px, auto) auto;
+  gap: var(--space-2);
+  align-items: end;
+  margin-top: var(--space-2);
+}
+
+.po-line-editor__extension {
+  padding-bottom: var(--space-2);
+  color: var(--brand-600);
+  font-size: var(--text-sm);
+  font-weight: 800;
+}
+
+.po-line-editor__sum {
+  margin: var(--space-3) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.po-line-editor__mismatch { display: block; color: var(--danger-600); font-weight: 900; }
+
+.shipment-card {
+  padding: var(--space-4);
+  margin: var(--space-3) 0;
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--brand-400);
+  border-radius: var(--radius-sm) var(--radius-md) var(--radius-md) var(--radius-sm);
+  background: var(--color-surface);
+}
+
+.shipment-card header {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.shipment-card header span { display: block; color: var(--color-text-muted); font-size: var(--text-sm); }
+
+.shipment-card__dates {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
+}
+
+.shipment-card__dates dt { color: var(--color-text-subtle); font-size: var(--text-xs); font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.shipment-card__dates dd { margin: 0; font-weight: 700; }
+
+/* Trục hành trình: chặng đã tới đậm và liền mạch, chặng chưa tới nhạt nhưng vẫn đọc được. */
+.milestone-timeline {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--space-2);
+  padding: 0;
+  margin: var(--space-3) 0 0;
+  list-style: none;
+  counter-reset: milestone;
+}
+
+.milestone-timeline li {
+  position: relative;
+  padding: var(--space-3) var(--space-2);
+  border-top: 4px solid var(--neutral-200);
+  color: var(--color-text-subtle);
+  font-size: var(--text-xs);
+}
+
+.milestone-timeline li[data-reached="true"] {
+  border-top-color: var(--brand-500);
+  color: var(--color-text);
+}
+
+.milestone-timeline li strong { display: block; font-size: var(--text-sm); }
+.milestone-timeline li span { display: block; }
+.milestone-timeline li small { color: var(--color-text-subtle); }
+
+.milestone-exceptions {
+  padding: var(--space-2) var(--space-4);
+  margin: var(--space-3) 0 0;
+  border-left: 4px solid var(--danger-600);
+  border-radius: var(--radius-sm);
+  background: var(--danger-100);
+  color: var(--danger-600);
+  font-size: var(--text-sm);
+  list-style: none;
+}
+
+.milestone-exceptions span { display: block; font-weight: 500; }
+
+.receipt-remaining {
+  padding: var(--space-3);
+  margin: var(--space-2) 0;
+  border-left: 4px solid var(--warning-500);
+  border-radius: var(--radius-sm);
+  background: var(--warning-100);
+  color: var(--warning-600);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.serial-editor {
+  padding: var(--space-3);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+}
+
+.serial-editor__row {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(200px, 1fr) auto;
+  gap: var(--space-2);
+  align-items: end;
+  margin-top: var(--space-2);
+}
+
+.status-pill[data-status="QUALIFIED"] { background: var(--success-100); color: var(--success-600) !important; }
+.status-pill[data-status="PENDING"] { background: var(--info-100); color: var(--info-600) !important; }
+.status-pill[data-status="SUSPENDED"] { background: var(--warning-100); color: var(--warning-600) !important; }
+.status-pill[data-status="ISSUED"],
+.status-pill[data-status="BID_OPEN"] { background: var(--brand-100); color: var(--brand-700) !important; }
+.status-pill[data-status="DELIVERED"],
+.status-pill[data-status="ACCEPTED"] { background: var(--success-100); color: var(--success-600) !important; }
+.status-pill[data-status="EXCEPTION"],
+.status-pill[data-status="QUARANTINED"] { background: var(--danger-600); color: var(--white) !important; }
+.status-pill[data-status="IN_TRANSIT"],
+.status-pill[data-status="CUSTOMS"] { background: var(--warning-100); color: var(--warning-600) !important; }
+
+@media (max-width: 1100px) {
+  .procurement-toolbar, .procurement-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .po-line-editor__row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .milestone-timeline { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .shipment-card__dates { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 720px) {
+  .procurement-toolbar, .procurement-form, .po-line-editor__row,
+  .serial-editor__row, .milestone-timeline, .shipment-card__dates { grid-template-columns: 1fr; }
+}

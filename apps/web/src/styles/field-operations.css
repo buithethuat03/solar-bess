@@ -1,0 +1,260 @@
+/*
+ * Field Operations & HSE (API-086…094).
+ *
+ * One idea rules this sheet: a stop-work must be impossible to miss and impossible to mistake for a
+ * normal state. The banner is the loudest surface in the whole application — full width, inverted
+ * danger, above the page heading — and its signal is repeated on every row it reaches, so a stopped
+ * workfront never renders like a working one even in greyscale.
+ */
+.stop-work-banner {
+  padding: var(--space-5) var(--space-6);
+  margin: 0 0 var(--space-5);
+  border: 2px solid var(--danger-600);
+  border-left-width: 10px;
+  border-radius: var(--radius-md) var(--radius-lg) var(--radius-lg) var(--radius-md);
+  background: var(--danger-100);
+  box-shadow: var(--shadow-md);
+}
+
+.stop-work-banner__head {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+}
+
+.stop-work-banner__glyph {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--danger-600);
+  color: var(--white);
+  font-size: 22px;
+}
+
+.stop-work-banner h2 {
+  margin: 0;
+  color: var(--danger-600);
+  font-size: var(--text-lg);
+  letter-spacing: .02em;
+  text-transform: uppercase;
+}
+
+.stop-work-banner p { margin: var(--space-1) 0 0; color: var(--neutral-800); }
+
+.stop-work-banner__list {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0;
+  margin: var(--space-4) 0 0;
+  list-style: none;
+}
+
+.stop-work-banner__list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--danger-500);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.stop-work-banner__list li > div { display: grid; gap: 2px; }
+.stop-work-banner__list strong { color: var(--danger-600); }
+.stop-work-banner__reason { font-weight: 700; }
+.stop-work-banner__meta { color: var(--color-text-muted); font-size: var(--text-xs); }
+
+.stop-work-banner__note {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-align: right;
+}
+
+.field-toolbar {
+  display: grid;
+  grid-template-columns: minmax(200px, 1fr) auto;
+  gap: var(--space-3);
+  align-items: end;
+  padding: var(--space-4);
+  margin: var(--space-5) 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.field-toolbar label, .field-inline-form label {
+  display: grid;
+  gap: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.field-panel {
+  padding: var(--space-6);
+  margin: var(--space-4) 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+}
+
+.field-panel .detail-heading small { color: var(--brand-500); font-weight: 900; letter-spacing: .1em; }
+.field-panel .detail-heading h2 { margin: var(--space-1) 0; }
+.field-panel__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+.field-inline-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  align-items: end;
+  padding: var(--space-4);
+  margin: var(--space-3) 0 var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+}
+
+.field-inline-form h3 { margin: 0; }
+.field-inline-form p { margin: 0; color: var(--color-text-muted); font-size: var(--text-sm); }
+.field-inline-form .form-wide { grid-column: 1 / -1; }
+
+.workfront-register { margin-top: var(--space-4); }
+.workfront-table td { vertical-align: top; }
+.workfront-table tbody tr[data-selected="true"] { background: var(--brand-50); }
+.workfront-table__actions { display: grid; gap: var(--space-1); justify-items: start; }
+
+/* The row-level echo of the banner: a stopped workfront is never quiet. */
+.workfront-table tbody tr[data-stopped="true"],
+.workfront-table tbody tr[data-stopped="true"]:hover {
+  background: var(--danger-100);
+  box-shadow: inset 6px 0 0 var(--danger-600);
+}
+
+.stop-work-chip {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  padding: 3px var(--space-2);
+  border: 1px solid var(--danger-600);
+  border-radius: var(--radius-pill);
+  background: var(--danger-600);
+  color: var(--white);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  letter-spacing: .04em;
+  white-space: nowrap;
+}
+
+.stop-work-chip__hint {
+  display: block;
+  max-width: 220px;
+  color: var(--danger-600);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.readiness-pill {
+  display: inline-flex;
+  padding: 3px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--warning-100);
+  color: var(--warning-600);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.readiness-pill[data-readiness="GATES_CLEARED"] { background: var(--success-100); color: var(--success-600); }
+
+.workfront-suspend-reason, .workfront-release-hint, .daily-log-correction, .permit-sod-note {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.35;
+}
+
+.status-pill[data-status="READY"] { background: var(--info-100); color: var(--info-600) !important; }
+.status-pill[data-status="RELEASED"] { background: var(--success-100); color: var(--success-600) !important; }
+.status-pill[data-status="PLANNED"] { background: var(--neutral-100); color: var(--neutral-600) !important; }
+.status-pill[data-status="ISSUE"] { background: var(--danger-600); color: var(--white) !important; }
+.status-pill[data-status="LIFT"] { background: var(--success-100); color: var(--success-600) !important; }
+.status-pill[data-status="REQUESTED"] { background: var(--info-100); color: var(--info-600) !important; }
+.status-pill[data-status="ISSUED"] { background: var(--brand-100); color: var(--brand-700) !important; }
+.status-pill[data-status="ACTIVE"] { background: var(--success-100); color: var(--success-600) !important; }
+.status-pill[data-status="SUPERSEDED"] { background: var(--neutral-100); color: var(--neutral-600) !important; }
+
+.stop-work-lift-note, .permit-blocked-note, .hse-incident-open-note {
+  padding: var(--space-3) var(--space-4);
+  margin: var(--space-3) 0;
+  border-left: 4px solid var(--color-border-strong);
+  border-radius: var(--radius-sm) var(--radius-md) var(--radius-md) var(--radius-sm);
+  background: var(--color-surface-sunken);
+  font-size: var(--text-sm);
+}
+
+.permit-blocked-note { border-left-color: var(--danger-600); background: var(--danger-100); color: var(--danger-600); font-weight: 700; }
+.hse-incident-open-note { border-left-color: var(--success-600); background: var(--success-100); color: var(--success-600); font-weight: 700; }
+
+.stop-work-lift-form { border-color: var(--danger-500); }
+
+/* Reporting is the one panel that is never blocked, so it reads as always-open rather than danger. */
+.hse-incident-panel { border-left: 6px solid var(--accent-500); }
+
+.hse-incident-receipt {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  margin-top: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--accent-500);
+  border-radius: var(--radius-sm) var(--radius-md) var(--radius-md) var(--radius-sm);
+  background: var(--color-surface-sunken);
+}
+
+.hse-incident-receipt p { margin: var(--space-2) 0 0; }
+.hse-incident-receipt__note { color: var(--color-text-muted); font-size: var(--text-xs); }
+
+.ledger-role-chip {
+  display: inline-flex;
+  width: fit-content;
+  padding: 3px var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.ledger-role-chip[data-role="CORRECTION"] { border-color: var(--warning-600); background: var(--warning-100); color: var(--warning-600); }
+.ledger-role-chip[data-role="CERTIFICATION"] { border-color: var(--success-600); background: var(--success-100); color: var(--success-600); }
+
+.quantity-table tbody tr[data-role="CORRECTION"] { box-shadow: inset 4px 0 0 var(--warning-500); }
+.quantity-table tbody tr[data-role="CERTIFICATION"] { box-shadow: inset 4px 0 0 var(--success-600); }
+
+.ledger-append-note {
+  margin: var(--space-3) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.reference-list { padding-left: var(--space-4); margin: 0; font-size: var(--text-xs); }
+
+@media (max-width: 1100px) {
+  .field-inline-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 720px) {
+  .field-toolbar, .field-inline-form { grid-template-columns: 1fr; }
+  .stop-work-banner__list li { align-items: stretch; flex-direction: column; }
+  .stop-work-banner__note { text-align: left; }
+}

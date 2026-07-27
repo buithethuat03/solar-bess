@@ -1,0 +1,296 @@
+/*
+ * Commissioning & COD (API-098…105). Sheet này phục vụ đúng ba câu chuyện:
+ * 1. cây hệ thống phải đọc được chiều sâu bằng mắt mà không cần đường kẻ giả;
+ * 2. một lần chạy đã ghi kết quả phải TRÔNG như lịch sử — nền khóa, không có ô nhập nào;
+ * 3. bảng chặn COD phải cho thấy nhóm nào đang mở trước khi người dùng tìm tới nút ký.
+ */
+.commissioning-toolbar {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr)) auto;
+  gap: var(--space-3);
+  align-items: end;
+  padding: var(--space-4);
+  margin: var(--space-5) 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.commissioning-toolbar label {
+  display: grid;
+  gap: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.commissioning-scope-note {
+  padding: var(--space-3) var(--space-4);
+  margin: var(--space-4) 0 0;
+  border-left: 4px solid var(--info-600);
+  border-radius: var(--radius-sm);
+  background: var(--info-100);
+  color: var(--info-600);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.commissioning-panel {
+  padding: var(--space-6);
+  margin: var(--space-4) 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+}
+
+.commissioning-panel .detail-heading small { color: var(--brand-500); font-weight: 900; letter-spacing: .1em; }
+.commissioning-panel .detail-heading h2 { margin: var(--space-1) 0; }
+.commissioning-panel .section-heading { margin-top: var(--space-5); }
+.commissioning-table td { vertical-align: top; }
+
+.commissioning-note {
+  margin: var(--space-3) 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.commissioning-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  align-items: end;
+  padding: var(--space-4);
+  margin: var(--space-3) 0 var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+}
+
+.commissioning-form label {
+  display: grid;
+  gap: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.commissioning-form h3, .commissioning-form h4 { margin: 0; }
+.commissioning-form .form-wide { grid-column: 1 / -1; }
+.cod-toggle { align-items: center; grid-auto-flow: column; justify-content: start; gap: var(--space-2); }
+
+.system-tree__list { padding: 0; margin: var(--space-3) 0 0; list-style: none; }
+
+.system-tree__node {
+  display: grid;
+  grid-template-columns: minmax(90px, auto) minmax(0, 1fr) minmax(90px, auto) auto auto;
+  gap: var(--space-3);
+  align-items: center;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.system-tree__node:hover { background: var(--brand-50); }
+.system-tree__list li[data-selected="true"] .system-tree__node { background: var(--brand-100); }
+
+/* Chiều sâu bằng thụt lề thật, không bằng ký tự vẽ hình. */
+.system-tree__list li[data-depth="1"] .system-tree__node { padding-left: var(--space-8); }
+.system-tree__list li[data-depth="2"] .system-tree__node { padding-left: var(--space-12); }
+.system-tree__list li[data-depth="3"] .system-tree__node { padding-left: calc(var(--space-12) + var(--space-4)); }
+
+.system-tree__code { font-weight: 900; }
+.system-tree__type { color: var(--color-text-muted); font-size: var(--text-xs); letter-spacing: .06em; }
+.system-tree__orphan { color: var(--warning-600); font-size: var(--text-xs); font-weight: 800; }
+
+/*
+ * Một lần chạy đã ghi kết quả là lịch sử: nền khóa cộng nhãn "Bất biến". Không có bất kỳ ô nhập
+ * nào trong hàng đó — sự vắng mặt của điều khiển chính là cái nói lên luật.
+ */
+.test-run-table tbody tr[data-frozen="true"] { background: var(--neutral-50); }
+
+.test-run-table tbody tr[data-result="FAILED"] {
+  background: var(--danger-100);
+  box-shadow: inset 4px 0 0 var(--danger-600);
+}
+
+.test-run-table tbody tr[data-result="PASSED"] { box-shadow: inset 4px 0 0 var(--success-600); }
+
+.run-frozen-flag {
+  display: block;
+  color: var(--neutral-600);
+  font-size: var(--text-xs);
+  font-weight: 900;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.run-retest-of { color: var(--brand-600); font-weight: 800; }
+.run-locked-note { color: var(--color-text-subtle); font-size: var(--text-xs); font-weight: 700; }
+
+.cod-board__asof { margin: 0; color: var(--color-text-muted); font-size: var(--text-sm); }
+
+.cod-board__summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+  padding: var(--space-4);
+  margin: var(--space-4) 0;
+  border-left: 4px solid var(--danger-600);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+}
+
+.cod-board__summary[data-ready="true"] { border-left-color: var(--success-600); }
+.cod-board__summary small { display: block; color: var(--color-text-subtle); font-size: var(--text-xs); font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.cod-board__summary strong { font-size: var(--text-lg); }
+
+.cod-blockers {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+}
+
+.cod-blockers__group {
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--success-600);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+/* Nhóm còn mở là nhóm đang chặn chữ ký — nó phải nổi lên trước khi mắt tìm tới nút ký. */
+.cod-blockers__group[data-open="true"] {
+  border-left-color: var(--danger-600);
+  background: var(--danger-100);
+}
+
+.cod-blockers__group h3 { margin: 0 0 var(--space-2); font-size: var(--text-md); }
+.cod-blockers__group ul { padding-left: var(--space-4); margin: 0; }
+.cod-blockers__group li { margin-bottom: var(--space-1); font-size: var(--text-sm); }
+.cod-blockers__group li strong { display: inline-block; min-width: 120px; }
+.cod-blockers__group li span { color: var(--color-text-muted); }
+.cod-blockers__clear { margin: 0; color: var(--success-600); font-size: var(--text-sm); font-weight: 700; }
+.cod-blockers__note { margin: var(--space-2) 0 0; color: var(--color-text-subtle); font-size: var(--text-xs); }
+
+.cod-expired-evidence {
+  padding: var(--space-3) var(--space-4);
+  margin: var(--space-3) 0;
+  border-left: 4px solid var(--warning-500);
+  border-radius: var(--radius-sm);
+  background: var(--warning-100);
+  color: var(--warning-600);
+  font-size: var(--text-sm);
+}
+
+.cod-expired-evidence ul { padding-left: var(--space-4); margin: var(--space-1) 0 0; }
+.cod-gate-table tbody tr[data-outstanding="true"] { box-shadow: inset 4px 0 0 var(--warning-500); }
+
+.cod-package {
+  padding: var(--space-4);
+  margin: var(--space-4) 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+}
+
+.cod-package h3 { margin: 0 0 var(--space-2); }
+
+.cod-package__facts {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.cod-package__facts dt { color: var(--color-text-subtle); font-size: var(--text-xs); font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.cod-package__facts dd { margin: 0; overflow-wrap: anywhere; font-weight: 700; }
+
+.cod-package__immutable {
+  padding: var(--space-2) var(--space-3);
+  margin: var(--space-3) 0 0;
+  border-left: 4px solid var(--brand-600);
+  border-radius: var(--radius-sm);
+  background: var(--brand-100);
+  color: var(--brand-700);
+  font-size: var(--text-sm);
+  font-weight: 800;
+}
+
+.cod-package__legal-hold {
+  padding: var(--space-2) var(--space-3);
+  margin: var(--space-2) 0 0;
+  border-left: 4px solid var(--danger-600);
+  border-radius: var(--radius-sm);
+  background: var(--danger-100);
+  color: var(--danger-600);
+  font-size: var(--text-sm);
+  font-weight: 900;
+}
+
+.cod-actions { margin: var(--space-4) 0; }
+
+.cod-actions__sod, .cod-actions__blocked {
+  padding: var(--space-2) var(--space-3);
+  margin: var(--space-2) 0;
+  border-left: 4px solid var(--danger-600);
+  border-radius: var(--radius-sm);
+  background: var(--danger-100);
+  color: var(--danger-600);
+  font-size: var(--text-sm);
+  font-weight: 800;
+}
+
+.cod-sign-blockers {
+  padding: var(--space-2) var(--space-4);
+  margin: 0;
+  border-left: 4px solid var(--danger-600);
+  border-radius: var(--radius-sm);
+  background: var(--danger-100);
+  color: var(--danger-600);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.cod-legal-hold {
+  padding: var(--space-4);
+  margin: var(--space-3) 0;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+}
+
+.cod-legal-hold h4 { margin: 0 0 var(--space-2); }
+.cod-legal-hold p { margin: 0 0 var(--space-2); color: var(--color-text-muted); font-size: var(--text-sm); }
+.cod-legal-hold__note { color: var(--danger-600) !important; font-weight: 800; }
+
+.status-pill[data-status="READY_FOR_TEST"],
+.status-pill[data-status="UNDER_REVIEW"] { background: var(--info-100); color: var(--info-600) !important; }
+.status-pill[data-status="TESTING"],
+.status-pill[data-status="IN_PROGRESS"] { background: var(--warning-100); color: var(--warning-600) !important; }
+.status-pill[data-status="PASSED"],
+.status-pill[data-status="ACCEPTED"] { background: var(--success-100); color: var(--success-600) !important; }
+.status-pill[data-status="FAILED"],
+.status-pill[data-status="ABORTED"],
+.status-pill[data-status="REJECTED"] { background: var(--danger-600); color: var(--white) !important; }
+.status-pill[data-status="INCONCLUSIVE"],
+.status-pill[data-status="NOT_READY"],
+.status-pill[data-status="RECORDED"] { background: var(--neutral-100); color: var(--neutral-700) !important; }
+.status-pill[data-status="HANDED_OVER"] { background: var(--brand-100); color: var(--brand-700) !important; }
+
+@media (max-width: 1100px) {
+  .commissioning-toolbar, .commissioning-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cod-board__summary, .cod-package__facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cod-blockers { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 720px) {
+  .commissioning-toolbar, .commissioning-form,
+  .cod-board__summary, .cod-package__facts { grid-template-columns: 1fr; }
+  .system-tree__node { grid-template-columns: 1fr; gap: var(--space-1); }
+}

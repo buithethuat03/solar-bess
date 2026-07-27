@@ -1,0 +1,197 @@
+/*
+ * Opportunity pipeline (API-026…033).
+ *
+ * The lanes are the primary structure: one column per WF-002 stage, drawn even when empty, because
+ * an absent lane would make the pipeline look shorter than it is. The scenario table uses tabular
+ * numerals so NPV/IRR/CAPEX columns line up by digit — they are strings, never re-aligned by
+ * rounding.
+ */
+.opportunity-toolbar {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr)) auto auto;
+  gap: var(--space-3);
+  align-items: end;
+  padding: var(--space-4);
+  margin: var(--space-5) 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.opportunity-toolbar label {
+  display: grid;
+  gap: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.opportunity-panel {
+  padding: var(--space-6);
+  margin: var(--space-4) 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+}
+
+.opportunity-panel .detail-heading small {
+  color: var(--brand-500);
+  font-weight: 900;
+  letter-spacing: .1em;
+}
+
+.opportunity-panel .detail-heading h2 { margin: var(--space-1) 0; }
+
+.opportunity-form,
+.opportunity-inline-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  align-items: end;
+}
+
+.opportunity-inline-form {
+  padding: var(--space-4);
+  margin: var(--space-3) 0 var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+}
+
+.opportunity-form label,
+.opportunity-inline-form label {
+  display: grid;
+  gap: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.opportunity-form .form-wide,
+.opportunity-inline-form .form-wide { grid-column: 1 / -1; }
+.opportunity-inline-form h3 { margin: 0; }
+
+.opportunity-pipeline { margin: var(--space-5) 0; }
+
+.opportunity-lanes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.opportunity-lane {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-top: 3px solid var(--brand-400);
+  border-radius: var(--radius-sm) var(--radius-sm) var(--radius-md) var(--radius-md);
+  background: var(--color-surface);
+  min-width: 0;
+}
+
+.opportunity-lane[data-stage="REJECTED"] { border-top-color: var(--danger-500); }
+.opportunity-lane[data-stage="CONVERTED"] { border-top-color: var(--success-600); }
+.opportunity-lane[data-stage="RETURNED"] { border-top-color: var(--warning-500); }
+
+.opportunity-lane header {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  align-items: center;
+  margin-bottom: var(--space-2);
+}
+
+.opportunity-lane header strong { font-variant-numeric: tabular-nums; }
+.opportunity-lane ul { display: grid; gap: var(--space-2); padding: 0; margin: 0; list-style: none; }
+
+.opportunity-card {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.opportunity-card:hover { border-color: var(--brand-300); background: var(--brand-50); }
+.opportunity-card span { color: var(--color-text-muted); font-size: var(--text-sm); overflow-wrap: anywhere; }
+.opportunity-lane li[data-selected="true"] .opportunity-card { border-color: var(--brand-500); background: var(--brand-100); }
+
+.status-pill[data-status="LEAD"] { background: var(--info-100); color: var(--info-600) !important; }
+.status-pill[data-status="QUALIFIED"],
+.status-pill[data-status="SURVEYED"] { background: var(--brand-100); color: var(--brand-700) !important; }
+.status-pill[data-status="SCENARIO_READY"] { background: var(--accent-100); color: var(--accent-600) !important; }
+.status-pill[data-status="RETURNED"] { background: var(--warning-100); color: var(--warning-600) !important; }
+.status-pill[data-status="CONVERTED"] { background: var(--success-100); color: var(--success-600) !important; }
+.status-pill[data-status="RAW"] { background: var(--neutral-100); color: var(--neutral-600) !important; }
+.status-pill[data-status="VALIDATED"] { background: var(--info-100); color: var(--info-600) !important; }
+.status-pill[data-status="SOLAR"],
+.status-pill[data-status="BESS"],
+.status-pill[data-status="HYBRID"] { background: var(--brand-100); color: var(--brand-700) !important; }
+
+.stage-advance {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  margin: var(--space-4) 0;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+}
+
+.stage-advance > span { color: var(--color-text-muted); font-size: var(--text-sm); font-weight: 700; }
+
+.survey-list, .convert-section { margin-top: var(--space-5); }
+
+.survey-revisions {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0;
+  margin: var(--space-3) 0 0;
+  list-style: none;
+}
+
+.survey-revisions li {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+}
+
+.survey-revisions li > div { display: flex; gap: var(--space-3); align-items: center; }
+.survey-revisions li p { margin: var(--space-1) 0; font-size: var(--text-sm); }
+.survey-revisions li small { color: var(--color-text-muted); }
+
+/* Financial evidence: digits line up, and the formula version sits in the same row as the numbers. */
+.scenario-table td.money,
+.scenario-table td[data-testid="scenario-payback"] { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.scenario-table code { font-size: var(--text-xs); overflow-wrap: anywhere; }
+
+.conversion-result {
+  padding: var(--space-4);
+  margin: var(--space-3) 0;
+  border: 1px solid var(--success-600);
+  border-radius: var(--radius-md);
+  background: var(--success-100);
+  color: var(--success-600);
+}
+
+.conversion-result p { margin: var(--space-1) 0 0; font-size: var(--text-sm); }
+
+@media (max-width: 1100px) {
+  .opportunity-toolbar,
+  .opportunity-form,
+  .opportunity-inline-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 720px) {
+  .opportunity-toolbar,
+  .opportunity-form,
+  .opportunity-inline-form { grid-template-columns: 1fr; }
+}

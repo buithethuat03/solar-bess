@@ -1,0 +1,225 @@
+/*
+ * O&M (API-114…121). Two signals get the visual weight in this sheet:
+ *
+ * 1. The "no measurement source" block is styled as an explicit statement, not as an empty widget.
+ *    It deliberately looks nothing like a stat tile or a chart frame — a dashed, unfilled panel
+ *    reads as "there is nothing here to read", which is exactly the fact being reported.
+ * 2. Work orders that need somebody to act (ON_HOLD, REOPENED) and the safety-critical permit flag
+ *    carry a row-level marker so they survive a greyscale print.
+ */
+.operations-toolbar {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr)) auto auto;
+  gap: var(--space-3);
+  align-items: end;
+  padding: var(--space-4);
+  margin: var(--space-5) 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.operations-toolbar label {
+  display: grid;
+  gap: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.operations-panel {
+  padding: var(--space-6);
+  margin: var(--space-4) 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+}
+
+.operations-panel .detail-heading small {
+  color: var(--brand-500);
+  font-weight: 900;
+  letter-spacing: .1em;
+}
+
+.operations-panel .detail-heading h2 { margin: var(--space-1) 0; }
+
+.operations-form,
+.operations-inline-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  align-items: end;
+}
+
+.operations-inline-form {
+  padding: var(--space-4);
+  margin: var(--space-3) 0 var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+}
+
+.operations-form label,
+.operations-inline-form label {
+  display: grid;
+  gap: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.operations-form .form-wide,
+.operations-inline-form .form-wide { grid-column: 1 / -1; }
+.operations-inline-form h3 { margin: 0; }
+
+.operations-table td { vertical-align: top; }
+.work-order-table tbody tr[data-selected="true"] { background: var(--brand-50); }
+
+/* A job that needs a permit to work is a safety fact; it never hides behind a click. */
+.permit-required {
+  color: var(--danger-600);
+  font-weight: 900;
+  letter-spacing: .03em;
+}
+
+.work-order-table tbody tr[data-status="ON_HOLD"] {
+  background: var(--warning-100);
+  box-shadow: inset 4px 0 0 var(--warning-500);
+}
+
+.work-order-table tbody tr[data-status="REOPENED"] {
+  background: var(--danger-100);
+  box-shadow: inset 4px 0 0 var(--danger-500);
+}
+
+.status-pill[data-status="CRITICAL"] { background: var(--danger-600); color: var(--white) !important; }
+.status-pill[data-status="HIGH"] { background: var(--danger-100); color: var(--danger-600) !important; }
+.status-pill[data-status="MEDIUM"] { background: var(--warning-100); color: var(--warning-600) !important; }
+.status-pill[data-status="LOW"] { background: var(--neutral-100); color: var(--neutral-600) !important; }
+.status-pill[data-status="DISPATCHED"],
+.status-pill[data-status="IN_PROGRESS"] { background: var(--brand-100); color: var(--brand-700) !important; }
+.status-pill[data-status="COMPLETE"],
+.status-pill[data-status="VERIFIED"] { background: var(--success-100); color: var(--success-600) !important; }
+.status-pill[data-status="REOPENED"] { background: var(--danger-100); color: var(--danger-600) !important; }
+.status-pill[data-status="SCHEDULED"] { background: var(--info-100); color: var(--info-600) !important; }
+.status-pill[data-status="ACKNOWLEDGED"] { background: var(--brand-100); color: var(--brand-700) !important; }
+.status-pill[data-status="INVESTIGATING"] { background: var(--warning-100); color: var(--warning-600) !important; }
+.status-pill[data-status="RESOLVED"],
+.status-pill[data-status="MITIGATED"] { background: var(--success-100); color: var(--success-600) !important; }
+
+/*
+ * The local-only banner. It is loud because the mistake it prevents — believing an acknowledgement
+ * changed the plant — is made in front of live equipment.
+ */
+.local-only-banner {
+  padding: var(--space-3) var(--space-4);
+  margin: var(--space-3) 0;
+  border-left: 4px solid var(--warning-500);
+  border-radius: var(--radius-sm) var(--radius-md) var(--radius-md) var(--radius-sm);
+  background: var(--warning-100);
+  color: var(--warning-600);
+  line-height: 1.55;
+}
+
+.local-only-banner strong { display: inline-block; margin-right: var(--space-1); }
+
+.work-order-commands { margin: var(--space-4) 0; flex-wrap: wrap; }
+.work-order-facts { margin: var(--space-4) 0; }
+
+.closure-cycle-history { margin-top: var(--space-5); }
+
+.closure-cycle-history ol {
+  display: grid;
+  gap: var(--space-3);
+  padding: 0;
+  margin: var(--space-3) 0 0;
+  list-style: none;
+}
+
+.closure-cycle-history li {
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--brand-400);
+  border-radius: var(--radius-sm) var(--radius-md) var(--radius-md) var(--radius-sm);
+  background: var(--color-surface-sunken);
+}
+
+.closure-cycle-history li > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.closure-cycle-history li p { margin: var(--space-2) 0 0; font-size: var(--text-sm); }
+
+.closure-cycle-history__decision {
+  padding: var(--space-2) var(--space-3);
+  margin-top: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--success-100);
+  color: var(--success-600);
+}
+
+.closure-cycle-history__pending {
+  padding: var(--space-2) var(--space-3);
+  margin-top: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--warning-100);
+  color: var(--warning-600);
+}
+
+/*
+ * NOT a stat tile and NOT a chart frame. An empty axis or a greyed-out number would both read as
+ * a measurement that came back flat; a dashed panel with a sentence in it reads as what it is.
+ */
+.no-measurement {
+  padding: var(--space-5);
+  margin: var(--space-3) 0;
+  border: 2px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: transparent;
+}
+
+.no-measurement h3 { margin: 0 0 var(--space-2); color: var(--color-text-muted); }
+.no-measurement p { margin: 0; color: var(--color-text-muted); font-size: var(--text-sm); line-height: 1.6; }
+
+.count-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.count-grid section {
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+}
+
+.count-grid h3 { margin: 0 0 var(--space-2); font-size: var(--text-sm); text-transform: uppercase; letter-spacing: .06em; }
+.count-grid ul { display: grid; gap: var(--space-1); padding: 0; margin: 0; list-style: none; }
+
+.count-grid li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.count-grid li strong { font-variant-numeric: tabular-nums; }
+
+@media (max-width: 1100px) {
+  .operations-toolbar,
+  .operations-form,
+  .operations-inline-form,
+  .count-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 720px) {
+  .operations-toolbar,
+  .operations-form,
+  .operations-inline-form,
+  .count-grid { grid-template-columns: 1fr; }
+}
