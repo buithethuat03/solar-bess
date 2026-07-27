@@ -34,14 +34,6 @@
   box-shadow: var(--shadow-md);
 }
 
-.search-panel .detail-heading small {
-  color: var(--brand-500);
-  font-weight: 900;
-  letter-spacing: .1em;
-}
-
-.search-panel .detail-heading h2 { margin: var(--space-1) 0; }
-
 .search-inline-form {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -146,7 +138,7 @@
 .object-reference > span {
   color: var(--color-text-subtle);
   font-size: var(--text-xs);
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: .06em;
   text-transform: uppercase;
 }
@@ -160,7 +152,9 @@
 .object-reference small { color: var(--color-text-muted); font-size: var(--text-xs); line-height: 1.5; }
 
 .identity-admin-panel .fact-grid { margin: var(--space-4) 0; }
-.audit-table tbody tr[data-result="FAILED"] { background: var(--danger-100); }
+
+/* A failed audit row keeps the register's leading-rule convention, not just a tint. */
+.audit-table tbody tr[data-result="FAILED"] { background: var(--danger-100); box-shadow: inset 4px 0 0 var(--danger-600); }
 .status-pill[data-status="SUCCEEDED"] { background: var(--success-100); color: var(--success-600) !important; }
 .status-pill[data-status="FAILED"] { background: var(--danger-100); color: var(--danger-600) !important; }
 .status-pill[data-status="QUEUED"] { background: var(--info-100); color: var(--info-600) !important; }

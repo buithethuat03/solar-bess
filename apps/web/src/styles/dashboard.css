@@ -16,7 +16,8 @@
   justify-content: space-between;
   gap: var(--space-6);
   border-bottom: 1px solid var(--color-border);
-  background: rgba(255, 255, 255, .88);
+  background: var(--color-surface);
+  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
   backdrop-filter: blur(12px);
 }
 
@@ -84,11 +85,11 @@
   color: var(--color-text-subtle);
   font-size: var(--text-xs);
   font-weight: 700;
-  letter-spacing: .1em;
+  letter-spacing: .06em;
   text-transform: uppercase;
 }
 
-.status-card h3 { margin: var(--space-3) 0 0; font-size: var(--text-lg); }
+.status-card h3 { margin: var(--space-3) 0 0; font-size: var(--text-lg); font-variant-numeric: tabular-nums; }
 .status-card p { margin: 0; color: var(--color-text-muted); font-size: var(--text-sm); }
 
 .status-card--primary {
@@ -111,17 +112,17 @@
   margin-top: 6px;
   border-radius: 50%;
   background: var(--accent-400);
-  box-shadow: 0 0 0 5px rgba(203, 232, 93, .16);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent-400) 16%, transparent);
 }
 
+/* Scope/boundary note — one shape shared with .scope-banner and .schedule-mobile-boundary. */
 .boundary-note {
-  margin-top: var(--space-6);
-  padding: var(--space-4) var(--space-5);
-  border: 1px solid var(--color-border);
-  border-left: 3px solid var(--accent-500);
+  padding: var(--space-3) var(--space-4);
+  margin: var(--space-6) 0 0;
+  border-left: 4px solid var(--accent-500);
+  border-radius: var(--radius-sm) var(--radius-md) var(--radius-md) var(--radius-sm);
   background: var(--accent-100);
   color: var(--brand-800);
-  border-radius: var(--radius-md);
   font-size: var(--text-sm);
 }
 
@@ -156,6 +157,7 @@
   color: var(--white);
   background: var(--brand-700);
   font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
 }
 
 .dashboard-alert-lane__state {
@@ -170,19 +172,26 @@
   font-size: var(--text-sm);
 }
 
-.dashboard-alert-lane__grid, .dashboard-risk-lane__grid {
+/*
+ * One priority-card lane, three callers: the dashboard alert lane, the dashboard risk lane and the
+ * schedule workspace alert lane. Only grid-template-columns is restated by the other two sheets, so
+ * a card looks and behaves identically wherever it is read.
+ */
+.dashboard-alert-lane__grid, .dashboard-risk-lane__grid, .schedule-alerts__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: var(--space-3);
 }
 
-.dashboard-alert-lane__grid button, .dashboard-risk-lane__grid button {
+.dashboard-alert-lane__grid button,
+.dashboard-risk-lane__grid button,
+.schedule-alerts__grid button {
   display: grid;
   gap: var(--space-1);
   padding: var(--space-4);
   border: 1px solid var(--color-border);
-  border-left: 3px solid var(--warning-500);
-  border-radius: var(--radius-md);
+  border-left: 4px solid var(--warning-500);
+  border-radius: var(--radius-sm) var(--radius-md) var(--radius-md) var(--radius-sm);
   background: var(--color-surface);
   color: var(--color-text);
   text-align: left;
@@ -190,10 +199,17 @@
   transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
 }
 
+/* Priority widens and darkens the leading rule: never hue on its own. */
 .dashboard-alert-lane__grid button[data-priority="HIGH"],
-.dashboard-risk-lane__grid button[data-priority="HIGH"] { border-left-color: var(--danger-500); }
+.dashboard-risk-lane__grid button[data-priority="HIGH"],
+.schedule-alerts__grid button[data-priority="HIGH"] {
+  border-left-width: 6px;
+  border-left-color: var(--danger-600);
+}
 
-.dashboard-alert-lane__grid button:hover, .dashboard-risk-lane__grid button:hover {
+.dashboard-alert-lane__grid button:hover,
+.dashboard-risk-lane__grid button:hover,
+.schedule-alerts__grid button:hover {
   border-color: var(--brand-300);
   border-left-color: var(--brand-500);
   box-shadow: var(--shadow-md);
@@ -212,21 +228,29 @@
   color: var(--color-text-subtle);
 }
 
-.dashboard-alert-lane__grid strong, .dashboard-risk-lane__grid strong { font-size: var(--text-sm); }
+.dashboard-alert-lane__grid strong,
+.dashboard-risk-lane__grid strong,
+.schedule-alerts__grid strong { font-size: var(--text-sm); }
 
 .dashboard-alert-lane__grid small,
 .dashboard-alert-lane__grid button > span:last-child,
-.dashboard-risk-lane__grid small {
+.dashboard-risk-lane__grid small,
+.schedule-alerts__grid small,
+.schedule-alerts__grid span {
   color: var(--color-text-muted);
   font-size: var(--text-sm);
 }
 
+@media (max-width: 1100px) {
+  .status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 @media (max-width: 900px) {
-  .status-grid { grid-template-columns: 1fr; }
   .app-header__brand { gap: var(--space-4); }
   .wordmark span { display: none; }
 }
 
-@media (max-width: 700px) {
+@media (max-width: 720px) {
+  .status-grid { grid-template-columns: 1fr; }
   .dashboard-alert-lane__heading { flex-direction: column; }
 }

@@ -1,107 +1,208 @@
 /*
- * Design tokens. Everything visual should resolve to a token here rather than a literal, so a
- * palette or density change stays a one-file edit. Values are tuned for a data-dense delivery tool:
- * the type scale tops out well below marketing sizes and the neutral ramp keeps long tables legible.
+ * Design tokens — the single place a palette, type scale or density change is made.
+ *
+ * Reading the numeric steps
+ * -------------------------
+ * A ramp step is NOT an absolute lightness, it is a distance from the page ground:
+ *   50…200  = grounds and tints (things you put other things on top of)
+ *   300…500 = edges, rules, bars, dividers, decorative marks
+ *   600…900 = ink (things you read)
+ * The dark theme at the bottom of this file re-points every step under that contract, which is why
+ * a domain rule like `background: var(--warning-100); color: var(--warning-600)` keeps working in
+ * both themes without a single change in the domain stylesheets.
+ *
+ * `--white` follows the same contract: it is "the ink that goes on a solid semantic fill", not
+ * literal paper. In the dark theme a solid fill is a light fill, so `--white` becomes near-black.
+ *
+ * Tuned for a data-dense delivery tool: the type scale tops out well below marketing sizes, the
+ * neutral ramp carries a deliberate evergreen bias so it sits with the brand instead of fighting
+ * it, and every ink/ground pair below is checked at >= 4.5:1.
  */
 :root {
-  /* Brand ramp — deep evergreen through the lime accent used on the logo. */
-  --brand-900: #05201b;
-  --brand-800: #0a2f27;
-  --brand-700: #0d382f;
-  --brand-600: #14513f;
-  --brand-500: #1d6b52;
-  --brand-400: #3d8f6f;
-  --brand-300: #7fb89e;
-  --brand-200: #bcdccc;
-  --brand-100: #e3f0e7;
-  --brand-50:  #f1f7f2;
+  /* ------------------------------------------------------------------ typography */
+  --font-sans: 'Inter', 'Inter var', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
 
-  --accent-600: #7d9a17;
+  /* Type scale — modest on purpose; this is a work tool, not a landing page. */
+  --text-2xs: 10px;
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-md: 16px;
+  --text-lg: 19px;
+  --text-xl: 22px;
+  --text-2xl: 27px;
+  --text-3xl: 33px;
+
+  /* Line heights. Headings are set tight, body copy generous, table rows in between so a dense
+     register stays scannable without the rows looking glued together. */
+  --leading-none: 1;
+  --leading-tight: 1.18;
+  --leading-snug: 1.32;
+  --leading-normal: 1.5;
+  --leading-body: 1.6;
+  --leading-relaxed: 1.7;
+
+  /* Tracking. Only uppercase micro-labels get real letter-spacing; headings get a touch of
+     negative tracking so large sizes do not look loose. */
+  --tracking-tighter: -.02em;
+  --tracking-tight: -.012em;
+  --tracking-normal: 0;
+  --tracking-wide: .02em;
+  --tracking-caps: .07em;
+  --tracking-caps-loose: .11em;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --weight-heavy: 800;
+
+  /* ------------------------------------------------------------------ brand ramp */
+  /* Deep evergreen through the lime accent used on the logo. */
+  --brand-900: #05201b;
+  --brand-800: #092d26;
+  --brand-700: #0e3c32;
+  --brand-600: #145243;
+  --brand-500: #1d6b56;
+  --brand-400: #3a8e75;
+  --brand-300: #7ab9a2;
+  --brand-200: #b7dccc;
+  --brand-100: #dbebe4;
+  --brand-50:  #f1f7f4;
+
+  /* Lime accent. Identity only — it never carries a status meaning. */
+  --accent-600: #55690c;
   --accent-500: #a3c62c;
   --accent-400: #cbe85d;
   --accent-200: #e6f5a8;
-  --accent-100: #f2fada;
+  --accent-100: #f4fadd;
 
-  /* Neutral ramp — very slightly warm so it sits with the greens. */
-  --neutral-900: #10231f;
-  --neutral-800: #1e332d;
-  --neutral-700: #33463f;
-  --neutral-600: #4d5f58;
-  --neutral-500: #6b7d75;
-  --neutral-400: #8f9e97;
-  --neutral-300: #bcc7c1;
-  --neutral-200: #dbe2dc;
-  --neutral-100: #eef2ed;
-  --neutral-50:  #f6f8f4;
+  /* ------------------------------------------------------------------ neutral ramp */
+  /* Hue-biased toward the brand evergreen (~168deg) at a low, controlled chroma: it reads as ink
+     and paper, not as green, but it never clashes with the greens sitting next to it. */
+  --neutral-900: #14201e;
+  --neutral-800: #24322e;
+  --neutral-700: #364845;
+  --neutral-600: #485d59;
+  --neutral-500: #5c726d;
+  --neutral-400: #93a5a1;
+  --neutral-300: #c2cfcc;
+  --neutral-200: #dfe7e5;
+  --neutral-100: #eef3f2;
+  --neutral-50:  #f8fbfa;
   --white: #ffffff;
 
-  /* Semantic status — used by pills, alert priority and validation. */
-  --success-600: #1f6b32;
-  --success-100: #dcf4df;
-  --warning-600: #8a5b00;
-  --warning-500: #d7a72f;
-  --warning-100: #fff0c7;
-  --danger-600: #a8322c;
-  --danger-500: #c54b45;
-  --danger-100: #fbe2e0;
-  --info-600: #1c5b78;
-  --info-100: #dcecf4;
+  /* ------------------------------------------------------------------ semantic ramp */
+  /* Four hues pulled deliberately apart so they separate at chip size: success sits at a warm
+     emerald (145deg) well clear of the cool brand evergreen, info is a true blue, warning a deep
+     amber, danger a brick red. Every `-600` ink clears 4.5:1 on both its own `-100` ground and on
+     the surface, so a chip is legible whether it is filled or bare. */
+  --success-700: #14572f;
+  --success-600: #1a6b3a;
+  --success-500: #2f8f56;
+  --success-100: #d6f2dd;
 
-  /* Roles */
+  --warning-700: #6d4206;
+  --warning-600: #855107;
+  --warning-500: #d09a1e;
+  --warning-100: #fdeecb;
+
+  --danger-700: #8b2521;
+  --danger-600: #a72e2a;
+  --danger-500: #c9483f;
+  --danger-100: #fbe1de;
+
+  --info-700: #124d68;
+  --info-600: #175d7c;
+  --info-500: #2b83a8;
+  --info-100: #d9ecf6;
+
+  /* ------------------------------------------------------------------ roles */
   --color-text: var(--neutral-900);
-  --color-text-muted: var(--neutral-500);
-  --color-text-subtle: var(--neutral-400);
+  --color-text-muted: var(--neutral-600);
+  --color-text-subtle: var(--neutral-500);
   --color-bg: var(--neutral-50);
   --color-surface: var(--white);
   --color-surface-sunken: var(--neutral-100);
+  --color-surface-raised: var(--white);
   --color-border: var(--neutral-200);
   --color-border-strong: var(--neutral-300);
   --color-primary: var(--brand-700);
   --color-primary-hover: var(--brand-600);
-  --color-focus-ring: rgba(29, 107, 82, .22);
+  --color-on-primary: var(--white);
+  --color-on-accent: var(--brand-900);
 
-  /* Spacing — 4px base. */
+  /* Focus. The ring colour is a deliberate step away from the surrounding surface in both themes,
+     and it is never the only cue — the halo widens the hit as well as the contrast. */
+  --color-focus: var(--brand-500);
+  --color-focus-ring: rgba(29, 107, 86, .24);
+  --color-focus-contrast: var(--white);
+
+  /* ------------------------------------------------------------------ spacing */
+  /* 4px base. Panel padding, table density and form gaps all resolve here so screens built months
+     apart still line up. */
+  --space-0: 0;
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
   --space-5: 20px;
   --space-6: 24px;
+  --space-7: 28px;
   --space-8: 32px;
   --space-10: 40px;
   --space-12: 48px;
+  --space-16: 64px;
 
-  /* Radius */
+  /* Density — one row height and one panel padding for the whole app. */
+  --table-cell-y: 10px;
+  --table-cell-x: var(--space-4);
+  --table-head-y: 8px;
+  --panel-pad: var(--space-6);
+  --panel-pad-tight: var(--space-4);
+  --control-height: 36px;
+
+  /* ------------------------------------------------------------------ radius */
+  --radius-xs: 4px;
   --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 18px;
+  --radius-md: 9px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
   --radius-pill: 999px;
 
-  /* Type scale — deliberately modest; this is a work tool, not a landing page. */
-  --text-xs: 11px;
-  --text-sm: 13px;
-  --text-base: 14px;
-  --text-md: 16px;
-  --text-lg: 19px;
-  --text-xl: 23px;
-  --text-2xl: 28px;
-  --text-3xl: 34px;
+  /* ------------------------------------------------------------------ elevation */
+  /* Shadows stay shallow and tinted with the neutral ink; a data tool should look printed, not
+     floated. Depth comes from the border first and the shadow second. */
+  --shadow-xs: 0 1px 1px rgba(20, 32, 30, .05);
+  --shadow-sm: 0 1px 2px rgba(20, 32, 30, .06), 0 1px 1px rgba(20, 32, 30, .04);
+  --shadow-md: 0 4px 10px rgba(20, 32, 30, .07), 0 1px 2px rgba(20, 32, 30, .05);
+  --shadow-lg: 0 14px 32px rgba(20, 32, 30, .10), 0 3px 8px rgba(20, 32, 30, .05);
+  --shadow-header: 0 1px 0 rgba(20, 32, 30, .06);
 
-  /* Elevation */
-  --shadow-xs: 0 1px 2px rgba(16, 35, 31, .06);
-  --shadow-sm: 0 1px 3px rgba(16, 35, 31, .07), 0 1px 2px rgba(16, 35, 31, .04);
-  --shadow-md: 0 4px 12px rgba(16, 35, 31, .07), 0 2px 4px rgba(16, 35, 31, .04);
-  --shadow-lg: 0 12px 32px rgba(16, 35, 31, .10), 0 4px 8px rgba(16, 35, 31, .04);
+  /* ------------------------------------------------------------------ motion */
+  --duration-instant: 80ms;
+  --duration-fast: 130ms;
+  --duration-base: 180ms;
+  --ease-standard: cubic-bezier(.2, 0, .2, 1);
+  --ease-exit: cubic-bezier(.4, 0, 1, 1);
 
-  /* Legacy aliases kept so the Project Controls and Risk/Change stylesheets, which predate this
-     token layer, resolve to the new scale instead of being restyled wholesale. */
+  /* ------------------------------------------------------------------ legacy aliases */
+  /* Kept so the Project Controls, Schedule and Risk/Change stylesheets, which predate this token
+     layer, resolve to the current scale instead of being restyled wholesale. */
   --color-brand-dark: var(--brand-700);
   --color-brand-deep: var(--brand-900);
   --color-accent: var(--accent-400);
   --shadow-card: var(--shadow-sm);
 
-  /* Element Plus theme overrides so its components inherit the brand instead of default blue. */
+  /* ------------------------------------------------------------------ Element Plus */
+  /* Element Plus reads its own custom properties, so pointing them at the tokens above makes its
+     components inherit the system instead of shipping their default blue next to it. */
+  --el-font-family: var(--font-sans);
+  --el-font-size-base: var(--text-base);
+  --el-border-radius-base: var(--radius-md);
+  --el-border-radius-small: var(--radius-sm);
+
   --el-color-primary: var(--brand-700);
   --el-color-primary-light-3: var(--brand-500);
   --el-color-primary-light-5: var(--brand-400);
@@ -109,18 +210,221 @@
   --el-color-primary-light-8: var(--brand-200);
   --el-color-primary-light-9: var(--brand-100);
   --el-color-primary-dark-2: var(--brand-800);
-  --el-color-success: var(--success-600);
-  --el-color-warning: var(--warning-600);
-  --el-color-danger: var(--danger-600);
-  --el-color-error: var(--danger-600);
-  --el-border-radius-base: var(--radius-md);
-  --el-font-size-base: var(--text-base);
 
-  font-family: 'Inter', 'Segoe UI', Roboto, Calibri, Arial, sans-serif;
+  --el-color-success: var(--success-600);
+  --el-color-success-light-9: var(--success-100);
+  --el-color-warning: var(--warning-600);
+  --el-color-warning-light-9: var(--warning-100);
+  --el-color-danger: var(--danger-600);
+  --el-color-danger-light-9: var(--danger-100);
+  --el-color-error: var(--danger-600);
+  --el-color-error-light-9: var(--danger-100);
+  --el-color-info: var(--info-600);
+  --el-color-info-light-9: var(--info-100);
+
+  --el-text-color-primary: var(--color-text);
+  --el-text-color-regular: var(--color-text);
+  --el-text-color-secondary: var(--color-text-muted);
+  --el-text-color-placeholder: var(--color-text-subtle);
+  --el-text-color-disabled: var(--color-text-subtle);
+
+  --el-border-color: var(--color-border-strong);
+  --el-border-color-light: var(--color-border);
+  --el-border-color-lighter: var(--color-border);
+  --el-border-color-extra-light: var(--color-border);
+  --el-border-color-hover: var(--brand-300);
+
+  --el-bg-color: var(--color-surface);
+  --el-bg-color-page: var(--color-bg);
+  --el-bg-color-overlay: var(--color-surface);
+  --el-fill-color-blank: var(--color-surface);
+  --el-fill-color: var(--color-surface-sunken);
+  --el-fill-color-light: var(--color-surface-sunken);
+  --el-fill-color-lighter: var(--color-surface-sunken);
+  --el-fill-color-extra-light: var(--color-surface-sunken);
+  --el-disabled-bg-color: var(--color-surface-sunken);
+  --el-disabled-text-color: var(--color-text-subtle);
+  --el-disabled-border-color: var(--color-border);
+  --el-box-shadow-light: var(--shadow-sm);
+
+  /* ------------------------------------------------------------------ dark palette */
+  /* Values only. The two blocks at the bottom of the file decide when they are applied, so the
+     dark theme is single-sourced here and cannot drift between the OS query and the toggle. */
+  --dk-brand-900: #d6f3e5;
+  --dk-brand-800: #b2e7ce;
+  --dk-brand-700: #8ed9b9;
+  --dk-brand-600: #74c9a7;
+  --dk-brand-500: #52b18e;
+  --dk-brand-400: #3f9174;
+  --dk-brand-300: #2b6857;
+  --dk-brand-200: #1c4136;
+  --dk-brand-100: #143028;
+  --dk-brand-50:  #0e211c;
+
+  --dk-accent-600: #d3ec7c;
+  --dk-accent-500: #a3c62c;
+  --dk-accent-400: #cbe85d;
+  --dk-accent-200: #313a10;
+  --dk-accent-100: #22280c;
+
+  --dk-neutral-900: #eaf1ee;
+  --dk-neutral-800: #dbe4e1;
+  --dk-neutral-700: #c2cfcb;
+  --dk-neutral-600: #a8b8b3;
+  --dk-neutral-500: #8b9d98;
+  --dk-neutral-400: #5c716c;
+  --dk-neutral-300: #3a4d46;
+  --dk-neutral-200: #253430;
+  --dk-neutral-100: #1a2724;
+  --dk-neutral-50:  #0c1513;
+  --dk-white: #0b1512;
+
+  --dk-success-700: #8fe5b3;
+  --dk-success-600: #63d493;
+  --dk-success-500: #3fae74;
+  --dk-success-100: #10301d;
+
+  --dk-warning-700: #f7d68f;
+  --dk-warning-600: #f0bf5c;
+  --dk-warning-500: #d09a1e;
+  --dk-warning-100: #33260a;
+
+  --dk-danger-700: #ffb3ac;
+  --dk-danger-600: #ff8b83;
+  --dk-danger-500: #d9584f;
+  --dk-danger-100: #3a1715;
+
+  --dk-info-700: #a5dcf3;
+  --dk-info-600: #79c6ea;
+  --dk-info-500: #2b83a8;
+  --dk-info-100: #0f2a38;
+
+  --dk-surface: #131f1c;
+  --dk-surface-sunken: #1a2724;
+  --dk-surface-raised: #1c2a26;
+
+  font-family: var(--font-sans);
   font-size: var(--text-base);
+  line-height: var(--leading-body);
   color: var(--color-text);
   background: var(--color-bg);
+  color-scheme: light;
   font-synthesis: none;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
+
+/*
+ * Dark theme.
+ *
+ * Not an inversion: the ramps are re-pointed under the "distance from the ground" contract at the
+ * top of this file, and every ink/ground pair was re-checked rather than flipped. Grounds stay
+ * genuinely dark (a near-black page, a raised panel, a sunken well) and the semantic inks are
+ * lifted to bright tints that clear 7:1 on their own ground, because a washed-out red is the one
+ * thing this product cannot afford.
+ *
+ * Applied twice on purpose: the media query is guarded with :not([data-theme="light"]) so an
+ * explicit light toggle beats the OS, and the attribute block lets an explicit dark toggle beat a
+ * light OS. Both read the same --dk-* values.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --brand-900: var(--dk-brand-900); --brand-800: var(--dk-brand-800); --brand-700: var(--dk-brand-700);
+    --brand-600: var(--dk-brand-600); --brand-500: var(--dk-brand-500); --brand-400: var(--dk-brand-400);
+    --brand-300: var(--dk-brand-300); --brand-200: var(--dk-brand-200); --brand-100: var(--dk-brand-100);
+    --brand-50: var(--dk-brand-50);
+
+    --accent-600: var(--dk-accent-600); --accent-500: var(--dk-accent-500); --accent-400: var(--dk-accent-400);
+    --accent-200: var(--dk-accent-200); --accent-100: var(--dk-accent-100);
+
+    --neutral-900: var(--dk-neutral-900); --neutral-800: var(--dk-neutral-800); --neutral-700: var(--dk-neutral-700);
+    --neutral-600: var(--dk-neutral-600); --neutral-500: var(--dk-neutral-500); --neutral-400: var(--dk-neutral-400);
+    --neutral-300: var(--dk-neutral-300); --neutral-200: var(--dk-neutral-200); --neutral-100: var(--dk-neutral-100);
+    --neutral-50: var(--dk-neutral-50); --white: var(--dk-white);
+
+    --success-700: var(--dk-success-700); --success-600: var(--dk-success-600);
+    --success-500: var(--dk-success-500); --success-100: var(--dk-success-100);
+    --warning-700: var(--dk-warning-700); --warning-600: var(--dk-warning-600);
+    --warning-500: var(--dk-warning-500); --warning-100: var(--dk-warning-100);
+    --danger-700: var(--dk-danger-700); --danger-600: var(--dk-danger-600);
+    --danger-500: var(--dk-danger-500); --danger-100: var(--dk-danger-100);
+    --info-700: var(--dk-info-700); --info-600: var(--dk-info-600);
+    --info-500: var(--dk-info-500); --info-100: var(--dk-info-100);
+
+    --color-surface: var(--dk-surface);
+    --color-surface-sunken: var(--dk-surface-sunken);
+    --color-surface-raised: var(--dk-surface-raised);
+    --color-border: var(--neutral-200);
+    --color-border-strong: var(--neutral-300);
+    --color-on-primary: var(--white);
+    --color-on-accent: #16200a;
+    --color-focus: #6fd3ab;
+    --color-focus-ring: rgba(111, 211, 171, .28);
+    --color-focus-contrast: #0b1512;
+
+    /* Element Plus paints solid-button and solid-tag text with --el-color-white. On a dark ground
+       a solid fill is a light fill, so that ink has to travel with --white or every primary button
+       loses its label. */
+    --el-color-white: var(--white);
+    --el-color-black: var(--neutral-900);
+    --el-mask-color: rgba(12, 21, 19, .8);
+
+    --shadow-xs: 0 1px 1px rgba(0, 0, 0, .30);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, .38), 0 1px 1px rgba(0, 0, 0, .24);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, .44), 0 1px 2px rgba(0, 0, 0, .30);
+    --shadow-lg: 0 16px 36px rgba(0, 0, 0, .52), 0 4px 10px rgba(0, 0, 0, .34);
+    --shadow-header: 0 1px 0 rgba(0, 0, 0, .5);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --brand-900: var(--dk-brand-900); --brand-800: var(--dk-brand-800); --brand-700: var(--dk-brand-700);
+  --brand-600: var(--dk-brand-600); --brand-500: var(--dk-brand-500); --brand-400: var(--dk-brand-400);
+  --brand-300: var(--dk-brand-300); --brand-200: var(--dk-brand-200); --brand-100: var(--dk-brand-100);
+  --brand-50: var(--dk-brand-50);
+
+  --accent-600: var(--dk-accent-600); --accent-500: var(--dk-accent-500); --accent-400: var(--dk-accent-400);
+  --accent-200: var(--dk-accent-200); --accent-100: var(--dk-accent-100);
+
+  --neutral-900: var(--dk-neutral-900); --neutral-800: var(--dk-neutral-800); --neutral-700: var(--dk-neutral-700);
+  --neutral-600: var(--dk-neutral-600); --neutral-500: var(--dk-neutral-500); --neutral-400: var(--dk-neutral-400);
+  --neutral-300: var(--dk-neutral-300); --neutral-200: var(--dk-neutral-200); --neutral-100: var(--dk-neutral-100);
+  --neutral-50: var(--dk-neutral-50); --white: var(--dk-white);
+
+  --success-700: var(--dk-success-700); --success-600: var(--dk-success-600);
+  --success-500: var(--dk-success-500); --success-100: var(--dk-success-100);
+  --warning-700: var(--dk-warning-700); --warning-600: var(--dk-warning-600);
+  --warning-500: var(--dk-warning-500); --warning-100: var(--dk-warning-100);
+  --danger-700: var(--dk-danger-700); --danger-600: var(--dk-danger-600);
+  --danger-500: var(--dk-danger-500); --danger-100: var(--dk-danger-100);
+  --info-700: var(--dk-info-700); --info-600: var(--dk-info-600);
+  --info-500: var(--dk-info-500); --info-100: var(--dk-info-100);
+
+  --color-surface: var(--dk-surface);
+  --color-surface-sunken: var(--dk-surface-sunken);
+  --color-surface-raised: var(--dk-surface-raised);
+  --color-border: var(--neutral-200);
+  --color-border-strong: var(--neutral-300);
+  --color-on-primary: var(--white);
+  --color-on-accent: #16200a;
+  --color-focus: #6fd3ab;
+  --color-focus-ring: rgba(111, 211, 171, .28);
+  --color-focus-contrast: #0b1512;
+
+  --el-color-white: var(--white);
+  --el-color-black: var(--neutral-900);
+  --el-mask-color: rgba(12, 21, 19, .8);
+
+  --shadow-xs: 0 1px 1px rgba(0, 0, 0, .30);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .38), 0 1px 1px rgba(0, 0, 0, .24);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, .44), 0 1px 2px rgba(0, 0, 0, .30);
+  --shadow-lg: 0 16px 36px rgba(0, 0, 0, .52), 0 4px 10px rgba(0, 0, 0, .34);
+  --shadow-header: 0 1px 0 rgba(0, 0, 0, .5);
+}
+
+/* An explicit light toggle re-asserts the light ground even under a dark OS. */
+:root[data-theme="light"] { color-scheme: light; }

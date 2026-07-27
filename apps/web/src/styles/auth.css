@@ -14,7 +14,7 @@
   justify-content: center;
   color: var(--brand-50);
   background:
-    radial-gradient(circle at 78% 18%, rgba(203, 232, 93, .22), transparent 34%),
+    radial-gradient(circle at 78% 18%, color-mix(in srgb, var(--accent-400) 22%, transparent), transparent 34%),
     linear-gradient(145deg, var(--brand-700) 0%, var(--brand-900) 72%);
 }
 
@@ -23,11 +23,13 @@
   position: absolute;
   width: 520px;
   height: 520px;
-  border: 1px solid rgba(204, 234, 113, .16);
+  border: 1px solid color-mix(in srgb, var(--accent-400) 16%, transparent);
   border-radius: 50%;
   right: -210px;
   bottom: -260px;
-  box-shadow: 0 0 0 70px rgba(204, 234, 113, .03), 0 0 0 140px rgba(204, 234, 113, .02);
+  box-shadow:
+    0 0 0 70px color-mix(in srgb, var(--accent-400) 3%, transparent),
+    0 0 0 140px color-mix(in srgb, var(--accent-400) 2%, transparent);
 }
 
 /* The marketing side of the split is the one place a display size is appropriate. */
@@ -63,7 +65,7 @@
 
 .login-card h2 { margin: var(--space-2) 0 var(--space-1); font-size: var(--text-2xl); }
 .login-card .el-alert { margin-bottom: var(--space-5); }
-.login-card label { display: grid; gap: var(--space-1); margin-bottom: var(--space-4); color: var(--color-text-muted); font-weight: 600; font-size: var(--text-sm); }
+.login-card label { display: grid; gap: var(--space-1); margin-bottom: var(--space-4); color: var(--color-text-muted); font-size: var(--text-sm); font-weight: 700; }
 
 .login-button { width: 100%; height: 44px; margin-top: var(--space-2); font-weight: 650; }
 

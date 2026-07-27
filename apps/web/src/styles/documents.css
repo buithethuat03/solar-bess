@@ -119,9 +119,6 @@
   box-shadow: var(--shadow-md);
 }
 
-.document-detail .detail-heading small { color: var(--brand-500); font-weight: 900; letter-spacing: .1em; }
-.document-detail .detail-heading h2 { margin: var(--space-1) 0; }
-
 .document-current {
   display: flex;
   flex-wrap: wrap;
@@ -191,4 +188,15 @@
 
 @media (max-width: 720px) {
   .document-toolbar, .document-form { grid-template-columns: 1fr; }
+}
+
+/**
+ * A revision whose scan is not CLEAN cannot be released. `data-scan` already carries the colour,
+ * but colour alone fails a colour-blind reader and fails on a cheap site-office monitor, so the
+ * blocked state is reinforced structurally: heavier weight and a left rule that survives both.
+ */
+.scan-chip[data-blocked="true"] {
+  font-weight: 650;
+  border-left-width: 3px;
+  padding-left: calc(var(--space-2) - 2px);
 }

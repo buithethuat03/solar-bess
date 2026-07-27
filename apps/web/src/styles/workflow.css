@@ -28,8 +28,8 @@
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--color-border);
   /* The accent bar carries urgency: returned work needs attention before fresh submissions. */
-  border-left: 3px solid var(--brand-400);
-  border-radius: var(--radius-md);
+  border-left: 4px solid var(--brand-400);
+  border-radius: var(--radius-sm) var(--radius-md) var(--radius-md) var(--radius-sm);
   background: var(--color-surface);
   color: inherit;
   text-align: left;
@@ -38,7 +38,9 @@
 }
 
 .approval-inbox__list li[data-state="RETURNED"] button { border-left-color: var(--warning-500); }
-.approval-inbox__list li[data-state="CONFIGURATION_ERROR"] button { border-left-color: var(--danger-500); }
+
+/* A misconfigured workflow blocks the decision entirely: widen the rule, do not only recolour it. */
+.approval-inbox__list li[data-state="CONFIGURATION_ERROR"] button { border-left-width: 6px; border-left-color: var(--danger-600); }
 
 .approval-inbox__list button:hover { border-color: var(--brand-300); box-shadow: var(--shadow-md); }
 
@@ -78,7 +80,7 @@
   color: var(--color-text-subtle);
   font-size: var(--text-xs);
   font-weight: 700;
-  letter-spacing: .08em;
+  letter-spacing: .06em;
 }
 
 .approval-inbox__detail h3 { margin: var(--space-1) 0 0; font-size: var(--text-md); overflow-wrap: anywhere; }
@@ -106,7 +108,7 @@
   text-transform: uppercase;
 }
 
-.approval-inbox__facts dd { margin: var(--space-1) 0 0; font-weight: 600; }
+.approval-inbox__facts dd { margin: var(--space-1) 0 0; font-weight: 700; font-variant-numeric: tabular-nums; }
 
 .approval-inbox__history {
   display: grid;
@@ -133,8 +135,8 @@
   display: grid;
   gap: var(--space-1);
   color: var(--color-text-muted);
-  font-weight: 600;
   font-size: var(--text-sm);
+  font-weight: 700;
 }
 
 .approval-inbox__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }

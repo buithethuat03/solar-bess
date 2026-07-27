@@ -1,66 +1,518 @@
-.page-heading__actions, .schedule-heading-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
-.schedule-page-heading h1 { max-width: none; font-size: clamp(38px, 5vw, 64px); }
-.schedule-loading { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; min-height: 230px; }
-.schedule-loading div { height: 120px; border-radius: var(--radius-lg); background: linear-gradient(100deg, #e9ece5 25%, #f6f7f3 45%, #e9ece5 65%); background-size: 240% 100%; animation: schedule-pulse 1.4s infinite linear; }
-.schedule-loading p { grid-column: 1 / -1; margin: 0; color: #66736d; text-align: center; }
+/*
+ * Project Controls · US-003 schedule workspace.
+ *
+ * This sheet predates the token layer and used to carry its own hex ramp, so the same panel, chip and
+ * table drifted away from the newer slices. Every value now resolves to a token and every repeated
+ * object — toolbar, panel, note banner, status chip, issue row — uses the shared shape.
+ *
+ * Two signals must survive a greyscale print and a colour-blind reader, so neither leans on hue:
+ * critical / near-critical forecast bars stay hatched (a pattern, not a shade), and a validation
+ * issue at ERROR severity keeps a heavier leading rule on top of its tint.
+ */
+
+/* Heading action group — shared shape lives with .page-heading in projects.css. */
+.schedule-heading-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
+
+/*
+ * Loading skeleton. Shared with the Risk/Change workspace so both screens shimmer identically;
+ * risk-change.css only overrides its column count.
+ */
+.schedule-loading, .risk-change-loading {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4);
+  min-height: 230px;
+}
+
+.schedule-loading div, .risk-change-loading span {
+  height: 120px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(100deg, var(--neutral-100) 25%, var(--neutral-50) 45%, var(--neutral-100) 65%);
+  background-size: 240% 100%;
+  animation: schedule-pulse 1.4s infinite linear;
+}
+
+.schedule-loading p, .risk-change-loading p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
 @keyframes schedule-pulse { to { background-position-x: -240%; } }
 
-.schedule-state-panel { display: grid; justify-items: center; max-width: 720px; margin: 20px auto; padding: 60px 36px; border: 1px dashed #aeb9ad; border-radius: 20px; background: rgba(255,255,255,.65); text-align: center; }
-.schedule-state-panel > span { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: #e7eddd; color: #425e18; font-size: 26px; font-weight: 900; }
-.schedule-state-panel h2 { margin: 18px 0 4px; }.schedule-state-panel p { max-width: 560px; color: #64726b; line-height: 1.55; }
-.schedule-state-panel--warning { border-color: #d4ad57; background: #fff9e9; }.schedule-state-panel--warning > span { background: #ffe9b4; color: #815a00; }
+/* Full-screen state panel — the .empty-panel treatment with room for a glyph and a command. */
+.schedule-state-panel {
+  display: grid;
+  justify-items: center;
+  max-width: 720px;
+  margin: var(--space-5) auto;
+  padding: var(--space-10) var(--space-6);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-muted);
+  text-align: center;
+}
 
-.schedule-context { display: grid; grid-template-columns: 1.4fr repeat(5, minmax(0, 1fr)); gap: 1px; overflow: hidden; margin: 18px 0; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-border); }
-.schedule-context > div { display: grid; align-content: center; min-width: 0; padding: 13px 15px; background: var(--color-surface); }
-.schedule-context span, .schedule-detail-grid span, .baseline-snapshot span { color: #77847d; font-size: 11px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
-.schedule-context strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
-.schedule-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin: 18px 0; }
-.schedule-kpis article { display: grid; gap: 8px; min-height: 140px; padding: 22px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-card); }
-.schedule-kpis span { color: #63726b; font-weight: 700; }.schedule-kpis strong { align-self: end; font-size: var(--text-2xl); font-weight: 650; }.schedule-kpis small { color: #7b8881; }
-.schedule-kpis__warning { border-color: #e2b655 !important; background: #fffbef !important; }.schedule-kpis__warning strong { color: #956400; }
+.schedule-state-panel > span {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--brand-100);
+  color: var(--brand-700);
+  font-size: var(--text-2xl);
+  font-weight: 900;
+}
 
-.schedule-toolbar { display: grid; grid-template-columns: repeat(5, minmax(120px, 1fr)); gap: 12px; align-items: end; padding: 18px; margin: 18px 0; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: rgba(255,255,255,.8); }
-.schedule-toolbar > label, .schedule-form-grid label { display: grid; gap: 6px; color: #56655e; font-size: 13px; font-weight: 700; }
-.schedule-toolbar__checks { display: flex; grid-column: 1 / span 3; flex-wrap: wrap; gap: 18px; align-self: center; }
-.schedule-toolbar__checks label { display: flex; align-items: center; gap: 7px; color: #4f5e57; font-size: 13px; font-weight: 700; }
-.schedule-toolbar__checks input { width: auto; }.schedule-toolbar__commands { display: flex; grid-column: span 1; justify-content: flex-end; gap: 8px; }
-.schedule-mobile-boundary { display: none; padding: 12px 14px; border-left: 4px solid #6f8c28; border-radius: 5px 10px 10px 5px; background: #edf2e4; color: #526159; font-size: 13px; }
+.schedule-state-panel h2 { margin: var(--space-5) 0 var(--space-1); color: var(--color-text); }
+.schedule-state-panel p { max-width: 560px; color: var(--color-text-muted); }
 
-.schedule-command-form { display: grid; gap: 18px; padding: 24px; margin: 18px 0; border: 1px solid #b9c6b2; border-radius: 18px; background: var(--color-surface); box-shadow: 0 20px 50px rgba(19,47,38,.08); }
-.schedule-command-form__heading { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; }.schedule-command-form__heading small { color: #66802b; font-weight: 900; letter-spacing: .1em; }.schedule-command-form__heading h2, .schedule-command-form__heading h3 { margin: 5px 0; }.schedule-command-form__heading p { margin: 0; color: #67756e; }
+.schedule-state-panel--warning { border-color: var(--warning-500); background: var(--warning-100); }
+.schedule-state-panel--warning > span { background: var(--warning-100); color: var(--warning-600); }
+
+/* Context strip and fact grids — one hairline grid, one micro-caps label treatment. */
+.schedule-context {
+  display: grid;
+  grid-template-columns: 1.4fr repeat(5, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  margin: var(--space-5) 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-border);
+}
+
+.schedule-context > div {
+  display: grid;
+  align-content: center;
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+}
+
+.schedule-context span, .schedule-detail-grid span, .baseline-snapshot span {
+  color: var(--color-text-subtle);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.schedule-context strong {
+  overflow: hidden;
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* KPI tiles — same tile as .risk-change-kpis; only the column count differs. */
+.schedule-kpis, .risk-change-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: var(--space-5) 0;
+}
+
+.schedule-kpis article, .risk-change-kpis article {
+  display: grid;
+  gap: var(--space-2);
+  min-height: 120px;
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.schedule-kpis span, .risk-change-kpis span { color: var(--color-text-muted); font-weight: 700; }
+.schedule-kpis small, .risk-change-kpis small { color: var(--color-text-muted); font-size: var(--text-sm); }
+
+.schedule-kpis strong, .risk-change-kpis strong {
+  align-self: end;
+  font-size: var(--text-2xl);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A KPI off plan keeps a warning surface AND a weight change, so it is not a colour-only signal. */
+.schedule-kpis__warning { border-color: var(--warning-500) !important; background: var(--warning-100) !important; }
+.schedule-kpis__warning strong { color: var(--warning-600); font-weight: 800; }
+
+/* Filter toolbar — the shape every register screen uses. */
+.schedule-toolbar {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  gap: var(--space-3);
+  align-items: end;
+  padding: var(--space-4);
+  margin: var(--space-5) 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.schedule-toolbar > label, .schedule-form-grid label {
+  display: grid;
+  gap: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.schedule-toolbar__checks {
+  display: flex;
+  grid-column: 1 / span 3;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-self: center;
+}
+
+.schedule-toolbar__checks label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.schedule-toolbar__checks input { width: auto; }
+
+.schedule-toolbar__commands {
+  display: flex;
+  grid-column: span 1;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+/* Scope note — same left-rule banner as the dashboard boundary note and the risk scope banner. */
+.schedule-mobile-boundary {
+  display: none;
+  padding: var(--space-3) var(--space-4);
+  border-left: 4px solid var(--accent-500);
+  border-radius: var(--radius-sm) var(--radius-md) var(--radius-md) var(--radius-sm);
+  background: var(--accent-100);
+  color: var(--brand-800);
+  font-size: var(--text-sm);
+}
+
+/* Command surfaces — the detail-panel shape shared with every other slice. */
+.schedule-command-form {
+  display: grid;
+  gap: var(--space-5);
+  padding: var(--space-6);
+  margin: var(--space-4) 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+}
+
+.schedule-command-form__heading {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  align-items: flex-start;
+  margin-bottom: var(--space-4);
+}
+
+.schedule-command-form__heading small { color: var(--brand-500); font-weight: 900; letter-spacing: .1em; }
+.schedule-command-form__heading h2, .schedule-command-form__heading h3 { margin: var(--space-1) 0; }
+.schedule-command-form__heading p { margin: 0; color: var(--color-text-muted); font-size: var(--text-sm); }
+
 .text-action { padding: var(--space-1) var(--space-2); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--brand-600); cursor: pointer; font-weight: 650; }
 .text-action:hover { color: var(--brand-800); background: var(--brand-100); }
-.schedule-command-form__actions { display: flex; justify-content: flex-end; gap: 9px; }
-.schedule-form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }.schedule-form-grid__wide { grid-column: 1 / -1; }
-.schedule-file-input { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 1px dashed #9faa99; border-radius: 10px; color: #56635d; font-weight: 700; }.schedule-file-input input { width: auto; padding: 0; border: 0; }
-.schedule-json-editor { min-height: 320px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; line-height: 1.55; tab-size: 2; }
-.schedule-preview-result { display: flex; justify-content: space-between; gap: 12px; padding: 13px 15px; border-radius: 10px; background: #eef4e6; color: #3d5318; }
-.schedule-preview-issues { display: grid; gap: 8px; padding: 0; margin: 0; list-style: none; }.schedule-preview-issues li { display: grid; grid-template-columns: 160px 1fr minmax(140px, auto); gap: 12px; padding: 11px 13px; border-left: 4px solid #d49b25; border-radius: var(--radius-sm); background: #fff8e7; }.schedule-preview-issues li[data-severity="ERROR"] { border-color: #bc3f3f; background: #fff0f0; }.schedule-preview-issues code { color: #67736d; font-size: 12px; }
-.schedule-mutation-issues { margin: 14px 0; }.schedule-inline-conflict { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 16px 18px; margin: 14px 0; border: 1px solid #d4ad57; border-radius: var(--radius-md); background: #fff9e9; }.schedule-inline-conflict p { margin: 4px 0 0; color: #685933; }
-.baseline-snapshot, .schedule-detail-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); overflow: hidden; border: 1px solid var(--color-border); border-radius: var(--radius-md); }
-.baseline-snapshot > div, .schedule-detail-grid > div { display: grid; gap: 7px; min-width: 0; padding: 14px; border-right: 1px solid var(--color-border); background: #fafbf8; }.baseline-snapshot > div:last-child { border-right: 0; }.baseline-snapshot code { overflow: hidden; text-overflow: ellipsis; }
-.schedule-readonly-note { margin: 0; color: #6e7973; }
 
-.schedule-issues, .schedule-alerts { margin-top: 18px; padding: 20px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: rgba(255,255,255,.75); }
-.schedule-issues .section-heading, .schedule-alerts .section-heading { margin-bottom: 12px; }
-.schedule-issues ul { display: grid; gap: 8px; padding: 0; margin: 0; list-style: none; }.schedule-issues li { display: grid; grid-template-columns: 150px 1fr minmax(140px, auto); gap: 12px; align-items: center; padding: 12px 14px; border-left: 4px solid #d49b25; border-radius: var(--radius-sm); background: #fff8e7; }.schedule-issues li[data-severity="ERROR"] { border-color: #bc3f3f; background: #fff0f0; }.schedule-issues code { color: #67736d; font-size: 12px; }
-.schedule-alerts__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }.schedule-alerts__grid button { display: grid; gap: 5px; padding: 14px; border: 1px solid #e2c576; border-radius: var(--radius-md); background: #fffaec; color: inherit; cursor: pointer; text-align: left; }.schedule-alerts__grid button[data-priority="HIGH"] { border-color: #d56c54; background: #fff0ec; }.schedule-alerts__grid small { color: #6f7974; }
+.schedule-command-form__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
 
-.schedule-status { display: inline-flex; padding: 6px 10px; border-radius: 999px; background: #e8eee1; color: #516148; font-size: 12px; font-weight: 900; letter-spacing: .06em; }.schedule-status[data-status="APPROVED"] { background: #daf2df; color: #226333; }.schedule-status[data-status="RETURNED"], .schedule-status[data-status="REJECTED"] { background: #fee1dc; color: #87372a; }
-.schedule-gantt { overflow: hidden; border: 1px solid var(--color-border); border-radius: 13px; background: var(--color-surface); }
-.schedule-gantt__legend { display: flex; flex-wrap: wrap; gap: 15px; padding: 12px 15px; border-bottom: 1px solid var(--color-border); background: #fafbf8; }.schedule-gantt__legend span { display: flex; align-items: center; gap: 6px; color: #63716a; font-size: 11px; font-weight: 700; }.schedule-gantt__legend i { display: inline-block; width: 23px; height: 7px; border-radius: 3px; }.legend-plan { border: 1px dashed #7b8881; background: transparent; }.legend-forecast { background: #638227; }.legend-critical { background: repeating-linear-gradient(135deg,#b53a37 0 4px,#ed8a82 4px 8px); }.legend-near { background: repeating-linear-gradient(135deg,#bc7e05 0 4px,#f2cb69 4px 8px); }.legend-milestone { width: 9px !important; height: 9px !important; border-radius: 1px !important; background: #263d36; transform: rotate(45deg); }
-.schedule-gantt__header, .schedule-gantt__row { display: grid; grid-template-columns: minmax(300px, 1.35fr) minmax(300px, 2fr) 110px; width: 100%; min-width: 760px; }
-.schedule-gantt__header { color: #69766f; background: #f1f4ed; font-size: 11px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }.schedule-gantt__header span { padding: 10px 14px; }
-.schedule-gantt__row { align-items: stretch; padding: 0; border: 0; border-top: 1px solid #e7ebe3; background: var(--color-surface); color: inherit; cursor: pointer; text-align: left; }.schedule-gantt__row:hover, .schedule-gantt__row:focus-visible { z-index: 1; outline: 2px solid #789538; outline-offset: -2px; background: #f9fbf6; }
-.schedule-gantt__identity { display: grid; gap: 3px; padding: 11px 14px; border-right: 1px solid #e7ebe3; }.schedule-gantt__identity small { overflow: hidden; color: #7b8881; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }.schedule-gantt__identity strong { font-size: 13px; }.schedule-gantt__identity em { color: #66736d; font-size: 10px; font-style: normal; }
-.schedule-gantt__track { position: relative; display: block; min-height: 58px; margin: 6px 10px; background-image: linear-gradient(to right, rgba(114,129,121,.12) 1px, transparent 1px); background-size: 10% 100%; }.schedule-gantt__track i { position: absolute; display: block; }
-.schedule-gantt__plan { top: 15px; height: 12px; border: 1px dashed #748178; border-radius: 4px; background: rgba(118,132,124,.12); }.schedule-gantt__forecast { top: 31px; height: 13px; border-radius: 4px; background: #698829; }.schedule-gantt__forecast.is-critical { background: repeating-linear-gradient(135deg,#af3835 0 5px,#e88079 5px 10px); }.schedule-gantt__forecast.is-near-critical { background: repeating-linear-gradient(135deg,#b87a03 0 5px,#efc660 5px 10px); }.schedule-gantt__milestone { top: 23px; width: 13px !important; height: 13px; border-radius: 2px; background: #253d35; transform: rotate(45deg); }.schedule-gantt__milestone.is-critical { background: #b23b37; }
-.schedule-gantt__progress { display: grid; align-content: center; justify-items: start; gap: 2px; padding: 9px; border-left: 1px solid #e7ebe3; }.schedule-gantt__progress small { color: #6c7972; font-size: 10px; }
+.schedule-form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); }
+.schedule-form-grid__wide { grid-column: 1 / -1; }
 
-.schedule-activity-detail { display: grid; gap: 18px; padding: 24px; margin-top: 18px; border: 1px solid #9faf98; border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: 0 20px 50px rgba(18,42,34,.08); }.schedule-detail-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }.schedule-detail-grid > div { border-bottom: 1px solid var(--color-border); }.schedule-detail-grid strong { overflow-wrap: anywhere; }
-.schedule-dependencies { display: grid; gap: 7px; padding: 0; margin: 0; list-style: none; }.schedule-dependencies li { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center; padding: 10px 12px; border-radius: var(--radius-sm); background: #f5f7f2; }.schedule-dependencies strong { color: #526c19; }
+.schedule-file-input {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  font-weight: 700;
+}
 
-@media (max-width: 1020px) {
+.schedule-file-input input { width: auto; padding: 0; border: 0; }
+
+.schedule-json-editor {
+  min-height: 320px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  tab-size: 2;
+}
+
+.schedule-preview-result {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--brand-100);
+  color: var(--brand-700);
+}
+
+/*
+ * Validation issues. The preview list and the persisted list are the same object, so they share one
+ * rule. Severity carries a leading rule plus a tint, and ERROR widens the rule instead of only
+ * changing its hue.
+ */
+.schedule-preview-issues, .schedule-issues ul {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.schedule-preview-issues li, .schedule-issues li {
+  display: grid;
+  grid-template-columns: 150px 1fr minmax(140px, auto);
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  border-left: 4px solid var(--warning-500);
+  border-radius: var(--radius-sm) var(--radius-md) var(--radius-md) var(--radius-sm);
+  background: var(--warning-100);
+}
+
+.schedule-preview-issues li[data-severity="ERROR"], .schedule-issues li[data-severity="ERROR"] {
+  border-left-width: 6px;
+  border-left-color: var(--danger-600);
+  background: var(--danger-100);
+}
+
+.schedule-preview-issues li[data-severity="ERROR"] strong,
+.schedule-issues li[data-severity="ERROR"] strong { color: var(--danger-600); font-weight: 800; }
+
+.schedule-preview-issues code, .schedule-issues code { color: var(--color-text-muted); font-size: var(--text-xs); }
+
+.schedule-mutation-issues { margin: var(--space-4) 0; }
+
+.schedule-inline-conflict {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  margin: var(--space-4) 0;
+  border: 1px solid var(--warning-500);
+  border-radius: var(--radius-md);
+  background: var(--warning-100);
+}
+
+.schedule-inline-conflict p { margin: var(--space-1) 0 0; color: var(--warning-600); font-size: var(--text-sm); }
+
+.baseline-snapshot, .schedule-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.baseline-snapshot > div, .schedule-detail-grid > div {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-4);
+  border-right: 1px solid var(--color-border);
+  background: var(--neutral-50);
+}
+
+.baseline-snapshot > div:last-child { border-right: 0; }
+.baseline-snapshot code { overflow: hidden; text-overflow: ellipsis; }
+
+.schedule-readonly-note { margin: var(--space-3) 0; color: var(--color-text-muted); font-size: var(--text-sm); }
+
+/* Issue / alert lanes use the same shell as the dashboard lanes. */
+.schedule-issues, .schedule-alerts {
+  padding: var(--space-6);
+  margin-top: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Layout only. Surface, border, priority rule and hover come from dashboard.css. */
+.schedule-alerts__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+/* Schedule lifecycle chip — the .status-pill shape, scoped to the workspace heading. */
+.schedule-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: .04em;
+  white-space: nowrap;
+}
+
+.schedule-status[data-status="APPROVED"] { background: var(--success-100); color: var(--success-600); }
+.schedule-status[data-status="RETURNED"],
+.schedule-status[data-status="REJECTED"] { background: var(--danger-100); color: var(--danger-600); }
+
+/*
+ * Gantt-lite. The bar chart is wider than the viewport on anything but a large desktop, so it owns
+ * its horizontal scroll and the page body never moves sideways.
+ */
+.schedule-gantt {
+  overflow: auto hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.schedule-gantt__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-sunken);
+}
+
+.schedule-gantt__legend span {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.schedule-gantt__legend i { display: inline-block; width: 23px; height: 7px; border-radius: 3px; }
+
+.legend-plan { border: 1px dashed var(--neutral-500); background: transparent; }
+.legend-forecast { background: var(--accent-600); }
+/* Criticality is hatched, never a flat shade: the pattern is what survives a monochrome print. */
+.legend-critical { background: repeating-linear-gradient(135deg, var(--danger-600) 0 4px, var(--danger-500) 4px 8px); }
+.legend-near { background: repeating-linear-gradient(135deg, var(--warning-600) 0 4px, var(--warning-500) 4px 8px); }
+.legend-milestone { width: 9px !important; height: 9px !important; border-radius: 1px !important; background: var(--neutral-800); transform: rotate(45deg); }
+
+.schedule-gantt__header, .schedule-gantt__row {
+  display: grid;
+  grid-template-columns: minmax(300px, 1.35fr) minmax(300px, 2fr) 110px;
+  width: 100%;
+  min-width: 760px;
+}
+
+.schedule-gantt__header {
+  color: var(--color-text-muted);
+  background: var(--color-surface-sunken);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.schedule-gantt__header span { padding: var(--space-3) var(--space-4); }
+
+.schedule-gantt__row {
+  align-items: stretch;
+  padding: 0;
+  border: 0;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.schedule-gantt__row:hover, .schedule-gantt__row:focus-visible {
+  z-index: 1;
+  outline: 2px solid var(--brand-500);
+  outline-offset: -2px;
+  background: var(--brand-50);
+}
+
+.schedule-gantt__identity {
+  display: grid;
+  gap: 3px;
+  padding: var(--space-3) var(--space-4);
+  border-right: 1px solid var(--color-border);
+}
+
+.schedule-gantt__identity small { overflow: hidden; color: var(--color-text-muted); font-size: var(--text-xs); text-overflow: ellipsis; white-space: nowrap; }
+.schedule-gantt__identity strong { font-size: var(--text-sm); }
+.schedule-gantt__identity em { color: var(--color-text-muted); font-size: var(--text-xs); font-style: normal; }
+
+.schedule-gantt__track {
+  position: relative;
+  display: block;
+  min-height: 58px;
+  margin: var(--space-2) var(--space-3);
+  background-image: linear-gradient(to right, var(--color-border) 1px, transparent 1px);
+  background-size: 10% 100%;
+}
+
+.schedule-gantt__track i { position: absolute; display: block; }
+
+.schedule-gantt__plan { top: 15px; height: 12px; border: 1px dashed var(--neutral-500); border-radius: 4px; background: var(--neutral-100); }
+.schedule-gantt__forecast { top: 31px; height: 13px; border-radius: 4px; background: var(--accent-600); }
+.schedule-gantt__forecast.is-critical { background: repeating-linear-gradient(135deg, var(--danger-600) 0 5px, var(--danger-500) 5px 10px); }
+.schedule-gantt__forecast.is-near-critical { background: repeating-linear-gradient(135deg, var(--warning-600) 0 5px, var(--warning-500) 5px 10px); }
+.schedule-gantt__milestone { top: 23px; width: 13px !important; height: 13px; border-radius: 2px; background: var(--neutral-800); transform: rotate(45deg); }
+.schedule-gantt__milestone.is-critical { background: var(--danger-600); }
+
+.schedule-gantt__progress {
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 2px;
+  padding: var(--space-2);
+  border-left: 1px solid var(--color-border);
+  font-variant-numeric: tabular-nums;
+}
+
+.schedule-gantt__progress small { color: var(--color-text-muted); font-size: var(--text-xs); }
+
+.schedule-activity-detail {
+  display: grid;
+  gap: var(--space-5);
+  padding: var(--space-6);
+  margin: var(--space-4) 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+}
+
+.schedule-detail-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.schedule-detail-grid > div { border-bottom: 1px solid var(--color-border); }
+.schedule-detail-grid strong { overflow-wrap: anywhere; }
+
+.schedule-dependencies { display: grid; gap: var(--space-2); padding: 0; margin: 0; list-style: none; }
+
+.schedule-dependencies li {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+}
+
+.schedule-dependencies strong { color: var(--brand-600); }
+
+@media (max-width: 1100px) {
   .schedule-context { grid-template-columns: repeat(3, 1fr); }
   .schedule-kpis { grid-template-columns: repeat(2, 1fr); }
   .schedule-toolbar { grid-template-columns: repeat(3, 1fr); }
@@ -70,18 +522,23 @@
 }
 
 @media (max-width: 720px) {
-  .schedule-page-heading, .schedule-command-form__heading { align-items: stretch; flex-direction: column; }
-  .page-heading__actions, .schedule-heading-actions { justify-content: stretch; }.page-heading__actions > *, .schedule-heading-actions > * { flex: 1; }
-  .schedule-loading { grid-template-columns: 1fr; }.schedule-loading div:not(:first-child) { display: none; }
-  .schedule-context { grid-template-columns: repeat(2, 1fr); }.schedule-context > div:first-child { grid-column: 1 / -1; }
+  .schedule-command-form__heading { align-items: stretch; flex-direction: column; }
+  .schedule-loading, .risk-change-loading { grid-template-columns: 1fr; }
+  .schedule-loading div:not(:first-child), .risk-change-loading span:not(:first-child) { display: none; }
+  .schedule-context { grid-template-columns: repeat(2, 1fr); }
+  .schedule-context > div:first-child { grid-column: 1 / -1; }
   .schedule-kpis, .schedule-toolbar, .schedule-form-grid, .schedule-detail-grid, .schedule-alerts__grid { grid-template-columns: 1fr; }
-  .schedule-toolbar__checks, .schedule-form-grid__wide { grid-column: auto; }.schedule-toolbar__checks { align-items: flex-start; flex-direction: column; }
-  .schedule-mobile-boundary { display: block; }.desktop-command { display: none !important; }
-  .schedule-issues li { grid-template-columns: 1fr; }
-  .schedule-preview-issues li { grid-template-columns: 1fr; }.schedule-inline-conflict { align-items: stretch; flex-direction: column; }
-  .schedule-workspace { padding: 15px; }
-  .schedule-gantt { overflow-x: auto; }.schedule-gantt__legend { position: sticky; left: 0; width: 100%; min-width: 320px; }
-  .schedule-gantt__header, .schedule-gantt__row { grid-template-columns: minmax(240px, 1fr) 100px; min-width: 340px; }.schedule-gantt__header span:nth-child(2), .schedule-gantt__track { display: none; }.schedule-gantt__progress { border-left: 1px solid #e7ebe3; }
-  .baseline-snapshot { grid-template-columns: 1fr; }.baseline-snapshot > div { border-right: 0; border-bottom: 1px solid var(--color-border); }
+  .schedule-toolbar__checks, .schedule-form-grid__wide { grid-column: auto; }
+  .schedule-toolbar__checks { align-items: flex-start; flex-direction: column; }
+  .schedule-mobile-boundary { display: block; }
+  .desktop-command { display: none !important; }
+  .schedule-issues li, .schedule-preview-issues li { grid-template-columns: 1fr; }
+  .schedule-inline-conflict { align-items: stretch; flex-direction: column; }
+  .schedule-workspace { padding: var(--space-4); }
+  .schedule-gantt__legend { position: sticky; left: 0; width: 100%; min-width: 320px; }
+  .schedule-gantt__header, .schedule-gantt__row { grid-template-columns: minmax(240px, 1fr) 100px; min-width: 340px; }
+  .schedule-gantt__header span:nth-child(2), .schedule-gantt__track { display: none; }
+  .baseline-snapshot { grid-template-columns: 1fr; }
+  .baseline-snapshot > div { border-right: 0; border-bottom: 1px solid var(--color-border); }
   .schedule-dependencies li { grid-template-columns: 1fr; }
 }

@@ -36,14 +36,6 @@
   box-shadow: var(--shadow-md);
 }
 
-.operations-panel .detail-heading small {
-  color: var(--brand-500);
-  font-weight: 900;
-  letter-spacing: .1em;
-}
-
-.operations-panel .detail-heading h2 { margin: var(--space-1) 0; }
-
 .operations-form,
 .operations-inline-form {
   display: grid;
